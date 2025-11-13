@@ -1,0 +1,471 @@
+{
+  "x-generator": "NSwag v14.6.2.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))",
+  "openapi": "3.0.0",
+  "info": {
+    "title": "My Title",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/Login": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "Auth_Login",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JwtResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Register": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "Auth_Register",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JwtResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/WhoAmI": {
+      "post": {
+        "tags": [
+          "Auth"
+        ],
+        "operationId": "Auth_WhoAmI",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JwtClaims"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GetBooks": {
+      "post": {
+        "tags": [
+          "Library"
+        ],
+        "operationId": "Library_GetBooks",
+        "requestBody": {
+          "x-name": "sieveModel",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SieveModel"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Book"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/CreateBook": {
+      "post": {
+        "tags": [
+          "Library"
+        ],
+        "operationId": "Library_CreateBook",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBookRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/UpdateBook": {
+      "put": {
+        "tags": [
+          "Library"
+        ],
+        "operationId": "Library_UpdateBook",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateBookRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/DeleteBook": {
+      "delete": {
+        "tags": [
+          "Library"
+        ],
+        "operationId": "Library_DeleteBook",
+        "parameters": [
+          {
+            "name": "bookId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Book"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "JwtResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          }
+        }
+      },
+      "LoginRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string"
+          }
+        }
+      },
+      "RegisterRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8
+          }
+        }
+      },
+      "JwtClaims": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "Book": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "pages": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "createdat": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "genreid": {
+            "type": "string",
+            "nullable": true
+          },
+          "genre": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Genre"
+              }
+            ]
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Author"
+            }
+          }
+        }
+      },
+      "Genre": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdat": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "books": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Book"
+            }
+          }
+        }
+      },
+      "Author": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "createdat": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "books": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Book"
+            }
+          }
+        }
+      },
+      "SieveModel": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SieveModelOfFilterTermAndSortTerm"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "SieveModelOfFilterTermAndSortTerm": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "filters": {
+            "type": "string",
+            "nullable": true
+          },
+          "sorts": {
+            "type": "string",
+            "nullable": true
+          },
+          "page": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "nullable": true
+          },
+          "pageSize": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 2147483647.0,
+            "minimum": 1.0,
+            "nullable": true
+          }
+        }
+      },
+      "CreateBookRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pages",
+          "title"
+        ],
+        "properties": {
+          "pages": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 2147483647.0,
+            "minimum": 1.0
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "UpdateBookRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "bookIdForLookupReference",
+          "newPageCount",
+          "newTitle",
+          "authorsIds"
+        ],
+        "properties": {
+          "bookIdForLookupReference": {
+            "type": "string",
+            "minLength": 1
+          },
+          "newPageCount": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 2147483647.0,
+            "minimum": 1.0
+          },
+          "newTitle": {
+            "type": "string",
+            "minLength": 1
+          },
+          "authorsIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "genreId": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SieveConstants": {
+        "type": "object",
+        "description": "String constants from SieveConstants",
+        "additionalProperties": false,
+        "properties": {
+          "GenreName": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Constant value: \"GenreName\"",
+            "default": "GenreName"
+          },
+          "GenreId": {
+            "type": "string",
+            "readOnly": true,
+            "description": "Constant value: \"GenreId\"",
+            "default": "GenreId"
+          }
+        },
+        "x-constant-values": {
+          "GenreName": "GenreName",
+          "GenreId": "GenreId"
+        }
+      }
+    }
+  }
+}
