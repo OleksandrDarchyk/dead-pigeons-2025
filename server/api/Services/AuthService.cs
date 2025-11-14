@@ -5,6 +5,7 @@ using System.Text.Json;
 using api.Models;
 using api.Models.Requests;
 using dataccess;
+using dataccess.Entities;
 using JWT;
 using JWT.Algorithms;
 using JWT.Builder;
