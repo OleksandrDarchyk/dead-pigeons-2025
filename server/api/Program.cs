@@ -19,19 +19,21 @@ public class Program
             opts.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.Preserve;
             opts.JsonSerializerOptions.MaxDepth = 128;
         });
-        services.AddOpenApiDocument(config => { config.AddStringConstants(typeof(SieveConstants)); });
-        services.AddCors();
-        services.AddScoped<ILibraryService, LibraryService>();
-        services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<ISeeder, SieveTestSeeder>();
-        services.AddExceptionHandler<GlobalExceptionHandler>();
-        services.Configure<SieveOptions>(options =>
+        services.AddOpenApiDocument(options =>
         {
-            options.CaseSensitive = false;
-            options.DefaultPageSize = 10;
-            options.MaxPageSize = 100;
-        });
-        services.AddScoped<ISieveProcessor, ApplicationSieveProcessor>();
+            options.Title = "Dead Pigeons API";
+        });       
+        services.AddCors();
+        services.AddScoped<IAuthService, AuthService>();
+        //we can delete later"services.AddScoped<ISeeder, SieveTestSeeder>();
+        services.AddExceptionHandler<GlobalExceptionHandler>();
+        //we can delete later  services.Configure<SieveOptions>(options =>
+        // {
+        //     options.CaseSensitive = false;
+        //     options.DefaultPageSize = 10;
+        //     options.MaxPageSize = 100;
+        // });
+        // services.AddScoped<ISieveProcessor, ApplicationSieveProcessor>();
     }
 
     public static void Main()
@@ -47,12 +49,12 @@ public class Program
         );
         app.UseCors(config => config.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin().SetIsOriginAllowed(x => true));
         app.MapControllers();
-        app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts").GetAwaiter().GetResult();
-        if (app.Environment.IsDevelopment())
-            using (var scope = app.Services.CreateScope())
-            {
-                scope.ServiceProvider.GetRequiredService<ISeeder>().Seed().GetAwaiter().GetResult();
-            }
+        // app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts").GetAwaiter().GetResult();
+        // we can delete later if (app.Environment.IsDevelopment())
+        //     using (var scope = app.Services.CreateScope())
+        //     {
+        //         scope.ServiceProvider.GetRequiredService<ISeeder>().Seed().GetAwaiter().GetResult();
+        //     }
 
         app.Run();
     }
