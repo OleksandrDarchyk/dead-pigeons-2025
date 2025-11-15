@@ -26,7 +26,18 @@ public class Program
         services.AddCors();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ISeeder, SieveTestSeeder>();
-        services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddScoped<IPlayerService, PlayerService>();
+        services.AddScoped<IGameService, GameService>();
+        services.AddScoped<IAuthService, AuthService>();
+        services.AddScoped<ISeeder, SieveTestSeeder>();
+        services.AddScoped<IPlayerService, PlayerService>();
+        services.AddScoped<IGameService, GameService>();
+        services.AddScoped<IBoardService, BoardService>();
+        services.AddScoped<ITransactionService, TransactionService>();
+
+        //services.AddScoped<IBoardService, BoardService>();
+        //services.AddScoped<ITransactionService, TransactionService>();
+        //services.AddExceptionHandler<GlobalExceptionHandler>();
         //we can delete later  services.Configure<SieveOptions>(options =>
         // {
         //     options.CaseSensitive = false;
