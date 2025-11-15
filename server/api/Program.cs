@@ -12,7 +12,7 @@ public class Program
     public static void ConfigureServices(IServiceCollection services)
     {
         services.AddSingleton(TimeProvider.System);
-        services.InjectAppOptions();
+        services.InjectAppOptions();//here we use appOptions
         services.AddMyDbContext();
         services.AddControllers().AddJsonOptions(opts =>
         {
@@ -25,7 +25,7 @@ public class Program
         });       
         services.AddCors();
         services.AddScoped<IAuthService, AuthService>();
-        //we can delete later"services.AddScoped<ISeeder, SieveTestSeeder>();
+        services.AddScoped<ISeeder, SieveTestSeeder>();
         services.AddExceptionHandler<GlobalExceptionHandler>();
         //we can delete later  services.Configure<SieveOptions>(options =>
         // {
@@ -49,13 +49,22 @@ public class Program
         );
         app.UseCors(config => config.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin().SetIsOriginAllowed(x => true));
         app.MapControllers();
-        // app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts").GetAwaiter().GetResult();
-        // we can delete later if (app.Environment.IsDevelopment())
-        //     using (var scope = app.Services.CreateScope())
-        //     {
-        //         scope.ServiceProvider.GetRequiredService<ISeeder>().Seed().GetAwaiter().GetResult();
-        //     }
+        app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts").GetAwaiter().GetResult();
+        app.MapControllers();
+
+        if (app.Environment.IsDevelopment())
+        {
+            app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts")
+                .GetAwaiter()
+                .GetResult();
+
+            using var scope = app.Services.CreateScope();
+            var seeder = scope.ServiceProvider.GetRequiredService<ISeeder>();
+            seeder.Seed().GetAwaiter().GetResult();
+        }
 
         app.Run();
+
+
     }
 }
