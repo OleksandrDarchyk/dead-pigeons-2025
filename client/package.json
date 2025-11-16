@@ -1,5 +1,5 @@
 {
-  "name": "client",
+  "name": "dead-pigeons-client",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -32,6 +32,7 @@
     "dependency-cruiser": "^17.2.0",
     "globals": "^16.0.0",
     "typescript": "^5.9.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "vitest": "^4.0.9"
   }
 }
