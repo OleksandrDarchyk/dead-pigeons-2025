@@ -108,18 +108,18 @@
 <path fill="none" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" d="M229.95,-78C240.57,-78 252.99,-78 264.46,-78"/>
 <polygon fill="#000000" fill-opacity="0.200000" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" points="264.38,-80.1 270.38,-78 264.38,-75.9 264.38,-80.1"/>
 </g>
-<!-- src/utilities/libraryApi.ts -->
+<!-- src/utilities/playersApi.ts -->
 <g id="node6" class="node">
-<title>src/utilities/libraryApi.ts</title>
-<g id="a_node6"><a xlink:href="src/utilities/libraryApi.ts" xlink:title="libraryApi.ts">
+<title>src/utilities/playersApi.ts</title>
+<g id="a_node6"><a xlink:href="src/utilities/playersApi.ts" xlink:title="playersApi.ts">
 <path fill="#ddfeff" stroke="black" d="M328.58,-118.62C328.58,-118.62 275.92,-118.62 275.92,-118.62 272.71,-118.62 269.5,-115.42 269.5,-112.21 269.5,-112.21 269.5,-105.79 269.5,-105.79 269.5,-102.58 272.71,-99.38 275.92,-99.38 275.92,-99.38 328.58,-99.38 328.58,-99.38 331.79,-99.38 335,-102.58 335,-105.79 335,-105.79 335,-112.21 335,-112.21 335,-115.42 331.79,-118.62 328.58,-118.62"/>
-<text text-anchor="start" x="277.5" y="-106.08" font-family="Helvetica,sans-Serif" font-size="9.00">libraryApi.ts</text>
+<text text-anchor="start" x="277.5" y="-106.08" font-family="Helvetica,sans-Serif" font-size="9.00">playersApi.ts</text>
 </a>
 </g>
 </g>
-<!-- src/components/routes/auth/Auth.tsx&#45;&gt;src/utilities/libraryApi.ts -->
+<!-- src/components/routes/auth/Auth.tsx&#45;&gt;src/utilities/playersApi.ts -->
 <g id="edge5" class="edge">
-<title>src/components/routes/auth/Auth.tsx&#45;&gt;src/utilities/libraryApi.ts</title>
+<title>src/components/routes/auth/Auth.tsx&#45;&gt;src/utilities/playersApi.ts</title>
 <path fill="none" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" d="M229.95,-86.39C239.59,-89.45 250.71,-92.97 261.26,-96.32"/>
 <polygon fill="#000000" fill-opacity="0.200000" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" points="260.32,-98.22 266.67,-98.03 261.59,-94.22 260.32,-98.22"/>
 </g>
@@ -159,21 +159,21 @@
 <path fill="none" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" d="M330.05,-87.98C336.81,-90.5 344.18,-93.24 351.29,-95.89"/>
 <polygon fill="#000000" fill-opacity="0.200000" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" points="350.27,-97.75 356.63,-97.88 351.74,-93.82 350.27,-97.75"/>
 </g>
-<!-- src/utilities/libraryApi.ts&#45;&gt;src/core/generated&#45;client.ts -->
+<!-- src/utilities/playersApi.ts&#45;&gt;src/core/generated&#45;client.ts -->
 <g id="edge13" class="edge">
-<title>src/utilities/libraryApi.ts&#45;&gt;src/core/generated&#45;client.ts</title>
+<title>src/utilities/playersApi.ts&#45;&gt;src/core/generated&#45;client.ts</title>
 <path fill="none" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" d="M327.51,-98.96C330.14,-97.46 332.7,-95.81 335,-94 342.21,-88.35 339.99,-82.45 348,-78 382.07,-59.07 398.87,-81.62 435,-67 439.12,-65.33 439.02,-62.97 443,-61 444.15,-60.43 445.32,-59.88 446.52,-59.35"/>
 <polygon fill="#000000" fill-opacity="0.200000" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" points="447.02,-61.41 451.8,-57.22 445.45,-57.51 447.02,-61.41"/>
 </g>
-<!-- src/utilities/libraryApi.ts&#45;&gt;src/core/baseUrl.ts -->
+<!-- src/utilities/playersApi.ts&#45;&gt;src/core/baseUrl.ts -->
 <g id="edge12" class="edge">
-<title>src/utilities/libraryApi.ts&#45;&gt;src/core/baseUrl.ts</title>
+<title>src/utilities/playersApi.ts&#45;&gt;src/core/baseUrl.ts</title>
 <path fill="none" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" d="M328.03,-98.97C334.44,-96.7 341.41,-94.51 348,-93 385.41,-84.42 429.22,-80.41 459.4,-78.55"/>
 <polygon fill="#000000" fill-opacity="0.200000" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" points="459.41,-80.66 465.28,-78.22 459.17,-76.46 459.41,-80.66"/>
 </g>
-<!-- src/utilities/libraryApi.ts&#45;&gt;src/utilities/customFetch.ts -->
+<!-- src/utilities/playersApi.ts&#45;&gt;src/utilities/customFetch.ts -->
 <g id="edge14" class="edge">
-<title>src/utilities/libraryApi.ts&#45;&gt;src/utilities/customFetch.ts</title>
+<title>src/utilities/playersApi.ts&#45;&gt;src/utilities/customFetch.ts</title>
 <path fill="none" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" d="M335.2,-109C336.33,-109 337.48,-109 338.63,-109"/>
 <polygon fill="#000000" fill-opacity="0.200000" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" points="338.5,-111.1 344.5,-109 338.5,-106.9 338.5,-111.1"/>
 </g>
