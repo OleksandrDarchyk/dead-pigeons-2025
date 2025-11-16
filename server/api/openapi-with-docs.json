@@ -2,7 +2,7 @@
   "x-generator": "NSwag v14.6.2.0 (NJsonSchema v11.5.2.0 (Newtonsoft.Json v13.0.0.0))",
   "openapi": "3.0.0",
   "info": {
-    "title": "My Title",
+    "title": "Dead Pigeons API",
     "version": "1.0.0"
   },
   "paths": {
@@ -90,53 +90,18 @@
         }
       }
     },
-    "/GetBooks": {
+    "/CreateBoard": {
       "post": {
         "tags": [
-          "Library"
+          "Board"
         ],
-        "operationId": "Library_GetBooks",
-        "requestBody": {
-          "x-name": "sieveModel",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/SieveModel"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/Book"
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/CreateBook": {
-      "post": {
-        "tags": [
-          "Library"
-        ],
-        "operationId": "Library_CreateBook",
+        "operationId": "Board_CreateBoard",
         "requestBody": {
           "x-name": "dto",
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/CreateBookRequestDto"
+                "$ref": "#/components/schemas/CreateBoardRequestDto"
               }
             }
           },
@@ -149,7 +114,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Book"
+                  "$ref": "#/components/schemas/Board"
                 }
               }
             }
@@ -157,47 +122,15 @@
         }
       }
     },
-    "/UpdateBook": {
-      "put": {
+    "/GetBoardsForGame": {
+      "get": {
         "tags": [
-          "Library"
+          "Board"
         ],
-        "operationId": "Library_UpdateBook",
-        "requestBody": {
-          "x-name": "dto",
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateBookRequestDto"
-              }
-            }
-          },
-          "required": true,
-          "x-position": 1
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Book"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/DeleteBook": {
-      "delete": {
-        "tags": [
-          "Library"
-        ],
-        "operationId": "Library_DeleteBook",
+        "operationId": "Board_GetBoardsForGame",
         "parameters": [
           {
-            "name": "bookId",
+            "name": "gameId",
             "in": "query",
             "schema": {
               "type": "string"
@@ -211,7 +144,514 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Book"
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Board"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GetBoardsForPlayer": {
+      "get": {
+        "tags": [
+          "Board"
+        ],
+        "operationId": "Board_GetBoardsForPlayer",
+        "parameters": [
+          {
+            "name": "playerId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Board"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GetActiveGame": {
+      "get": {
+        "tags": [
+          "Games"
+        ],
+        "operationId": "Games_GetActiveGame",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Game"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GetGamesHistory": {
+      "get": {
+        "tags": [
+          "Games"
+        ],
+        "operationId": "Games_GetGamesHistory",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Game"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/SetWinningNumbers": {
+      "post": {
+        "tags": [
+          "Games"
+        ],
+        "operationId": "Games_SetWinningNumbers",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetWinningNumbersRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Game"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/CreatePlayer": {
+      "post": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_CreatePlayer",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePlayerRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Player"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GetPlayers": {
+      "get": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_GetPlayers",
+        "parameters": [
+          {
+            "name": "isActive",
+            "in": "query",
+            "schema": {
+              "type": "boolean",
+              "nullable": true
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Player"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GetPlayerById": {
+      "get": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_GetPlayerById",
+        "parameters": [
+          {
+            "name": "playerId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Player"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ActivatePlayer": {
+      "post": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_ActivatePlayer",
+        "parameters": [
+          {
+            "name": "playerId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Player"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/DeactivatePlayer": {
+      "post": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_DeactivatePlayer",
+        "parameters": [
+          {
+            "name": "playerId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Player"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/DeletePlayer": {
+      "post": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_DeletePlayer",
+        "parameters": [
+          {
+            "name": "playerId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Player"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/UpdatePlayer": {
+      "post": {
+        "tags": [
+          "Players"
+        ],
+        "operationId": "Players_UpdatePlayer",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePlayerRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Player"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/CreateTransaction": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "operationId": "Transactions_CreateTransaction",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransactionRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ApproveTransaction": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "operationId": "Transactions_ApproveTransaction",
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/RejectTransaction": {
+      "post": {
+        "tags": [
+          "Transactions"
+        ],
+        "operationId": "Transactions_RejectTransaction",
+        "parameters": [
+          {
+            "name": "transactionId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Transaction"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GetTransactionsForPlayer": {
+      "get": {
+        "tags": [
+          "Transactions"
+        ],
+        "operationId": "Transactions_GetTransactionsForPlayer",
+        "parameters": [
+          {
+            "name": "playerId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Transaction"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GetPendingTransactions": {
+      "get": {
+        "tags": [
+          "Transactions"
+        ],
+        "operationId": "Transactions_GetPendingTransactions",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Transaction"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/GetPlayerBalance": {
+      "get": {
+        "tags": [
+          "Transactions"
+        ],
+        "operationId": "Transactions_GetPlayerBalance",
+        "parameters": [
+          {
+            "name": "playerId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerBalanceResponseDto"
                 }
               }
             }
@@ -246,10 +686,15 @@
       "RegisterRequestDto": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "email",
+          "password"
+        ],
         "properties": {
           "email": {
             "type": "string",
-            "format": "email"
+            "format": "email",
+            "minLength": 1
           },
           "password": {
             "type": "string",
@@ -266,204 +711,357 @@
           }
         }
       },
-      "Book": {
+      "Board": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string"
           },
-          "title": {
-            "type": "string"
+          "playerid": {
+            "type": "string",
+            "nullable": true
           },
-          "pages": {
+          "gameid": {
+            "type": "string",
+            "nullable": true
+          },
+          "numbers": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "price": {
             "type": "integer",
             "format": "int32"
           },
+          "iswinning": {
+            "type": "boolean"
+          },
+          "repeatweeks": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "repeatactive": {
+            "type": "boolean"
+          },
           "createdat": {
             "type": "string",
-            "format": "date-time"
-          },
-          "genreid": {
-            "type": "string",
+            "format": "date-time",
             "nullable": true
           },
-          "genre": {
+          "deletedat": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "game": {
             "nullable": true,
             "oneOf": [
               {
-                "$ref": "#/components/schemas/Genre"
+                "$ref": "#/components/schemas/Game"
               }
             ]
           },
-          "authors": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Author"
-            }
+          "player": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Player"
+              }
+            ]
           }
         }
       },
-      "Genre": {
+      "Game": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string"
           },
-          "name": {
-            "type": "string"
+          "weeknumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "winningnumbers": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "isactive": {
+            "type": "boolean"
           },
           "createdat": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
-          "books": {
+          "closedat": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedat": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "boards": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/Book"
+              "$ref": "#/components/schemas/Board"
             }
           }
         }
       },
-      "Author": {
+      "Player": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string"
           },
-          "name": {
+          "fullname": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "isactive": {
+            "type": "boolean"
+          },
+          "activatedat": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdat": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedat": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "boards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Board"
+            }
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Transaction"
+            }
+          }
+        }
+      },
+      "Transaction": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "playerid": {
+            "type": "string",
+            "nullable": true
+          },
+          "mobilepaynumber": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "status": {
             "type": "string"
           },
           "createdat": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "nullable": true
           },
-          "books": {
+          "approvedat": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "deletedat": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "player": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/Player"
+              }
+            ]
+          }
+        }
+      },
+      "CreateBoardRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "playerId",
+          "gameId",
+          "numbers"
+        ],
+        "properties": {
+          "playerId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "gameId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "numbers": {
             "type": "array",
+            "maxItems": 8,
+            "minItems": 5,
             "items": {
-              "$ref": "#/components/schemas/Book"
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "repeatWeeks": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 2147483647.0,
+            "minimum": 0.0
+          }
+        }
+      },
+      "SetWinningNumbersRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "gameId",
+          "winningNumbers"
+        ],
+        "properties": {
+          "gameId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "winningNumbers": {
+            "type": "array",
+            "maxItems": 3,
+            "minItems": 3,
+            "items": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         }
       },
-      "SieveModel": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/SieveModelOfFilterTermAndSortTerm"
-          },
-          {
-            "type": "object",
-            "additionalProperties": false
-          }
-        ]
-      },
-      "SieveModelOfFilterTermAndSortTerm": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "filters": {
-            "type": "string",
-            "nullable": true
-          },
-          "sorts": {
-            "type": "string",
-            "nullable": true
-          },
-          "page": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 2147483647.0,
-            "minimum": 1.0,
-            "nullable": true
-          },
-          "pageSize": {
-            "type": "integer",
-            "format": "int32",
-            "maximum": 2147483647.0,
-            "minimum": 1.0,
-            "nullable": true
-          }
-        }
-      },
-      "CreateBookRequestDto": {
+      "CreatePlayerRequestDto": {
         "type": "object",
         "additionalProperties": false,
         "required": [
-          "pages",
-          "title"
+          "fullName",
+          "email",
+          "phone"
         ],
         "properties": {
-          "pages": {
+          "fullName": {
+            "type": "string",
+            "minLength": 3
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 1
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 5
+          }
+        }
+      },
+      "UpdatePlayerRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "fullName",
+          "phone"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "fullName": {
+            "type": "string",
+            "minLength": 3
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 5
+          }
+        }
+      },
+      "CreateTransactionRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "playerId",
+          "mobilePayNumber"
+        ],
+        "properties": {
+          "playerId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mobilePayNumber": {
+            "type": "string",
+            "minLength": 3
+          },
+          "amount": {
             "type": "integer",
             "format": "int32",
             "maximum": 2147483647.0,
             "minimum": 1.0
-          },
-          "title": {
-            "type": "string",
-            "minLength": 1
           }
         }
       },
-      "UpdateBookRequestDto": {
+      "PlayerBalanceResponseDto": {
         "type": "object",
         "additionalProperties": false,
-        "required": [
-          "bookIdForLookupReference",
-          "newPageCount",
-          "newTitle",
-          "authorsIds"
-        ],
         "properties": {
-          "bookIdForLookupReference": {
-            "type": "string",
-            "minLength": 1
+          "playerId": {
+            "type": "string"
           },
-          "newPageCount": {
+          "balance": {
             "type": "integer",
-            "format": "int32",
-            "maximum": 2147483647.0,
-            "minimum": 1.0
-          },
-          "newTitle": {
-            "type": "string",
-            "minLength": 1
-          },
-          "authorsIds": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "genreId": {
-            "type": "string",
-            "nullable": true
+            "format": "int32"
           }
-        }
-      },
-      "SieveConstants": {
-        "type": "object",
-        "description": "String constants from SieveConstants",
-        "additionalProperties": false,
-        "properties": {
-          "GenreName": {
-            "type": "string",
-            "readOnly": true,
-            "description": "Constant value: \"GenreName\"",
-            "default": "GenreName"
-          },
-          "GenreId": {
-            "type": "string",
-            "readOnly": true,
-            "description": "Constant value: \"GenreId\"",
-            "default": "GenreId"
-          }
-        },
-        "x-constant-values": {
-          "GenreName": "GenreName",
-          "GenreId": "GenreId"
         }
       }
     }
