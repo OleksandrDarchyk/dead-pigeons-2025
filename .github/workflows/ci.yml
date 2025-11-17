@@ -19,3 +19,6 @@ jobs:
 
       - name: Install dependencies
         run: npm clean-install --prefix=client
+
+      - name: Build
+        run: npm run build --prefix=client
