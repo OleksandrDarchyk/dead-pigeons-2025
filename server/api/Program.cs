@@ -31,7 +31,7 @@ public class Program
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<ITransactionService, TransactionService>();
         
-        //services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddExceptionHandler<GlobalExceptionHandler>();
         //we can delete later  services.Configure<SieveOptions>(options =>
         // {
         //     options.CaseSensitive = false;
@@ -47,7 +47,7 @@ public class Program
 
         ConfigureServices(builder.Services);
         var app = builder.Build();
-        app.UseExceptionHandler(config => { });
+        app.UseExceptionHandler(); 
         app.UseOpenApi();
         app.UseSwaggerUi();
         app.MapScalarApiReference(options => options.OpenApiRoutePattern = "/swagger/v1/swagger.json"
