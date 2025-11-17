@@ -28,16 +28,10 @@ public class Program
         services.AddScoped<ISeeder, SieveTestSeeder>();
         services.AddScoped<IPlayerService, PlayerService>();
         services.AddScoped<IGameService, GameService>();
-        services.AddScoped<IAuthService, AuthService>();
-        services.AddScoped<ISeeder, SieveTestSeeder>();
-        services.AddScoped<IPlayerService, PlayerService>();
-        services.AddScoped<IGameService, GameService>();
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<ITransactionService, TransactionService>();
-
-        //services.AddScoped<IBoardService, BoardService>();
-        //services.AddScoped<ITransactionService, TransactionService>();
-        //services.AddExceptionHandler<GlobalExceptionHandler>();
+        
+        services.AddExceptionHandler<GlobalExceptionHandler>();
         //we can delete later  services.Configure<SieveOptions>(options =>
         // {
         //     options.CaseSensitive = false;
@@ -53,14 +47,12 @@ public class Program
 
         ConfigureServices(builder.Services);
         var app = builder.Build();
-        app.UseExceptionHandler(config => { });
+        app.UseExceptionHandler(); 
         app.UseOpenApi();
         app.UseSwaggerUi();
         app.MapScalarApiReference(options => options.OpenApiRoutePattern = "/swagger/v1/swagger.json"
         );
         app.UseCors(config => config.AllowAnyHeader().AllowAnyMethod().AllowAnyOrigin().SetIsOriginAllowed(x => true));
-        app.MapControllers();
-        app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts").GetAwaiter().GetResult();
         app.MapControllers();
 
         if (app.Environment.IsDevelopment())

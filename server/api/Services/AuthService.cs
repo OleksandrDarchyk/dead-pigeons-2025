@@ -24,6 +24,12 @@ public class AuthService(
     {
         if (string.IsNullOrWhiteSpace(token))
             throw new ValidationException("No token attached!");
+        
+        const string bearerPrefix = "Bearer ";
+        if (token.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            token = token.Substring(bearerPrefix.Length);
+        }
 
         var builder = CreateJwtBuilder();
 
