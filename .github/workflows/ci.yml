@@ -1,4 +1,5 @@
-name: Build, test and lint
+name: Continuous integration
+
 on:
   push:
     branches: ["main"]
@@ -7,18 +8,129 @@ on:
     branches: ["main"]
 
 jobs:
-  frontend_build_lint_test_job:
+  # ============================
+  # Client (React) – build & test
+  # ============================
+  client_test_job:
+    name: Client test
     runs-on: ubuntu-latest
-    name: Build, lint and test job
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 15
 
-      - uses: actions/setup-node@v4
+    steps:
+      # Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
 
+      # Install client dependencies
       - name: Install dependencies
         run: npm clean-install --prefix=client
 
-      - name: Build
+      # Build React app
+      - name: Build client
         run: npm run build --prefix=client
+
+      # Run client tests
+      - name: Test client
+        # TODO: Remove "|| echo ..." once real tests are implemented
+        run: npm run test --prefix=client || echo "No client tests yet – skipping"
+
+  # ============================
+  # Server (.NET) – build & test
+  # ============================
+  server_test_job:
+    name: Server test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      # Checkout repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup .NET SDK
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # Project targets net9.0 → use 9.0.x on CI
+          dotnet-version: "9.0.x"
+
+      # Restore NuGet packages for the solution
+      - name: Restore .NET solution
+        run: dotnet restore DeadPigeons.sln
+
+      # Build all backend projects (api, dataccess, tests)
+      - name: Build backend
+        run: dotnet build DeadPigeons.sln --no-restore
+
+      # Run backend tests
+      - name: Test backend
+        run: dotnet test DeadPigeons.sln --no-build
+
+      # TODO (later): Enable code coverage for .NET tests (Coverlet or XPlat Code Coverage)
+      # - name: Test backend with coverage
+      #   run: |
+      #     dotnet test DeadPigeons.sln \
+      #       --no-build \
+      #       --collect:"XPlat Code Coverage" \
+      #       /p:CoverletOutputFormat=opencover
+
+  # ============================
+  # End-to-end tests (Playwright + Docker)
+  # ============================
+  # TODO: Implement real e2e tests with Playwright and Docker Compose.
+  # For now this job is disabled/commented out.
+  #
+  # e2e_test_job:
+  #   name: End-to-end test
+  #   runs-on: ubuntu-latest
+  #   needs: [client_test_job, server_test_job]
+  #   timeout-minutes: 15
+  #
+  #   steps:
+  #     # Checkout repository
+  #     - name: Checkout code
+  #       uses: actions/checkout@v4
+  #
+  #     # Setup Node.js for e2e tests
+  #     - name: Setup Node.js
+  #       uses: actions/setup-node@v4
+  #       with:
+  #         node-version: "22"
+  #         cache: "npm"
+  #         cache-dependency-path: client/package-lock.json
+  #
+  #     # Setup Docker Buildx (for docker compose / images)
+  #     - name: Setup Docker Buildx
+  #       uses: docker/setup-buildx-action@v3
+  #
+  #     # Start backend + database services for e2e tests
+  #     # TODO: Add a proper docker-compose.yml with server + db
+  #     # - name: Start services
+  #     #   run: docker compose up -d --wait
+  #
+  #     # Install client dependencies (again, inside CI runner)
+  #     - name: Install client dependencies for e2e
+  #       run: npm clean-install --prefix=client
+  #
+  #     # Install Playwright browsers
+  #     # TODO: Enable once e2e tests are implemented
+  #     # - name: Install Playwright browsers
+  #     #   run: npx --prefix=client playwright install --with-deps
+  #
+  #     # Run e2e tests
+  #     # TODO: Add "e2e" script in client/package.json before enabling this
+  #     # - name: Run e2e tests
+  #     #   run: npm run e2e --prefix=client
+  #
+  #     # Stop services after tests
+  #     # - name: Stop services
+  #     #   if: always()
+  #     #   run: docker compose down

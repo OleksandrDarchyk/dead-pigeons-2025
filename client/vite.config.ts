@@ -16,3 +16,4 @@ export default defineConfig({
         }
     }
 })
+// TODO: Add test configuration (coverage, reporters, etc.)
