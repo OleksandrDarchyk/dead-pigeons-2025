@@ -78,7 +78,6 @@ public static class DiExtensions
 
         await File.WriteAllTextAsync(outputPath, code);
 
-
         var logger = app.Services.GetRequiredService<ILogger<Program>>();
         logger.LogInformation("OpenAPI JSON with documentation saved at: " + openApiPath);
         logger.LogInformation("TypeScript client generated at: " + outputPath);
@@ -138,20 +137,20 @@ public static class DiExtensions
 
     public static void AddMyDbContext(this IServiceCollection services)
     {
-        // читаємо середовище (Development / Production / etc)
+        // Read environment (Development / Production / etc)
         var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
     
-        // DOTNET_RUNNING_IN_CONTAINER = "true" коли код працює всередині Docker-контейнера
+        // DOTNET_RUNNING_IN_CONTAINER = "true" when code runs inside a Docker container
         var runningInContainer = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
 
         if (!runningInContainer && environment != "Production")
         {
-            // ЛОКАЛЬНИЙ DEV: тут у нас є Docker, можемо запускати Testcontainers
+            // LOCAL DEV: we have Docker here, so we can start Testcontainers
             var postgreSqlContainer = new PostgreSqlBuilder()
                 .WithDatabase("postgres")
                 .WithUsername("postgres")
                 .WithPassword("postgres")
-                .WithPortBinding("5432", true) // привʼязка до випадкового порта на хості
+                .WithPortBinding("5432", true) // bind to a random port on the host
                 .WithExposedPort("5432")
                 .Build();
 
@@ -167,17 +166,16 @@ public static class DiExtensions
         }
         else
         {
-            // ПРОД / будь-який контейнер (Fly, Docker-образ і т.д.)
+            // PROD / any container (Fly, Docker image, etc.)
             services.AddDbContext<MyDbContext>((sp, options) =>
             {
                 var appOptions = sp.GetRequiredService<AppOptions>();
-                // тут має бути нормальний connection string (Neon / Fly Postgres),
-                // який ми передамо через змінну середовища AppOptions__Db
+                // here we expect a proper connection string (Neon / Fly Postgres),
+                // which we pass through the AppOptions__Db environment variable
                 options.UseNpgsql(appOptions.Db);
             }, ServiceLifetime.Transient);
         }
     }
-
 
     public static void InjectAppOptions(this IServiceCollection services)
     {
