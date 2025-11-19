@@ -1,8 +1,8 @@
-// src/components/Home.tsx
+// src/components/HomeLayout.tsx
 import { Outlet } from 'react-router-dom';
-import AppHeader from '@components/layout/AppHeader';
+import AppHeader from '@components/layout/AppHeader.tsx';
 
-export default function Home() {
+export default function HomeLayout() {
     return (
         <div className="min-h-screen bg-white text-slate-900">
             {/* Global header for all pages */}

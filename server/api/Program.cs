@@ -32,6 +32,7 @@ public class Program
         services.AddScoped<ITransactionService, TransactionService>();
         
         services.AddExceptionHandler<GlobalExceptionHandler>();
+        services.AddProblemDetails();
         //we can delete later  services.Configure<SieveOptions>(options =>
         // {
         //     options.CaseSensitive = false;

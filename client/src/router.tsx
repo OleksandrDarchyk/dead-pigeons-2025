@@ -1,24 +1,23 @@
 // src/router.tsx
-
 import {
     createBrowserRouter,
     createRoutesFromElements,
     Route,
 } from "react-router-dom";
 
-// Correct paths
-import Home from "./components/home/Home";
-import LandingPage from "./components/home/LandingPage";
+import HomeLayout from "./components/layout/HomeLayout";
+import HomePage from "./pages/HomePage";
+import LoginPage from "./pages/LoginPage"; // 👈 додали
 
 const router = createBrowserRouter(
     createRoutesFromElements(
-        <Route path="/" element={<Home />}>
-            <Route index element={<LandingPage />} />
+        <Route path="/" element={<HomeLayout />}>
+            <Route index element={<HomePage />} />
 
-            {/* TODO: Add login route later */}
-            {/* <Route path="login" element={<LoginPage />} /> */}
+            {/* /login → наша форма логіну */}
+            <Route path="login" element={<LoginPage />} />
 
-            {/* TODO: Player and admin routes later */}
+            {/* TODO: Player and admin pages later */}
         </Route>
     )
 );

@@ -1,6 +1,6 @@
 // src/components/App.tsx
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Home from '@components/home/Home.tsx';
+import HomeLayout from '@components/layout/HomeLayout.tsx';
 
 // TODO: Create these components later.
 // import LoginPage from '@components/auth/LoginPage';
@@ -12,7 +12,7 @@ export default function App() {
         <BrowserRouter>
             <Routes>
                 {/* Root layout route */}
-                <Route path="/" element={<Home />}>
+                <Route path="/" element={<HomeLayout />}>
                     {/* Index = main landing page for now */}
                     <Route
                         index
