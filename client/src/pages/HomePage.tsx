@@ -1,7 +1,7 @@
-// src/components/home/LandingPage.tsx
-import HeroSection from './HeroSection';
+// src/components/home/HomePage.tsx
+import HeroSection from '../components/home/HeroSection';
 
-export default function LandingPage() {
+export default function HomePage() {
     return (
         <>
             <HeroSection />
