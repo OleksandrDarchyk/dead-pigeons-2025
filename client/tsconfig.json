@@ -4,17 +4,11 @@
     "disableSourceOfProjectReferenceRedirect": true
   },
   "references": [
-    {
-      "path": "./tsconfig.node.json"
-    },
-    {
-      "path": "./src/core/tsconfig.json"
-    },
-    {
-      "path": "./src/utilities/tsconfig.json"
-    },
-    {
-      "path": "./src/components/tsconfig.json"
-    }
+    { "path": "./tsconfig.node.json" },
+    { "path": "./src/core/tsconfig.json" },
+    { "path": "./src/utilities/tsconfig.json" },
+    { "path": "./src/components/tsconfig.json" },
+    { "path": "./src/atoms/tsconfig.json" },
+    { "path": "./src/pages/tsconfig.json" }
   ]
 }

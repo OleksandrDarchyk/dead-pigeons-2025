@@ -1,42 +1,61 @@
 // src/components/layout/AppHeader.tsx
-import { Link } from 'react-router-dom';
+import { Link } from "react-router-dom";
+import { useAuth } from "@atoms/auth";
 
 export default function AppHeader() {
+    const { user, logout } = useAuth();
+
+    // user може бути будь-чим, тому обережно дістаємо email
+    const email = (user as any)?.email as string | undefined;
+
+    const handleLogout = () => {
+        logout();
+    };
+
     return (
-        <header className="bg-white/80 backdrop-blur border-b border-slate-200 text-slate-900">
+        <header className="bg-slate-900 text-white">
             <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
                 {/* Logo + title */}
                 <Link to="/" className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 font-bold text-white">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-red-600 font-bold">
                         <span className="text-sm">DP</span>
                     </div>
                     <div className="leading-tight">
-                        <div className="text-sm font-semibold text-slate-900">
-                            Dead Pigeons
-                        </div>
-                        <div className="text-xs text-slate-400">
-                            Jerne IF
-                        </div>
+                        <div className="text-sm font-semibold">Dead Pigeons</div>
+                        <div className="text-xs text-slate-300">Jerne IF</div>
                     </div>
                 </Link>
 
-                {/* Simple navigation */}
-                <nav className="flex items-center gap-4">
-                    {/* TODO: Replace with NavLink when you want active state styling. */}
+                {/* Navigation + auth */}
+                <nav className="flex items-center gap-4 text-sm">
                     <Link
                         to="/"
-                        className="text-sm font-medium text-slate-600 hover:text-slate-900"
+                        className="font-medium text-slate-200 hover:text-white"
                     >
                         Home
                     </Link>
 
-                    {/* TODO: Connect this button with the real /login route later. */}
-                    <Link
-                        to="/login"
-                        className="rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 shadow-sm"
-                    >
-                        Login
-                    </Link>
+                    {email ? (
+                        <>
+                            <span className="hidden sm:inline text-xs text-slate-300">
+                                {email}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={handleLogout}
+                                className="rounded-full bg-slate-100 px-4 py-1.5 text-xs font-semibold text-slate-900 hover:bg-white shadow-sm"
+                            >
+                                Logout
+                            </button>
+                        </>
+                    ) : (
+                        <Link
+                            to="/login"
+                            className="rounded-full bg-white px-4 py-1.5 text-xs font-semibold text-slate-900 hover:bg-slate-100 shadow-sm"
+                        >
+                            Login
+                        </Link>
+                    )}
                 </nav>
             </div>
         </header>

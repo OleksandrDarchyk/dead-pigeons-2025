@@ -1,5 +1,5 @@
 // src/components/home/HeroSection.tsx
-import BoardPreview from "./BoardPreview";
+import BoardPreview from "./BoardPreview.tsx";
 import { Link } from "react-router-dom";
 
 export default function HeroSection() {

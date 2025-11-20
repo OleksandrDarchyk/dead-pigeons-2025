@@ -5,5 +5,12 @@
     "**/*.tsx",
     "../vite-env.d.ts"
   ],
-  "references": []
+  "references": [
+    {
+      "path": "../core"
+    },
+    {
+      "path": "../utilities"
+    }
+  ]
 }

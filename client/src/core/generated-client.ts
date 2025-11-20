@@ -874,6 +874,8 @@ export interface RegisterRequestDto {
 
 export interface JwtClaims {
     id: string;
+    email: string;
+    role: string;
 }
 
 export interface Board {

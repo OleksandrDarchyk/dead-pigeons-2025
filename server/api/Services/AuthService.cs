@@ -116,6 +116,8 @@ public class AuthService(
     {
         return CreateJwtBuilder()
             .AddClaim(nameof(User.Id), user.Id)
+            .AddClaim(nameof(User.Email), user.Email)
+            .AddClaim(nameof(User.Role), user.Role)
             .Encode();
     }
 }
