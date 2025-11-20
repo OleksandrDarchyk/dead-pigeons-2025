@@ -26,7 +26,9 @@
     "paths": {
       "@core/*": ["./src/core/*"],
       "@utilities/*": ["./src/utilities/*"],
-      "@components/*": ["./src/components/*"]
+      "@components/*": ["./src/components/*"],
+      "@pages/*": ["./src/pages/*"],
+      "@atoms/*": ["./src/atoms/*"]
     },
     /* Linting */
     "noImplicitAny": false,

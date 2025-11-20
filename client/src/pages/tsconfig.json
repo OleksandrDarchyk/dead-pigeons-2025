@@ -8,6 +8,15 @@
   "references": [
     {
       "path": "../core"
+    },
+    {
+      "path": "../utilities"
+    },
+    {
+      "path": "../atoms"
+    },
+    {
+      "path": "../components"
     }
   ]
 }

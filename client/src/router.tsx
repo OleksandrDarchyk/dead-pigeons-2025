@@ -6,8 +6,10 @@ import {
 } from "react-router-dom";
 
 import HomeLayout from "./components/layout/HomeLayout";
-import HomePage from "./pages/HomePage";
-import LoginPage from "./pages/LoginPage"; // 👈 додали
+import HomePage from "./pages/home/HomePage";
+import LoginPage from "./pages/auth/LoginPage";
+import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
+
 
 const router = createBrowserRouter(
     createRoutesFromElements(
@@ -16,8 +18,9 @@ const router = createBrowserRouter(
 
             {/* /login → наша форма логіну */}
             <Route path="login" element={<LoginPage />} />
+            <Route path="admin" element={<AdminDashboardPage />} />
 
-            {/* TODO: Player and admin pages later */}
+            {/* TODO: User  pages later */}
         </Route>
     )
 );

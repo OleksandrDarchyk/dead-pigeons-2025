@@ -2,9 +2,7 @@ import { atom } from "jotai";
 import { atomWithStorage, createJSONStorage } from "jotai/utils";
 import { useAtom } from "jotai";
 import { useNavigate } from "react-router-dom";
-import { authApi } from '../utilities/authApi';
-
-
+import { authApi } from "../utilities/authApi";
 // Types for login credentials
 export type Credentials = {
     email: string;

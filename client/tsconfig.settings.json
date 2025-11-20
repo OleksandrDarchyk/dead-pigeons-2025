@@ -6,7 +6,16 @@
     "composite": true,
     "incremental": true,
     "outDir": "./dist",
-    "rootDir": "."
+    "rootDir": ".",
+
+    "baseUrl": "./src",
+    "paths": {
+      "@atoms/*": ["atoms/*"],
+      "@components/*": ["components/*"],
+      "@core/*": ["core/*"],
+      "@utilities/*": ["utilities/*"],
+      "@pages/*": ["pages/*"]
+    }
   },
   "include": [
     "**/*.ts",

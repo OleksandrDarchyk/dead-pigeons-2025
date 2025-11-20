@@ -1,6 +1,7 @@
 // src/components/HomeLayout.tsx
 import { Outlet } from 'react-router-dom';
-import AppHeader from '@components/layout/AppHeader.tsx';
+import AppHeader from './AppHeader';
+
 
 export default function HomeLayout() {
     return (

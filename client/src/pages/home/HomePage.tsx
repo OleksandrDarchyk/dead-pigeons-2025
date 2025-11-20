@@ -1,5 +1,5 @@
 // src/components/home/HomePage.tsx
-import HeroSection from '../components/home/HeroSection';
+import HeroSection from './components/HeroSection.tsx';
 
 export default function HomePage() {
     return (
