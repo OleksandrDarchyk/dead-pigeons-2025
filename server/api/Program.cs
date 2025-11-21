@@ -22,7 +22,19 @@ public class Program
         services.AddOpenApiDocument(options =>
         {
             options.Title = "Dead Pigeons API";
-        });       
+
+            // add buttom Authorize
+            options.AddSecurity("JWT", Array.Empty<string>(), new NSwag.OpenApiSecurityScheme
+            {
+                Type = NSwag.OpenApiSecuritySchemeType.ApiKey,
+                Name = "Authorization",
+                In = NSwag.OpenApiSecurityApiKeyLocation.Header,
+                Description = "Write: Bearer {your token}"
+            });
+
+            // add token to all operations
+            options.OperationProcessors.Add(new NSwag.Generation.Processors.Security.AspNetCoreOperationSecurityScopeProcessor("JWT"));
+        });   
         services.AddCors();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<ISeeder, SieveTestSeeder>();
@@ -61,7 +73,7 @@ public class Program
             app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts")
                 .GetAwaiter()
                 .GetResult();
-
+        
             using var scope = app.Services.CreateScope();
             var seeder = scope.ServiceProvider.GetRequiredService<ISeeder>();
             seeder.Seed().GetAwaiter().GetResult();

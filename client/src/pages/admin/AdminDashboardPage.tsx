@@ -7,8 +7,6 @@ import WinningNumbersTab from "./tabs/WinningNumbersTab";
 import BoardsStatsTab from "./tabs/BoardsStatsTab";
 
 
-
-
 type AdminTab = "players" | "payments" | "winning" | "boards";
 
 function TabButton(props: {
@@ -37,7 +35,7 @@ export default function AdminDashboardPage() {
     const { user } = useAuth();
     const [tab, setTab] = useState<AdminTab>("players");
 
-    const role = (user as any)?.role as string | undefined;
+    const role = user?.role;
 
     if (!user) {
         return (
