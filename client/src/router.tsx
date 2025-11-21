@@ -16,12 +16,23 @@ const router = createBrowserRouter(
         <Route path="/" element={<HomeLayout />}>
             <Route index element={<HomePage />} />
 
-            {/* /login → наша форма логіну */}
+            {/* /login →  */}
             <Route path="login" element={<LoginPage />} />
+
+            {/* /admin →  */}
             <Route path="admin" element={<AdminDashboardPage />} />
 
-            {/* TODO: User  pages later */}
+            {/*TODO /player → тимчасова сторінка для гравця */}
+            <Route
+                path="player"
+                element={
+                    <div className="p-4 text-white">
+                        Player area – TODO (here will be boards, balance, etc.)
+                    </div>
+                }
+            />
         </Route>
+
     )
 );
 

@@ -7,8 +7,6 @@ import WinningNumbersTab from "./tabs/WinningNumbersTab";
 import BoardsStatsTab from "./tabs/BoardsStatsTab";
 
 
-
-
 type AdminTab = "players" | "payments" | "winning" | "boards";
 
 function TabButton(props: {

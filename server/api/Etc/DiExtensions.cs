@@ -137,44 +137,11 @@ public static class DiExtensions
 
     public static void AddMyDbContext(this IServiceCollection services)
     {
-        // Read environment (Development / Production / etc)
-        var environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT");
-    
-        // DOTNET_RUNNING_IN_CONTAINER = "true" when code runs inside a Docker container
-        var runningInContainer = Environment.GetEnvironmentVariable("DOTNET_RUNNING_IN_CONTAINER") == "true";
-
-        if (!runningInContainer && environment != "Production")
+        services.AddDbContext<MyDbContext>((sp, options) =>
         {
-            // LOCAL DEV: we have Docker here, so we can start Testcontainers
-            var postgreSqlContainer = new PostgreSqlBuilder()
-                .WithDatabase("postgres")
-                .WithUsername("postgres")
-                .WithPassword("postgres")
-                .WithPortBinding("5432", true) // bind to a random port on the host
-                .WithExposedPort("5432")
-                .Build();
-
-            postgreSqlContainer.StartAsync().GetAwaiter().GetResult();
-
-            var connectionString = postgreSqlContainer.GetConnectionString();
-            Console.WriteLine("Connecting to DB (Testcontainers): " + connectionString);
-
-            services.AddDbContext<MyDbContext>((sp, options) =>
-            {
-                options.UseNpgsql(connectionString);
-            });
-        }
-        else
-        {
-            // PROD / any container (Fly, Docker image, etc.)
-            services.AddDbContext<MyDbContext>((sp, options) =>
-            {
-                var appOptions = sp.GetRequiredService<AppOptions>();
-                // here we expect a proper connection string (Neon / Fly Postgres),
-                // which we pass through the AppOptions__Db environment variable
-                options.UseNpgsql(appOptions.Db);
-            }, ServiceLifetime.Transient);
-        }
+            var appOptions = sp.GetRequiredService<AppOptions>();
+            options.UseNpgsql(appOptions.Db);
+        });
     }
 
     public static void InjectAppOptions(this IServiceCollection services)

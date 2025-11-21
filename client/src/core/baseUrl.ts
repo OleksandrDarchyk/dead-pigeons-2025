@@ -1,7 +1,6 @@
 const isProduction = import.meta.env.PROD;
 
-// TODO: change this to your real Fly backend URL when you deploy
-const prod = "https://deadpigeons-server-one.fly.dev";
-const dev = "http://localhost:5284"; // keep this equal to your local .NET API port
+const prod = "https://dead-pigeons-server-one.fly.dev";
+const dev = "http://localhost:5284";
 
 export const baseUrl = isProduction ? prod : dev;
