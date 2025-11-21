@@ -5,8 +5,7 @@ import { useAuth } from "@atoms/auth";
 export default function AppHeader() {
     const { user, logout } = useAuth();
 
-    // user може бути будь-чим, тому обережно дістаємо email
-    const email = (user as any)?.email as string | undefined;
+    const email = user?.email;
 
     const handleLogout = () => {
         logout();
