@@ -1,29 +1,35 @@
-import type {ProblemDetails} from "@core/problemdetails.ts";
+import type { ProblemDetails } from "@core/problemdetails.ts";
 import toast from "react-hot-toast";
 
 /**
- * This fetch http client attaches JWT from localstorage
- * and toasts if http requests fail.
+ * HTTP client that:
+ * - attaches JWT from storage to Authorization header
+ * - shows toast if HTTP response is not ok
  */
 export const customFetch = {
     fetch(url: RequestInfo, init?: RequestInit): Promise<Response> {
-        const token = localStorage.getItem('jwt');
+        // Prefer sessionStorage (safer for exams),
+        // but also try localStorage as a fallback
+        const token =
+            sessionStorage.getItem("jwt") ?? localStorage.getItem("jwt");
+
+        // Start with existing headers (if any)
         const headers = new Headers(init?.headers);
 
-        // Only necessary change → add "Bearer"
+        // Attach Authorization header if token is present
         if (token) {
-            headers.set('Authorization', `Bearer ${token}`);
+            headers.set("Authorization", `Bearer ${token}`);
         }
 
         return fetch(url, {
             ...init,
-            headers
+            headers,
         }).then(async (response) => {
-
             if (!response.ok) {
                 try {
                     const errorClone = response.clone();
-                    const problemDetails = (await errorClone.json()) as ProblemDetails;
+                    const problemDetails =
+                        (await errorClone.json()) as ProblemDetails;
 
                     if (problemDetails?.title) {
                         toast(problemDetails.title);
@@ -37,5 +43,5 @@ export const customFetch = {
 
             return response;
         });
-    }
+    },
 };
