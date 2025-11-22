@@ -10,64 +10,81 @@ public class SieveTestSeeder(MyDbContext ctx, TimeProvider timeProvider) : ISeed
 {
     public async Task Seed()
     {
-        // 1) Create all tables in the current database (Testcontainers)
+        // 1) Ensure DB exists (Testcontainers)
         await ctx.Database.EnsureCreatedAsync();
 
-        // 2) Just in case, clear data (so each run starts from scratch)
+        // 2) CLEAR ALL DATA (test/dev only)
         ctx.Boards.RemoveRange(ctx.Boards);
         ctx.Transactions.RemoveRange(ctx.Transactions);
         ctx.Players.RemoveRange(ctx.Players);
         ctx.Games.RemoveRange(ctx.Games);
         ctx.Users.RemoveRange(ctx.Users);
+
         await ctx.SaveChangesAsync();
-
-        // 3) Create a test user for login
-        //    Email: test@user.dk
-        //    Password: Password123 (hashed the same way as in AuthService.Register)
-        var salt = Guid.NewGuid().ToString();
-        var password = "Password123";
-
-        var hashBytes = SHA512.HashData(
-            Encoding.UTF8.GetBytes(password + salt));
-
-        var passwordHash = hashBytes.Aggregate(
-            "",
-            (current, b) => current + b.ToString("x2"));
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        var user = new User
+        // ------------------------
+        // TEST USER
+        // ------------------------
+        var salt = Guid.NewGuid().ToString();
+        var testPassword = "Password123";
+
+        var testHashBytes = SHA512.HashData(
+            Encoding.UTF8.GetBytes(testPassword + salt));
+
+        var testHash = BitConverter
+            .ToString(testHashBytes)
+            .Replace("-", "")
+            .ToLower();
+
+        ctx.Users.Add(new User
         {
             Id = Guid.NewGuid().ToString(),
             Email = "test@user.dk",
             Salt = salt,
-            Passwordhash = passwordHash,
+            Passwordhash = testHash,
             Role = "User",
             Createdat = now
-        };
+        });
 
-        ctx.Users.Add(user);
+        // ------------------------
+        // FIXED ADMIN FOR DEV
+        // ------------------------
+        var adminId = "cbeaed9a-1466-4763-a3c9-3b10a26cf081";
+        var adminEmail = "a@dp.dk";
+        var adminSalt = "static-salt-admin";
 
-        // 4) (minimal) create one active Game,
-        //    so the frontend does not crash when it asks for an active game
-        var game = new Game
+        // Hash already computed correctly for Password123 + static-salt-admin
+        var adminHash =
+            "1b0b7aaebe570e09c7ee7d5c58604a373ec8dc3404b430e40df1f28c14d84a4294a0ff9e1a95491d806968f5c630d4ad723bb503422a9bc097b97b845eb9ca9d";
+
+        ctx.Users.Add(new User
+        {
+            Id = adminId,
+            Email = adminEmail,
+            Salt = adminSalt,
+            Passwordhash = adminHash,
+            Role = "Admin",
+            Createdat = now
+        });
+
+        // ------------------------
+        // MINIMAL GAME
+        // ------------------------
+        ctx.Games.Add(new Game
         {
             Id = Guid.NewGuid().ToString(),
             Weeknumber = 45,
             Year = 2025,
-            Winningnumbers = null,
             Isactive = true,
-            Createdat = now,
-            Closedat = null,
-            Deletedat = null
-        };
+            Createdat = now
+        });
 
-        ctx.Games.Add(game);
-
-        // 5) Save changes
+        // ------------------------
+        // SAVE
+        // ------------------------
         await ctx.SaveChangesAsync();
-
-        // 6) Clear the change tracker (so EF does not keep a lot of entities in memory)
         ctx.ChangeTracker.Clear();
     }
 }
