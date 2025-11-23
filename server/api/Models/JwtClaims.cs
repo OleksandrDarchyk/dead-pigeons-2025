@@ -1,8 +1,8 @@
 namespace api.Models;
 
-public record JwtClaims(string Id, string Email, string Role)
+public class JwtClaims
 {
-    public string Id { get; set; } = Id;
-    public string Email { get; set; } = Email;
-    public string Role { get; set; } = Role;
+    public string Id { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
+    public string Role { get; set; } = string.Empty;
 }

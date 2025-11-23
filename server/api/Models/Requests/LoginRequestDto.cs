@@ -1,10 +1,13 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace api.Models.Requests;
 
 public class LoginRequestDto
 {
-    // Email entered by user in login form
+    [Required]
+    [EmailAddress]
     public string Email { get; set; } = null!;
 
-    // Plain password from login form (will be hashed on server)
+    [Required]
     public string Password { get; set; } = null!;
 }
