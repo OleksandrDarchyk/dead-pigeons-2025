@@ -1,19 +1,21 @@
-using System.Security.Cryptography;
-using System.Text;
 using dataccess;
 using dataccess.Entities;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace api.Etc;
 
-public class SieveTestSeeder(MyDbContext ctx, TimeProvider timeProvider) : ISeeder
+public class SieveTestSeeder(
+    MyDbContext ctx,
+    TimeProvider timeProvider,
+    IPasswordHasher<User> passwordHasher) : ISeeder
 {
     public async Task Seed()
     {
-        // 1) Ensure DB exists (Testcontainers)
+        // Ensure database exists (dev/test only)
         await ctx.Database.EnsureCreatedAsync();
 
-        // 2) CLEAR ALL DATA (test/dev only)
+        // Clear all data (dev/test only)
         ctx.Boards.RemoveRange(ctx.Boards);
         ctx.Transactions.RemoveRange(ctx.Transactions);
         ctx.Players.RemoveRange(ctx.Players);
@@ -25,52 +27,37 @@ public class SieveTestSeeder(MyDbContext ctx, TimeProvider timeProvider) : ISeed
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         // ------------------------
-        // TEST USER
+        // TEST USER (argon2id)
         // ------------------------
-        var salt = Guid.NewGuid().ToString();
-        var testPassword = "Password123";
-
-        var testHashBytes = SHA512.HashData(
-            Encoding.UTF8.GetBytes(testPassword + salt));
-
-        var testHash = BitConverter
-            .ToString(testHashBytes)
-            .Replace("-", "")
-            .ToLower();
-
-        ctx.Users.Add(new User
+        var testUser = new User
         {
             Id = Guid.NewGuid().ToString(),
             Email = "test@user.dk",
-            Salt = salt,
-            Passwordhash = testHash,
             Role = "User",
-            Createdat = now
-        });
+            Createdat = now,
+            Salt = "" // salt is embedded in Passwordhash now
+        };
+
+        testUser.Passwordhash = passwordHasher.HashPassword(testUser, "Password123");
+        ctx.Users.Add(testUser);
 
         // ------------------------
-        // FIXED ADMIN FOR DEV
+        // FIXED ADMIN FOR DEV (argon2id)
         // ------------------------
-        var adminId = "cbeaed9a-1466-4763-a3c9-3b10a26cf081";
-        var adminEmail = "a@dp.dk";
-        var adminSalt = "static-salt-admin";
-
-        // Hash already computed correctly for Password123 + static-salt-admin
-        var adminHash =
-            "1b0b7aaebe570e09c7ee7d5c58604a373ec8dc3404b430e40df1f28c14d84a4294a0ff9e1a95491d806968f5c630d4ad723bb503422a9bc097b97b845eb9ca9d";
-
-        ctx.Users.Add(new User
+        var admin = new User
         {
-            Id = adminId,
-            Email = adminEmail,
-            Salt = adminSalt,
-            Passwordhash = adminHash,
+            Id = "cbeaed9a-1466-4763-a3c9-3b10a26cf081",
+            Email = "a@dp.dk",
             Role = "Admin",
-            Createdat = now
-        });
+            Createdat = now,
+            Salt = "" // we keep column but do not use it
+        };
+
+        admin.Passwordhash = passwordHasher.HashPassword(admin, "Password123");
+        ctx.Users.Add(admin);
 
         // ------------------------
-        // MINIMAL GAME
+        // MINIMAL ACTIVE GAME
         // ------------------------
         ctx.Games.Add(new Game
         {
@@ -81,9 +68,6 @@ public class SieveTestSeeder(MyDbContext ctx, TimeProvider timeProvider) : ISeed
             Createdat = now
         });
 
-        // ------------------------
-        // SAVE
-        // ------------------------
         await ctx.SaveChangesAsync();
         ctx.ChangeTracker.Clear();
     }
