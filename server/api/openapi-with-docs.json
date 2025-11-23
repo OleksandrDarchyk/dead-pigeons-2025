@@ -71,7 +71,7 @@
       }
     },
     "/WhoAmI": {
-      "post": {
+      "get": {
         "tags": [
           "Auth"
         ],
@@ -87,7 +87,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
       }
     },
     "/CreateBoard": {
@@ -674,12 +679,19 @@
       "LoginRequestDto": {
         "type": "object",
         "additionalProperties": false,
+        "required": [
+          "email",
+          "password"
+        ],
         "properties": {
           "email": {
-            "type": "string"
+            "type": "string",
+            "format": "email",
+            "minLength": 1
           },
           "password": {
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           }
         }
       },

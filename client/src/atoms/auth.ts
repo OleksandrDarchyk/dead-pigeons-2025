@@ -4,6 +4,7 @@ import { atomWithStorage } from "jotai/utils";
 import { useAtom } from "jotai";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../utilities/authApi";
+import type { JwtClaims } from "@core/generated-client";
 
 // Credentials type used by the login form
 export type Credentials = {
@@ -41,15 +42,16 @@ const storage: {
 export const jwtAtom = atomWithStorage<string | null>(TOKEN_KEY, null, storage);
 
 // User atom: calls WhoAmI when token changes
-export const userAtom = atom(async (get) => {
+export const userAtom = atom(async (get): Promise<JwtClaims | null> => {
     const token = get(jwtAtom);
 
     if (!token) return null;
 
     try {
-        const user = await authApi.whoAmI();
+        const user = await authApi.whoAmI(); // JwtClaims from generated client
         return user;
     } catch {
+        // If token is invalid, we treat user as not logged in
         return null;
     }
 });
@@ -59,24 +61,17 @@ export const useAuth = () => {
     const [user] = useAtom(userAtom);
     const navigate = useNavigate();
 
-    // Login: call API, save token, redirect by role from JWT
+    // Login: call API, save token, then ask backend who this user is
     const login = async (credentials: Credentials) => {
         const result = await authApi.login(credentials);
 
         // Save token in jotai atom (and sessionStorage via storage adapter)
         setToken(result.token);
 
-        // Decode role directly from JWT payload
         try {
-            const base64 = result.token
-                .split(".")[1]
-                .replace(/-/g, "+")
-                .replace(/_/g, "/");
-
-            const json = atob(base64);
-            const payload = JSON.parse(json);
-
-            const role: string | undefined = payload.Role ?? payload.role;
+            // Ask backend who is logged in (uses JwtBearer + WhoAmI)
+            const me: JwtClaims = await authApi.whoAmI();
+            const role: string = me.role; // type-safe
 
             if (role === "Admin") {
                 navigate("/admin");
@@ -84,7 +79,7 @@ export const useAuth = () => {
                 navigate("/player");
             }
         } catch (e) {
-            console.error("Failed to decode JWT", e);
+            console.error("Failed to fetch current user info", e);
             navigate("/login");
         }
     };

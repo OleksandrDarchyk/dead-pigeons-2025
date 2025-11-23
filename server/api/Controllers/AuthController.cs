@@ -1,6 +1,7 @@
 using api.Models;
 using api.Models.Requests;
 using api.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers;
@@ -20,11 +21,10 @@ public class AuthController(IAuthService authService) : ControllerBase
         return await authService.Register(dto);
     }
 
-    [HttpPost(nameof(WhoAmI))]
-    public async Task<JwtClaims> WhoAmI()
+    [HttpGet(nameof(WhoAmI))]
+    [Authorize] 
+    public JwtClaims WhoAmI()
     {
-        var token = Request.Headers.Authorization.FirstOrDefault();
-        var jwtClaims = await authService.VerifyAndDecodeToken(token);
-        return jwtClaims;
+        return authService.GetCurrentUserClaims(User);
     }
 }

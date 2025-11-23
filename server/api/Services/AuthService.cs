@@ -1,14 +1,10 @@
 using System.ComponentModel.DataAnnotations;
-
-using System.Text.Json;
+using System.Security.Claims;
 using api.Models;
 using api.Models.Requests;
 using dataccess;
 using dataccess.Entities;
-using JWT;
-using JWT.Algorithms;
-using JWT.Builder;
-using JWT.Serializers;
+using Api.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using ValidationException = Bogus.ValidationException;
@@ -19,46 +15,25 @@ public class AuthService(
     MyDbContext ctx,
     ILogger<AuthService> logger,
     TimeProvider timeProvider,
-    AppOptions appOptions,
-    IPasswordHasher<User> passwordHasher) : IAuthService
+    IPasswordHasher<User> passwordHasher,
+    ITokenService tokenService // JwtService injected here
+) : IAuthService
 {
-    public async Task<JwtClaims> VerifyAndDecodeToken(string? token)
+    // Used by WhoAmI (via ClaimsPrincipal + JwtBearer)
+    public JwtClaims GetCurrentUserClaims(ClaimsPrincipal principal)
     {
-        if (string.IsNullOrWhiteSpace(token))
-            throw new ValidationException("No token attached!");
+        var userId = principal.GetUserId();                 // from ClaimExtensions (sub)
+        var role = principal.GetUserRole() ?? string.Empty; // also from ClaimExtensions
+        var email = principal.FindFirst(ClaimTypes.Email)?.Value ?? string.Empty;
 
-        const string bearerPrefix = "Bearer ";
-        if (token.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
+        return new JwtClaims
         {
-            token = token.Substring(bearerPrefix.Length);
-        }
+            Id = userId,
+            Email = email,
+            Role = role
+        };
 
-        var builder = CreateJwtBuilder();
-
-        string jsonString;
-        try
-        {
-            jsonString = builder.Decode(token)
-                         ?? throw new ValidationException("Authentication failed!");
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "Failed to decode JWT");
-            throw new ValidationException("Failed to verify JWT");
-        }
-
-        var jwtClaims = JsonSerializer.Deserialize<JwtClaims>(jsonString, new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true
-        }) ?? throw new ValidationException("Authentication failed!");
-
-        var userExists = await ctx.Users.AnyAsync(u => u.Id == jwtClaims.Id);
-        if (!userExists)
-        {
-            throw new ValidationException("Authentication is valid, but user is not found!");
-        }
-
-        return jwtClaims;
+        
     }
 
     public async Task<JwtResponse> Login(LoginRequestDto dto)
@@ -75,10 +50,11 @@ public class AuthService(
             throw new ValidationException("Password is incorrect!");
         }
 
-        var token = CreateJwt(user);
+        // Create JWT via JwtService
+        var token = tokenService.CreateToken(user);
         return new JwtResponse(token);
     }
-    
+
     public async Task<JwtResponse> Register(RegisterRequestDto dto)
     {
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
@@ -95,35 +71,17 @@ public class AuthService(
             Email = dto.Email,
             Createdat = timeProvider.GetUtcNow().DateTime.ToUniversalTime(),
             Role = "User",
-            Salt = string.Empty
+            Salt = string.Empty // column still exists, but hash contains salt
         };
 
+        // Hash password with Argon2id password hasher
         user.Passwordhash = passwordHasher.HashPassword(user, dto.Password);
 
         ctx.Users.Add(user);
         await ctx.SaveChangesAsync();
 
-        var token = CreateJwt(user);
+        // Issue JWT for newly registered user
+        var token = tokenService.CreateToken(user);
         return new JwtResponse(token);
-    }
-
-
-    private JwtBuilder CreateJwtBuilder()
-    {
-        return JwtBuilder.Create()
-            .WithAlgorithm(new HMACSHA512Algorithm())
-            .WithSecret(appOptions.JwtSecret)
-            .WithUrlEncoder(new JwtBase64UrlEncoder())
-            .WithJsonSerializer(new JsonNetSerializer())
-            .MustVerifySignature();
-    }
-
-    private string CreateJwt(User user)
-    {
-        return CreateJwtBuilder()
-            .AddClaim(nameof(User.Id), user.Id)
-            .AddClaim(nameof(User.Email), user.Email)
-            .AddClaim(nameof(User.Role), user.Role)
-            .Encode();
     }
 }
