@@ -4,6 +4,7 @@ import { atomWithStorage } from "jotai/utils";
 import { useAtom } from "jotai";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../utilities/authApi";
+import type { JwtClaims } from "@core/generated-client";
 
 // Credentials type used by the login form
 export type Credentials = {
@@ -41,13 +42,13 @@ const storage: {
 export const jwtAtom = atomWithStorage<string | null>(TOKEN_KEY, null, storage);
 
 // User atom: calls WhoAmI when token changes
-export const userAtom = atom(async (get) => {
+export const userAtom = atom(async (get): Promise<JwtClaims | null> => {
     const token = get(jwtAtom);
 
     if (!token) return null;
 
     try {
-        const user = await authApi.whoAmI();
+        const user = await authApi.whoAmI(); // JwtClaims from generated client
         return user;
     } catch {
         // If token is invalid, we treat user as not logged in
@@ -69,8 +70,8 @@ export const useAuth = () => {
 
         try {
             // Ask backend who is logged in (uses JwtBearer + WhoAmI)
-            const me: any = await authApi.whoAmI();
-            const role: string | undefined = me.role ?? me.Role;
+            const me: JwtClaims = await authApi.whoAmI();
+            const role: string = me.role; // type-safe
 
             if (role === "Admin") {
                 navigate("/admin");
