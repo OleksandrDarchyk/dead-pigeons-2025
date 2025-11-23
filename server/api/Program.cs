@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using api.Etc;
 using Api.Security;
@@ -5,7 +6,10 @@ using api.Services;
 using dataccess.Entities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 using Scalar.AspNetCore;
+using Sieve.Models;
+using Sieve.Services;
 
 namespace api;
 
@@ -15,7 +19,8 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        ConfigureServices(builder);
+        // Normal path when app is running
+        ConfigureServices(builder.Services, builder.Configuration);
 
         var app = builder.Build();
 
@@ -24,13 +29,32 @@ public class Program
         app.Run();
     }
 
-    public static void ConfigureServices(WebApplicationBuilder builder)
+    /// <summary>
+    /// Used by tests (Startup in tests project)
+    /// </summary>
+    public static void ConfigureServices(IServiceCollection services)
     {
-        var services = builder.Services;
+        // Build configuration manually when tests call this overload
+        var configuration = new ConfigurationBuilder()
+            .SetBasePath(AppContext.BaseDirectory)
+            .AddJsonFile("appsettings.json", optional: true)
+            .AddJsonFile("appsettings.Development.json", optional: true)
+            .AddEnvironmentVariables()
+            .Build();
 
+        services.AddSingleton<IConfiguration>(configuration);
+
+        ConfigureServices(services, configuration);
+    }
+
+    /// <summary>
+    /// Real registration, shared between app and tests
+    /// </summary>
+    public static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+    {
         // TimeProvider + AppOptions + DbContext
         services.AddSingleton(TimeProvider.System);
-        services.InjectAppOptions(); // reads AppOptions (Db, JwtSecret) from configuration
+        services.InjectAppOptions();          // uses AppOptions from configuration (Db, JwtSecret)
         services.AddMyDbContext();
 
         // Controllers + JSON
@@ -40,12 +64,12 @@ public class Program
             opts.JsonSerializerOptions.MaxDepth = 128;
         });
 
-        // OpenAPI / Swagger (kept your config)
+        // OpenAPI / Swagger + Sieve string constants (добавлено з твого прикладу)
         services.AddOpenApiDocument(options =>
         {
             options.Title = "Dead Pigeons API";
 
-            // "Authorize" button in Swagger UI
+            
             options.AddSecurity("JWT", Array.Empty<string>(), new NSwag.OpenApiSecurityScheme
             {
                 Type = NSwag.OpenApiSecuritySchemeType.ApiKey,
@@ -56,6 +80,9 @@ public class Program
 
             options.OperationProcessors.Add(
                 new NSwag.Generation.Processors.Security.AspNetCoreOperationSecurityScopeProcessor("JWT"));
+
+            // 👇 ЦЕ з твого library-туторіалу
+            options.AddStringConstants(typeof(SieveConstants));
         });
 
         services.AddCors();
@@ -71,10 +98,20 @@ public class Program
         // Password hasher (Argon2id)
         services.AddScoped<IPasswordHasher<User>, NSecArgon2idPasswordHasher>();
 
-        // JWT token service (our JwtService)
+        // JWT token service (для JwtBearer валідації)
         services.AddScoped<ITokenService, JwtService>();
 
-        // Authentication & Authorization (teacher-style)
+        // 🔽 Sieve configuration (додано ТІЛЬКИ з того, що ти скинув)
+        services.Configure<SieveOptions>(options =>
+        {
+            options.CaseSensitive = false;
+            options.DefaultPageSize = 10;
+            options.MaxPageSize = 100;
+        });
+
+        services.AddScoped<ISieveProcessor, ApplicationSieveProcessor>();
+
+        // Authentication & Authorization (як у вчителя)
         services
             .AddAuthentication(options =>
             {
@@ -85,10 +122,9 @@ public class Program
             })
             .AddJwtBearer(options =>
             {
-                // Use JwtService.ValidationParameters with AppOptions:JwtSecret
-                options.TokenValidationParameters = JwtService.ValidationParameters(builder.Configuration);
+                options.TokenValidationParameters = JwtService.ValidationParameters(configuration);
 
-                // Optional logging for debugging auth problems
+                // Debug-логування
                 options.Events = new JwtBearerEvents
                 {
                     OnAuthenticationFailed = context =>
