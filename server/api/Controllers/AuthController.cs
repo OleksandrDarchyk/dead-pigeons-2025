@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers;
 
+[ApiController]
 public class AuthController(IAuthService authService) : ControllerBase
 {
     [HttpPost(nameof(Login))]
@@ -22,7 +23,8 @@ public class AuthController(IAuthService authService) : ControllerBase
     [HttpPost(nameof(WhoAmI))]
     public async Task<JwtClaims> WhoAmI()
     {
-        var jwtClaims = await authService.VerifyAndDecodeToken(Request.Headers.Authorization.FirstOrDefault());
+        var token = Request.Headers.Authorization.FirstOrDefault();
+        var jwtClaims = await authService.VerifyAndDecodeToken(token);
         return jwtClaims;
     }
 }

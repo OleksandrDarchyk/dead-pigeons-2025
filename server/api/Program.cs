@@ -1,6 +1,9 @@
 using System.Text.Json.Serialization;
 using api.Etc;
+using Api.Security;
 using api.Services;
+using dataccess.Entities;
+using Microsoft.AspNetCore.Identity;
 using Scalar.AspNetCore;
 using Sieve.Models;
 using Sieve.Services;
@@ -42,6 +45,8 @@ public class Program
         services.AddScoped<IGameService, GameService>();
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<ITransactionService, TransactionService>();
+        services.AddScoped<IPasswordHasher<User>, NSecArgon2idPasswordHasher>();
+
         
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();

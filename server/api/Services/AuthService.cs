@@ -1,6 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using System.Security.Cryptography;
-using System.Text;
+
 using System.Text.Json;
 using api.Models;
 using api.Models.Requests;
@@ -10,6 +9,8 @@ using JWT;
 using JWT.Algorithms;
 using JWT.Builder;
 using JWT.Serializers;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using ValidationException = Bogus.ValidationException;
 
 namespace api.Services;
@@ -18,13 +19,14 @@ public class AuthService(
     MyDbContext ctx,
     ILogger<AuthService> logger,
     TimeProvider timeProvider,
-    AppOptions appOptions) : IAuthService
+    AppOptions appOptions,
+    IPasswordHasher<User> passwordHasher) : IAuthService
 {
-    public async Task<JwtClaims> VerifyAndDecodeToken(string token)
+    public async Task<JwtClaims> VerifyAndDecodeToken(string? token)
     {
         if (string.IsNullOrWhiteSpace(token))
             throw new ValidationException("No token attached!");
-        
+
         const string bearerPrefix = "Bearer ";
         if (token.StartsWith(bearerPrefix, StringComparison.OrdinalIgnoreCase))
         {
@@ -41,7 +43,7 @@ public class AuthService(
         }
         catch (Exception e)
         {
-            logger.LogError(e.Message, e);
+            logger.LogError(e, "Failed to decode JWT");
             throw new ValidationException("Failed to verify JWT");
         }
 
@@ -50,50 +52,53 @@ public class AuthService(
             PropertyNameCaseInsensitive = true
         }) ?? throw new ValidationException("Authentication failed!");
 
-        _ = ctx.Users.FirstOrDefault(u => u.Id == jwtClaims.Id)
-            ?? throw new ValidationException("Authentication is valid, but user is not found!");
+        var userExists = await ctx.Users.AnyAsync(u => u.Id == jwtClaims.Id);
+        if (!userExists)
+        {
+            throw new ValidationException("Authentication is valid, but user is not found!");
+        }
 
         return jwtClaims;
     }
 
     public async Task<JwtResponse> Login(LoginRequestDto dto)
     {
-        var user = ctx.Users.FirstOrDefault(u => u.Email == dto.Email)
-                   ?? throw new ValidationException("User is not found!");
+        var user = await ctx.Users.FirstOrDefaultAsync(u => u.Email == dto.Email);
+        if (user == null)
+        {
+            throw new ValidationException("User is not found!");
+        }
 
-        var passwordsMatch = user.Passwordhash ==
-                             SHA512.HashData(
-                                     Encoding.UTF8.GetBytes(dto.Password + user.Salt))
-                                 .Aggregate("", (current, b) => current + b.ToString("x2"));
-
-        if (!passwordsMatch)
+        var result = passwordHasher.VerifyHashedPassword(user, user.Passwordhash, dto.Password);
+        if (result == PasswordVerificationResult.Failed)
+        {
             throw new ValidationException("Password is incorrect!");
+        }
 
         var token = CreateJwt(user);
         return new JwtResponse(token);
     }
-
+    
     public async Task<JwtResponse> Register(RegisterRequestDto dto)
     {
-        Validator.ValidateObject(dto, new ValidationContext(dto), true);
+        Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
-        var isEmailTaken = ctx.Users.Any(u => u.Email == dto.Email);
+        var isEmailTaken = await ctx.Users.AnyAsync(u => u.Email == dto.Email);
         if (isEmailTaken)
+        {
             throw new ValidationException("Email is already taken");
-
-        var salt = Guid.NewGuid().ToString();
-        var hash = SHA512.HashData(
-            Encoding.UTF8.GetBytes(dto.Password + salt));
+        }
 
         var user = new User
         {
+            Id = Guid.NewGuid().ToString(),
             Email = dto.Email,
             Createdat = timeProvider.GetUtcNow().DateTime.ToUniversalTime(),
-            Id = Guid.NewGuid().ToString(),
-            Salt = salt,
-            Passwordhash = hash.Aggregate("", (current, b) => current + b.ToString("x2")),
-            Role = "User"
+            Role = "User",
+            Salt = string.Empty
         };
+
+        user.Passwordhash = passwordHasher.HashPassword(user, dto.Password);
 
         ctx.Users.Add(user);
         await ctx.SaveChangesAsync();
@@ -101,6 +106,7 @@ public class AuthService(
         var token = CreateJwt(user);
         return new JwtResponse(token);
     }
+
 
     private JwtBuilder CreateJwtBuilder()
     {
