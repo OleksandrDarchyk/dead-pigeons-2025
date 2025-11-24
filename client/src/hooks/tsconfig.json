@@ -11,15 +11,6 @@
     },
     {
       "path": "../utilities"
-    },
-    {
-      "path": "../atoms"
-    },
-    {
-      "path": "../components"
-    },
-    {
-      "path": "../hooks"
     }
   ]
 }

@@ -10,23 +10,25 @@ using Microsoft.AspNetCore.Mvc;
 namespace api.Controllers;
 
 [ApiController]
-// All endpoints here require authentication by default
-[Authorize]
+[Authorize] // all actions require authenticated user unless overridden
 public class TransactionsController(ITransactionService transactionService) : ControllerBase
 {
-    // --------------------------------
-    // PLAYER: create own transaction
-    // --------------------------------
+    // Player creates a transaction for their own account (player id comes from JWT)
     [HttpPost(nameof(CreateTransaction))]
     public async Task<Transaction> CreateTransaction([FromBody] CreateTransactionRequestDto dto)
     {
-        // PlayerId is resolved from JWT, not trusted from the body
         return await transactionService.CreateTransactionForCurrentUser(User, dto);
     }
 
-    // --------------------------------
-    // ADMIN: approve transaction
-    // --------------------------------
+    // Admin creates a transaction for a chosen player
+    [HttpPost(nameof(CreateTransactionForPlayer))]
+    [Authorize(Roles = Roles.Admin)]
+    public async Task<Transaction> CreateTransactionForPlayer([FromBody] CreateTransactionRequestDto dto)
+    {
+        return await transactionService.CreateTransaction(dto);
+    }
+
+    // Admin approves a pending transaction
     [HttpPost(nameof(ApproveTransaction))]
     [Authorize(Roles = Roles.Admin)]
     public async Task<Transaction> ApproveTransaction([FromQuery] string transactionId)
@@ -34,9 +36,7 @@ public class TransactionsController(ITransactionService transactionService) : Co
         return await transactionService.ApproveTransaction(transactionId);
     }
 
-    // --------------------------------
-    // ADMIN: reject transaction
-    // --------------------------------
+    // Admin rejects a pending transaction
     [HttpPost(nameof(RejectTransaction))]
     [Authorize(Roles = Roles.Admin)]
     public async Task<Transaction> RejectTransaction([FromQuery] string transactionId)
@@ -44,18 +44,14 @@ public class TransactionsController(ITransactionService transactionService) : Co
         return await transactionService.RejectTransaction(transactionId);
     }
 
-    // --------------------------------
-    // PLAYER: get own transactions
-    // --------------------------------
+    // Player gets their own transactions
     [HttpGet(nameof(GetMyTransactions))]
     public async Task<List<Transaction>> GetMyTransactions()
     {
         return await transactionService.GetTransactionsForCurrentUser(User);
     }
 
-    // --------------------------------
-    // ADMIN: all pending transactions
-    // --------------------------------
+    // Admin gets all pending transactions
     [HttpGet(nameof(GetPendingTransactions))]
     [Authorize(Roles = Roles.Admin)]
     public async Task<List<Transaction>> GetPendingTransactions()
@@ -63,23 +59,18 @@ public class TransactionsController(ITransactionService transactionService) : Co
         return await transactionService.GetPendingTransactions();
     }
 
-    // --------------------------------
-    // PLAYER: get own balance
-    // --------------------------------
+    // Player gets their own balance
     [HttpGet(nameof(GetMyBalance))]
     public async Task<PlayerBalanceResponseDto> GetMyBalance()
     {
         return await transactionService.GetBalanceForCurrentUser(User);
     }
 
-    // --------------------------------
-    // ADMIN: get balance for a player
-    // --------------------------------
+    // Admin gets balance for a specific player
     [HttpGet(nameof(GetPlayerBalance))]
     [Authorize(Roles = Roles.Admin)]
     public async Task<PlayerBalanceResponseDto> GetPlayerBalance([FromQuery] string playerId)
     {
-        // Simple admin helper: reuse shared balance logic
         return await transactionService.GetPlayerBalance(playerId);
     }
 }

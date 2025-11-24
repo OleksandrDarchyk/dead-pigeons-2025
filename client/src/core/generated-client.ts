@@ -709,6 +709,43 @@ export class TransactionsClient {
         return Promise.resolve<Transaction>(null as any);
     }
 
+    createTransactionForPlayer(dto: CreateTransactionRequestDto): Promise<Transaction> {
+        let url_ = this.baseUrl + "/CreateTransactionForPlayer";
+        url_ = url_.replace(/[?&]$/, "");
+
+        const content_ = JSON.stringify(dto);
+
+        let options_: RequestInit = {
+            body: content_,
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processCreateTransactionForPlayer(_response);
+        });
+    }
+
+    protected processCreateTransactionForPlayer(response: Response): Promise<Transaction> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Transaction;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Transaction>(null as any);
+    }
+
     approveTransaction(transactionId: string | undefined): Promise<Transaction> {
         let url_ = this.baseUrl + "/ApproveTransaction?";
         if (transactionId === null)

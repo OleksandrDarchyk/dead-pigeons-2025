@@ -28,7 +28,8 @@
       "@utilities/*": ["./src/utilities/*"],
       "@components/*": ["./src/components/*"],
       "@pages/*": ["./src/pages/*"],
-      "@atoms/*": ["./src/atoms/*"]
+      "@atoms/*": ["./src/atoms/*"],
+      "@hooks/*": ["./src/hooks/*"]
     },
     /* Linting */
     "noImplicitAny": false,
