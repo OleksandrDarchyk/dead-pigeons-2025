@@ -20,6 +20,15 @@ export default function BoardsStatsTab() {
             setIsLoading(true);
 
             const game = await gamesApi.getActiveGame();
+            console.log("Active game:", game);
+
+            if (!game || !game.id) {
+                setActiveGame(null);
+                setBoards([]);
+                setPlayers([]);
+                return;
+            }
+
             setActiveGame(game);
 
             const [boardsForGame, allPlayers] = await Promise.all([
@@ -27,15 +36,27 @@ export default function BoardsStatsTab() {
                 playersApi.getPlayers(true),
             ]);
 
-            setBoards(boardsForGame as BoardWithPlayer[]);
-            setPlayers(allPlayers);
+            console.log("BoardsForGame:", boardsForGame);
+            console.log("AllPlayers:", allPlayers);
+
+            setBoards(
+                Array.isArray(boardsForGame)
+                    ? (boardsForGame as BoardWithPlayer[])
+                    : [],
+            );
+
+            setPlayers(Array.isArray(allPlayers) ? allPlayers : []);
         } catch (err) {
             console.error(err);
             toast.error("Failed to load boards and stats");
+
+            setBoards([]);
+            setPlayers([]);
         } finally {
             setIsLoading(false);
         }
     };
+
 
     useEffect(() => {
         void loadData();

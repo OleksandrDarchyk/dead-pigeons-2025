@@ -4,6 +4,7 @@ using api.Models.Requests;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
+using ValidationException = Bogus.ValidationException;
 
 namespace api.Services;
 
@@ -13,12 +14,12 @@ public class BoardService(
 {
     public async Task<Board> CreateBoard(string playerId, CreateBoardRequestDto dto)
     {
-        // Basic DataAnnotations validation on the DTO
+        // Validate DTO via DataAnnotations
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
         var numbers = dto.Numbers ?? Array.Empty<int>();
 
-        // Extra safety: DTO already has MinLength/MaxLength, but we keep a guard here too
+        // Extra safety: length 5–8
         if (numbers.Length is < 5 or > 8)
         {
             throw new ValidationException("Board must have between 5 and 8 numbers.");
@@ -38,7 +39,7 @@ public class BoardService(
 
         var sortedNumbers = numbers.OrderBy(n => n).ToArray();
 
-        // Ensure player exists, not soft-deleted and active
+        // Ensure player exists, not soft-deleted
         var player = await ctx.Players
             .FirstOrDefaultAsync(p =>
                 p.Id == playerId &&
@@ -54,7 +55,7 @@ public class BoardService(
             throw new ValidationException("Only active players can buy boards.");
         }
 
-        // Ensure game exists, not soft-deleted and active
+        // Ensure game exists, not soft-deleted
         var game = await ctx.Games
             .FirstOrDefaultAsync(g =>
                 g.Id == dto.GameId &&
@@ -70,7 +71,7 @@ public class BoardService(
             throw new ValidationException("Cannot buy boards for an inactive game.");
         }
 
-        // Price depends on how many numbers the board has
+        // Price depends on numbers count
         var count = sortedNumbers.Length;
         var price = count switch
         {
@@ -126,9 +127,10 @@ public class BoardService(
 
     public async Task<List<Board>> GetBoardsForGame(string gameId)
     {
-        // All non-deleted boards for a specific game
+        // All non-deleted boards for a specific game, with Player included
         return await ctx.Boards
             .Where(b => b.Gameid == gameId && b.Deletedat == null)
+            .Include(b => b.Player)
             .OrderBy(b => b.Createdat)
             .ToListAsync();
     }
@@ -142,7 +144,9 @@ public class BoardService(
             .ToListAsync();
     }
 
-    public async Task<Board> CreateBoardForCurrentUser(ClaimsPrincipal claims, CreateBoardRequestDto dto)
+    public async Task<Board> CreateBoardForCurrentUser(
+        ClaimsPrincipal claims,
+        CreateBoardRequestDto dto)
     {
         // Use email from JWT to resolve the player
         var email = claims.FindFirst(ClaimTypes.Email)?.Value;
