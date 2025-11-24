@@ -3,6 +3,8 @@ using api.Models.Requests;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
+// Domain validation errors should use Bogus.ValidationException
+using ValidationException = Bogus.ValidationException;
 
 namespace api.Services;
 
@@ -12,17 +14,17 @@ public class GameService(
 {
     public async Task<Game> GetActiveGame()
     {
-        // Find the currently active game (not soft-deleted)
+        // Find the current active game (ignore soft-deleted)
         var game = await ctx.Games
             .Where(g => g.Deletedat == null && g.Isactive)
             .OrderBy(g => g.Year)
             .ThenBy(g => g.Weeknumber)
             .FirstOrDefaultAsync();
 
-        // If there is no active game, something is wrong with seeding
+        // If this happens, seeding or data is broken
         if (game == null)
         {
-            throw new ValidationException("No active game found");
+            throw new ValidationException("No active game found.");
         }
 
         return game;
@@ -30,7 +32,7 @@ public class GameService(
 
     public async Task<List<Game>> GetGamesHistory()
     {
-        // Return all games (not soft-deleted), newest first
+        // All non-deleted games, newest first
         return await ctx.Games
             .Where(g => g.Deletedat == null)
             .OrderByDescending(g => g.Year)
@@ -40,17 +42,18 @@ public class GameService(
 
     public async Task<Game> SetWinningNumbers(SetWinningNumbersRequestDto dto)
     {
-        // 1) Validate DTO attributes (DataAnnotations)
+        // Attribute-based validation on the DTO
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
-        // 2) Validate winning numbers: exactly 3 distinct numbers between 1 and 16
         var numbers = dto.WinningNumbers;
 
+        // Must be exactly 3 distinct numbers
         if (numbers.Distinct().Count() != 3)
         {
             throw new ValidationException("Winning numbers must be 3 distinct values.");
         }
 
+        // Each number must be in [1;16]
         if (numbers.Any(n => n < 1 || n > 16))
         {
             throw new ValidationException("Winning numbers must be between 1 and 16.");
@@ -58,29 +61,29 @@ public class GameService(
 
         var sortedNumbers = numbers.OrderBy(n => n).ToArray();
 
-        // 3) Load the game and its boards
+        // Load the game with its boards (only if not soft-deleted)
         var game = await ctx.Games
             .Include(g => g.Boards)
             .FirstOrDefaultAsync(g => g.Id == dto.GameId && g.Deletedat == null);
 
         if (game == null)
         {
-            throw new ValidationException("Game not found");
+            throw new ValidationException("Game not found.");
         }
 
-        // 4) Do not allow setting winning numbers twice
+        // Do not allow closing the same game twice
         if (game.Winningnumbers != null)
         {
-            throw new ValidationException("Winning numbers already set for this game");
+            throw new ValidationException("Winning numbers already set for this game.");
         }
 
-        // 5) Set winning numbers and close the game
+        // Close current game and set winning numbers
         game.Winningnumbers = sortedNumbers.ToList();
         game.Closedat = timeProvider.GetUtcNow().UtcDateTime;
         game.Isactive = false;
 
-        // 6) Mark winning boards for this game
-        // A board is winning if it contains all 3 winning numbers
+        // Mark winning boards:
+        // a board wins if it contains all 3 winning numbers
         var winningSet = sortedNumbers.ToHashSet();
 
         foreach (var board in game.Boards.Where(b => b.Deletedat == null))
@@ -90,7 +93,7 @@ public class GameService(
             board.Iswinning = isWinning;
         }
 
-        // 7) Activate the next upcoming game (same idea as seeding future games)
+        // Activate the next upcoming game by (year, weekNumber)
         var nextGame = await ctx.Games
             .Where(g =>
                 g.Deletedat == null &&
@@ -106,7 +109,7 @@ public class GameService(
             nextGame.Isactive = true;
         }
 
-        // 8) Save all changes as a single transaction
+        // Save all changes in one go
         await ctx.SaveChangesAsync();
 
         return game;

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using api.Models.Requests;
 using dataccess;
 using dataccess.Entities;
@@ -10,20 +11,26 @@ public class BoardService(
     MyDbContext ctx,
     TimeProvider timeProvider) : IBoardService
 {
-    public async Task<Board> CreateBoard(CreateBoardRequestDto dto)
+    public async Task<Board> CreateBoard(string playerId, CreateBoardRequestDto dto)
     {
-        // 1) Validate DTO attributes (DataAnnotations)
+        // Basic DataAnnotations validation on the DTO
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
-        // 2) Validate numbers: length already checked by DTO (5–8),
-        // but we still need distinct values and range 1–16
-        var numbers = dto.Numbers;
+        var numbers = dto.Numbers ?? Array.Empty<int>();
 
+        // Extra safety: DTO already has MinLength/MaxLength, but we keep a guard here too
+        if (numbers.Length is < 5 or > 8)
+        {
+            throw new ValidationException("Board must have between 5 and 8 numbers.");
+        }
+
+        // Numbers must be unique
         if (numbers.Distinct().Count() != numbers.Length)
         {
             throw new ValidationException("Board numbers must be distinct.");
         }
 
+        // Numbers must be within 1–16
         if (numbers.Any(n => n < 1 || n > 16))
         {
             throw new ValidationException("Board numbers must be between 1 and 16.");
@@ -31,10 +38,10 @@ public class BoardService(
 
         var sortedNumbers = numbers.OrderBy(n => n).ToArray();
 
-        // 3) Ensure player exists, is not soft-deleted and is active
+        // Ensure player exists, not soft-deleted and active
         var player = await ctx.Players
             .FirstOrDefaultAsync(p =>
-                p.Id == dto.PlayerId &&
+                p.Id == playerId &&
                 p.Deletedat == null);
 
         if (player == null)
@@ -47,7 +54,7 @@ public class BoardService(
             throw new ValidationException("Only active players can buy boards.");
         }
 
-        // 4) Ensure game exists, is not soft-deleted and is active
+        // Ensure game exists, not soft-deleted and active
         var game = await ctx.Games
             .FirstOrDefaultAsync(g =>
                 g.Id == dto.GameId &&
@@ -63,7 +70,7 @@ public class BoardService(
             throw new ValidationException("Cannot buy boards for an inactive game.");
         }
 
-        // 5) Calculate price based on how many numbers the board has
+        // Price depends on how many numbers the board has
         var count = sortedNumbers.Length;
         var price = count switch
         {
@@ -74,18 +81,17 @@ public class BoardService(
             _ => throw new ValidationException("Board must have between 5 and 8 numbers.")
         };
 
-        // 6) Calculate current balance:
         // balance = sum(Approved transactions) - sum(board prices)
         var approvedAmount = await ctx.Transactions
             .Where(t =>
-                t.Playerid == dto.PlayerId &&
+                t.Playerid == playerId &&
                 t.Deletedat == null &&
                 t.Status == "Approved")
             .SumAsync(t => (int?)t.Amount) ?? 0;
 
         var spentOnBoards = await ctx.Boards
             .Where(b =>
-                b.Playerid == dto.PlayerId &&
+                b.Playerid == playerId &&
                 b.Deletedat == null)
             .SumAsync(b => (int?)b.Price) ?? 0;
 
@@ -96,13 +102,12 @@ public class BoardService(
             throw new ValidationException("Not enough balance to buy this board.");
         }
 
-        // 7) Create the new board entity
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         var board = new Board
         {
             Id = Guid.NewGuid().ToString(),
-            Playerid = dto.PlayerId,
+            Playerid = playerId,
             Gameid = dto.GameId,
             Numbers = sortedNumbers.ToList(),
             Price = price,
@@ -121,7 +126,7 @@ public class BoardService(
 
     public async Task<List<Board>> GetBoardsForGame(string gameId)
     {
-        // Return all non-deleted boards for this game
+        // All non-deleted boards for a specific game
         return await ctx.Boards
             .Where(b => b.Gameid == gameId && b.Deletedat == null)
             .OrderBy(b => b.Createdat)
@@ -130,10 +135,50 @@ public class BoardService(
 
     public async Task<List<Board>> GetBoardsForPlayer(string playerId)
     {
-        // Return all non-deleted boards for this player (latest first)
+        // All non-deleted boards for a specific player (latest first)
         return await ctx.Boards
             .Where(b => b.Playerid == playerId && b.Deletedat == null)
             .OrderByDescending(b => b.Createdat)
             .ToListAsync();
+    }
+
+    public async Task<Board> CreateBoardForCurrentUser(ClaimsPrincipal claims, CreateBoardRequestDto dto)
+    {
+        // Use email from JWT to resolve the player
+        var email = claims.FindFirst(ClaimTypes.Email)?.Value;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ValidationException("Email not found on current user.");
+        }
+
+        var player = await ctx.Players
+            .FirstOrDefaultAsync(p => p.Email == email && p.Deletedat == null);
+
+        if (player == null)
+        {
+            throw new ValidationException("Player not found for current user.");
+        }
+
+        // Only the server decides which player owns the board
+        return await CreateBoard(player.Id, dto);
+    }
+
+    public async Task<List<Board>> GetBoardsForCurrentUser(ClaimsPrincipal claims)
+    {
+        var email = claims.FindFirst(ClaimTypes.Email)?.Value;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ValidationException("Email not found on current user.");
+        }
+
+        var player = await ctx.Players
+            .FirstOrDefaultAsync(p => p.Email == email && p.Deletedat == null);
+
+        if (player == null)
+        {
+            throw new ValidationException("Player not found for current user.");
+        }
+
+        return await GetBoardsForPlayer(player.Id);
     }
 }

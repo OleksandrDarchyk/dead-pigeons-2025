@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using ValidationException = Bogus.ValidationException;
+using BogusValidationException = Bogus.ValidationException;
+using DataAnnotationValidationException = System.ComponentModel.DataAnnotations.ValidationException;
 
 namespace api.Etc;
 
@@ -13,8 +14,12 @@ public class GlobalExceptionHandler : IExceptionHandler
     {
         var statusCode = exception switch
         {
-            ValidationException => StatusCodes.Status400BadRequest,
+            BogusValidationException => StatusCodes.Status400BadRequest,
+            
+            DataAnnotationValidationException => StatusCodes.Status400BadRequest,
+            
             UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
+            
             _ => StatusCodes.Status500InternalServerError
         };
 

@@ -1,71 +1,85 @@
+// api/Controllers/TransactionsController.cs
 using api.Models.Requests;
 using api.Models.Responses;
 using api.Services;
 using dataccess.Entities;
+using Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers;
 
 [ApiController]
+// All endpoints here require authentication by default
+[Authorize]
 public class TransactionsController(ITransactionService transactionService) : ControllerBase
 {
-    // POST /CreateTransaction
-    // Player submits a new MobilePay transaction (status = Pending)
+    // --------------------------------
+    // PLAYER: create own transaction
+    // --------------------------------
     [HttpPost(nameof(CreateTransaction))]
     public async Task<Transaction> CreateTransaction([FromBody] CreateTransactionRequestDto dto)
     {
-        // Later we can add [Authorize] and check that the playerId matches the logged in user
-        var tx = await transactionService.CreateTransaction(dto);
-        return tx;
+        // PlayerId is resolved from JWT, not trusted from the body
+        return await transactionService.CreateTransactionForCurrentUser(User, dto);
     }
 
-    // POST /ApproveTransaction?transactionId=...
-    // Admin approves a pending transaction
+    // --------------------------------
+    // ADMIN: approve transaction
+    // --------------------------------
     [HttpPost(nameof(ApproveTransaction))]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<Transaction> ApproveTransaction([FromQuery] string transactionId)
     {
-        // Later we can add [Authorize(Roles = "Admin")]
-        var tx = await transactionService.ApproveTransaction(transactionId);
-        return tx;
+        return await transactionService.ApproveTransaction(transactionId);
     }
 
-    // POST /RejectTransaction?transactionId=...
-    // Admin rejects a pending transaction
+    // --------------------------------
+    // ADMIN: reject transaction
+    // --------------------------------
     [HttpPost(nameof(RejectTransaction))]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<Transaction> RejectTransaction([FromQuery] string transactionId)
     {
-        // Later we can add [Authorize(Roles = "Admin")]
-        var tx = await transactionService.RejectTransaction(transactionId);
-        return tx;
+        return await transactionService.RejectTransaction(transactionId);
     }
 
-    // GET /GetTransactionsForPlayer?playerId=...
-    // Returns transaction history for a specific player
-    [HttpGet(nameof(GetTransactionsForPlayer))]
-    public async Task<List<Transaction>> GetTransactionsForPlayer([FromQuery] string playerId)
+    // --------------------------------
+    // PLAYER: get own transactions
+    // --------------------------------
+    [HttpGet(nameof(GetMyTransactions))]
+    public async Task<List<Transaction>> GetMyTransactions()
     {
-        // Later we can add [Authorize] and ensure players only see their own transactions
-        var list = await transactionService.GetTransactionsForPlayer(playerId);
-        return list;
+        return await transactionService.GetTransactionsForCurrentUser(User);
     }
 
-    // GET /GetPendingTransactions
-    // Admin overview: list of all pending transactions
+    // --------------------------------
+    // ADMIN: all pending transactions
+    // --------------------------------
     [HttpGet(nameof(GetPendingTransactions))]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<List<Transaction>> GetPendingTransactions()
     {
-        // Later we can add [Authorize(Roles = "Admin")]
-        var list = await transactionService.GetPendingTransactions();
-        return list;
+        return await transactionService.GetPendingTransactions();
     }
 
-    // GET /GetPlayerBalance?playerId=...
-    // Returns the current balance for a player
+    // --------------------------------
+    // PLAYER: get own balance
+    // --------------------------------
+    [HttpGet(nameof(GetMyBalance))]
+    public async Task<PlayerBalanceResponseDto> GetMyBalance()
+    {
+        return await transactionService.GetBalanceForCurrentUser(User);
+    }
+
+    // --------------------------------
+    // ADMIN: get balance for a player
+    // --------------------------------
     [HttpGet(nameof(GetPlayerBalance))]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<PlayerBalanceResponseDto> GetPlayerBalance([FromQuery] string playerId)
     {
-        // Later we can add [Authorize] and ensure players only see their own balance
-        var balance = await transactionService.GetPlayerBalance(playerId);
-        return balance;
+        // Simple admin helper: reuse shared balance logic
+        return await transactionService.GetPlayerBalance(playerId);
     }
 }

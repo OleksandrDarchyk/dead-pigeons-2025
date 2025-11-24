@@ -133,6 +133,7 @@ public partial class MyDbContext : DbContext
 
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Createdat).HasColumnName("createdat");
+            entity.Property(e => e.Deletedat).HasColumnName("deletedat");
             entity.Property(e => e.Email).HasColumnName("email");
             entity.Property(e => e.Passwordhash).HasColumnName("passwordhash");
             entity.Property(e => e.Role)

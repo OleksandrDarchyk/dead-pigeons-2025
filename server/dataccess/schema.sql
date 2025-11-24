@@ -1,4 +1,3 @@
-
 drop schema if exists deadpigeons cascade;
 create schema if not exists deadpigeons;
 
@@ -13,7 +12,8 @@ create table deadpigeons.users
     passwordhash text             not null,
     salt         text             not null,
     role         text             not null default 'User',
-    createdAt    timestamp with time zone
+    createdAt    timestamp with time zone,
+    deletedAt    timestamp with time zone  -- soft delete for auth users
 );
 
 create unique index idx_users_email on deadpigeons.users(email);

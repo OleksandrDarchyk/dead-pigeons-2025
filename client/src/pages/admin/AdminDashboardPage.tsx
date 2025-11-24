@@ -6,7 +6,6 @@ import PaymentsTab from "./tabs/PaymentsTab";
 import WinningNumbersTab from "./tabs/WinningNumbersTab";
 import BoardsStatsTab from "./tabs/BoardsStatsTab";
 
-
 type AdminTab = "players" | "payments" | "winning" | "boards";
 
 function TabButton(props: {
@@ -15,6 +14,7 @@ function TabButton(props: {
     onClick: () => void;
 }) {
     const { label, isActive, onClick } = props;
+
     return (
         <button
             type="button"
@@ -32,21 +32,41 @@ function TabButton(props: {
 }
 
 export default function AdminDashboardPage() {
-    const { user } = useAuth();
+    const { user, token } = useAuth();
     const [tab, setTab] = useState<AdminTab>("players");
 
     const role = user?.role;
 
-    if (!user) {
+    // User is not logged in at all (no token)
+    if (!token) {
         return (
             <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
                 <div className="mx-auto max-w-5xl px-4 py-10">
-                    <p className="text-sm text-slate-500">Loading admin data...</p>
+                    <h1 className="text-2xl font-bold text-slate-900 mb-2">
+                        Please log in
+                    </h1>
+                    <p className="text-sm text-slate-500">
+                        You must log in as an administrator to view this page.
+                    </p>
                 </div>
             </div>
         );
     }
 
+    // Token exists, but user info is still loading (WhoAmI call)
+    if (token && !user) {
+        return (
+            <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
+                <div className="mx-auto max-w-5xl px-4 py-10">
+                    <p className="text-sm text-slate-500">
+                        Loading admin data...
+                    </p>
+                </div>
+            </div>
+        );
+    }
+
+    // Logged in but not an admin
     if (role !== "Admin") {
         return (
             <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
@@ -62,6 +82,7 @@ export default function AdminDashboardPage() {
         );
     }
 
+    // Admin view
     return (
         <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
             <div className="mx-auto max-w-5xl px-4 py-8">

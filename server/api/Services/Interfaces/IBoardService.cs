@@ -1,3 +1,5 @@
+// api/Services/IBoardService.cs
+using System.Security.Claims;
 using api.Models.Requests;
 using dataccess.Entities;
 
@@ -5,12 +7,18 @@ namespace api.Services;
 
 public interface IBoardService
 {
-    // Creates a new board (guess) for a player in a specific game
-    Task<Board> CreateBoard(CreateBoardRequestDto dto);
+    // Create a board for a specific player (used from helpers or admin endpoints)
+    Task<Board> CreateBoard(string playerId, CreateBoardRequestDto dto);
 
-    // Returns all boards for a given game (admin overview of that round)
+    // Boards for a specific game (admin view)
     Task<List<Board>> GetBoardsForGame(string gameId);
 
-    // Returns all boards for a given player (player history)
+    // Boards for a specific player (admin view)
     Task<List<Board>> GetBoardsForPlayer(string playerId);
+
+    // Use the current logged-in user as the player
+    Task<Board> CreateBoardForCurrentUser(ClaimsPrincipal user, CreateBoardRequestDto dto);
+
+    // Boards belonging to the current logged-in user
+    Task<List<Board>> GetBoardsForCurrentUser(ClaimsPrincipal user);
 }

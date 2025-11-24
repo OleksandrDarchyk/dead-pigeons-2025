@@ -16,4 +16,6 @@ public partial class User
     public string Role { get; set; } = null!;
 
     public DateTime? Createdat { get; set; }
+
+    public DateTime? Deletedat { get; set; }
 }

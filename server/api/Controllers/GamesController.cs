@@ -1,15 +1,17 @@
 using api.Models.Requests;
 using api.Services;
 using dataccess.Entities;
+using Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers;
 
 [ApiController]
+[Authorize] // all endpoints here require an authenticated user
 public class GamesController(IGameService gameService) : ControllerBase
 {
     // GET /GetActiveGame
-    // Returns the currently active game (there should be only one)
     [HttpGet(nameof(GetActiveGame))]
     public async Task<Game> GetActiveGame()
     {
@@ -17,19 +19,20 @@ public class GamesController(IGameService gameService) : ControllerBase
     }
 
     // GET /GetGamesHistory
-    // Returns the list of all games (history) for admin overview
+    // Admin overview of all games (past and current)
     [HttpGet(nameof(GetGamesHistory))]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<List<Game>> GetGamesHistory()
     {
         return await gameService.GetGamesHistory();
     }
 
     // POST /SetWinningNumbers
-    // Admin closes the game by entering the 3 winning numbers
+    // Only admin is allowed to close a game and set winners
     [HttpPost(nameof(SetWinningNumbers))]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<Game> SetWinningNumbers([FromBody] SetWinningNumbersRequestDto dto)
     {
-        // Later we will add [Authorize(Roles = "Admin")] here
         return await gameService.SetWinningNumbers(dto);
     }
 }

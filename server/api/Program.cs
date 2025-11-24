@@ -1,15 +1,15 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using api.Etc;
 using Api.Security;
 using api.Services;
 using dataccess.Entities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Scalar.AspNetCore;
 using Sieve.Models;
 using Sieve.Services;
+using System.Text.Json.Serialization;
 
 namespace api;
 
@@ -19,7 +19,7 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Normal path when app is running
+        // Normal path when the real app is starting
         ConfigureServices(builder.Services, builder.Configuration);
 
         var app = builder.Build();
@@ -30,7 +30,7 @@ public class Program
     }
 
     /// <summary>
-    /// Used by tests (Startup in tests project)
+    /// Used by tests (Startup in the tests project)
     /// </summary>
     public static void ConfigureServices(IServiceCollection services)
     {
@@ -48,7 +48,7 @@ public class Program
     }
 
     /// <summary>
-    /// Real registration, shared between app and tests
+    /// Shared registration, used by both the real app and the tests
     /// </summary>
     public static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
@@ -57,19 +57,19 @@ public class Program
         services.InjectAppOptions();          // uses AppOptions from configuration (Db, JwtSecret)
         services.AddMyDbContext();
 
-        // Controllers + JSON
+        // Controllers + JSON configuration
         services.AddControllers().AddJsonOptions(opts =>
         {
+            // Handle circular references in EF navigation properties
             opts.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.Preserve;
             opts.JsonSerializerOptions.MaxDepth = 128;
         });
 
-        // OpenAPI / Swagger + Sieve string constants (добавлено з твого прикладу)
+        // OpenAPI / Swagger + Sieve string constants
         services.AddOpenApiDocument(options =>
         {
             options.Title = "Dead Pigeons API";
 
-            
             options.AddSecurity("JWT", Array.Empty<string>(), new NSwag.OpenApiSecurityScheme
             {
                 Type = NSwag.OpenApiSecuritySchemeType.ApiKey,
@@ -81,7 +81,7 @@ public class Program
             options.OperationProcessors.Add(
                 new NSwag.Generation.Processors.Security.AspNetCoreOperationSecurityScopeProcessor("JWT"));
 
-            // 👇 ЦЕ з твого library-туторіалу
+            // Expose Sieve constants to the generated TypeScript client
             options.AddStringConstants(typeof(SieveConstants));
         });
 
@@ -98,10 +98,10 @@ public class Program
         // Password hasher (Argon2id)
         services.AddScoped<IPasswordHasher<User>, NSecArgon2idPasswordHasher>();
 
-        // JWT token service (для JwtBearer валідації)
+        // JWT token service (used by JwtBearer validation)
         services.AddScoped<ITokenService, JwtService>();
 
-        // 🔽 Sieve configuration (додано ТІЛЬКИ з того, що ти скинув)
+        // Sieve configuration
         services.Configure<SieveOptions>(options =>
         {
             options.CaseSensitive = false;
@@ -111,7 +111,7 @@ public class Program
 
         services.AddScoped<ISieveProcessor, ApplicationSieveProcessor>();
 
-        // Authentication & Authorization (як у вчителя)
+        // Authentication setup
         services
             .AddAuthentication(options =>
             {
@@ -124,7 +124,7 @@ public class Program
             {
                 options.TokenValidationParameters = JwtService.ValidationParameters(configuration);
 
-                // Debug-логування
+                // Simple debug logging
                 options.Events = new JwtBearerEvents
                 {
                     OnAuthenticationFailed = context =>
@@ -140,16 +140,23 @@ public class Program
                 };
             });
 
-        services.AddAuthorization();
+        // Global "whitelist" style authorization:
+        // everything requires an authenticated user unless [AllowAnonymous] is used
+        services.AddAuthorization(options =>
+        {
+            options.FallbackPolicy = new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .Build();
+        });
 
-        // Global exception handling
+        // Global exception handling (maps ValidationException etc. to ProblemDetails)
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
     }
 
     public static void ConfigureApp(WebApplication app)
     {
-        // Exception handler must be early in pipeline
+        // Centralized exception handler should be early in the pipeline
         app.UseExceptionHandler();
 
         // OpenAPI / Swagger / Scalar
@@ -159,7 +166,7 @@ public class Program
             options.OpenApiRoutePattern = "/swagger/v1/swagger.json"
         );
 
-        // CORS
+        // CORS configuration
         app.UseCors(config =>
             config
                 .AllowAnyHeader()
@@ -171,10 +178,10 @@ public class Program
         app.UseAuthentication();
         app.UseAuthorization();
 
-        // Controllers
+        // Map controllers
         app.MapControllers();
 
-        // Dev-only: generate TS client + seed DB
+        // Dev-only: generate TypeScript client and seed the database
         if (app.Environment.IsDevelopment())
         {
             app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts")
