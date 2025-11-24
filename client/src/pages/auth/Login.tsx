@@ -25,10 +25,10 @@ export default function Login() {
         try {
             setIsLoading(true);
 
-            // call global auth hook
+            // call global auth hooks
             await login(form);
 
-            // if no error – the hook will navigate to /admin or /player
+            // if no error – the hooks will navigate to /admin or /player
         } catch (err) {
             console.error(err);
             toast.error("Login failed");

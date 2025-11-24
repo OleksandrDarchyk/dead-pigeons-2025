@@ -1,61 +1,24 @@
-// src/components/admin/PaymentsTab.tsx
-import { useEffect, useState } from "react";
-import type { Transaction } from "../../../core/generated-client";
-import { transactionsApi } from "../../../utilities/transactionsApi";
-import toast from "react-hot-toast";
-
-
+// src/components/admin/tabs/PaymentsTab.tsx
+import { useAdminPayments } from "../../../hooks/useAdminPayments";
 
 export default function PaymentsTab() {
-    const [pending, setPending] = useState<Transaction[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
+    const {
+        pending,
+        players,
+        isLoading,
+        isAdding,
+        isSaving,
+        form,
+        setForm,
+        setIsAdding,
+        approve,
+        reject,
+        saveNewPayment,
+    } = useAdminPayments();
 
-    const loadPending = async () => {
-        try {
-            setIsLoading(true);
-
-            const list = await transactionsApi.getPendingTransactions();
-
-            console.log("getPendingTransactions result:", list);
-
-            if (Array.isArray(list)) {
-                setPending(list);
-            } else {
-                setPending([]);
-            }
-        } catch (err) {
-            console.error(err);
-            toast.error("Failed to load pending transactions");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-
-    useEffect(() => {
-        void loadPending();
-    }, []);
-
-    const approve = async (tx: Transaction) => {
-        try {
-            await transactionsApi.approveTransaction(tx.id);
-            toast.success("Transaction approved");
-            await loadPending();
-        } catch (err) {
-            console.error(err);
-            toast.error("Failed to approve transaction");
-        }
-    };
-
-    const reject = async (tx: Transaction) => {
-        try {
-            await transactionsApi.rejectTransaction(tx.id);
-            toast.success("Transaction rejected");
-            await loadPending();
-        } catch (err) {
-            console.error(err);
-            toast.error("Failed to reject transaction");
-        }
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await saveNewPayment();
     };
 
     return (
@@ -70,7 +33,74 @@ export default function PaymentsTab() {
                         {pending.length === 1 ? "" : "s"}
                     </p>
                 </div>
+
+                <button
+                    type="button"
+                    onClick={() => setIsAdding((x) => !x)}
+                    className="inline-flex items-center rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                    {isAdding ? "Close" : "Add Payment"}
+                </button>
             </div>
+
+            {isAdding && (
+                <form
+                    onSubmit={handleSubmit}
+                    className="mb-6 grid gap-3 md:grid-cols-[2fr,1fr,1fr,auto]"
+                >
+                    <select
+                        className="select select-bordered w-full text-sm bg-slate-50"
+                        value={form.playerId}
+                        onChange={(e) =>
+                            setForm((prev) => ({
+                                ...prev,
+                                playerId: e.target.value,
+                            }))
+                        }
+                    >
+                        <option value="">Select player…</option>
+                        {players.map((p) => (
+                            <option key={p.id} value={p.id}>
+                                {p.fullname} ({p.phone})
+                            </option>
+                        ))}
+                    </select>
+
+                    <input
+                        type="text"
+                        className="input input-bordered w-full text-sm bg-slate-50"
+                        placeholder="Amount (DKK)"
+                        value={form.amount}
+                        onChange={(e) =>
+                            setForm((prev) => ({
+                                ...prev,
+                                amount: e.target.value,
+                            }))
+                        }
+                    />
+
+                    <input
+                        type="text"
+                        className="input input-bordered w-full text-sm bg-slate-50"
+                        placeholder="MobilePay number"
+                        value={form.mobilePayNumber}
+                        onChange={(e) =>
+                            setForm((prev) => ({
+                                ...prev,
+                                mobilePayNumber: e.target.value,
+                            }))
+                        }
+                    />
+
+                    <button
+                        type="submit"
+                        disabled={isSaving}
+                        className="rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+                    >
+                        {isSaving ? "Saving…" : "Save"}
+                    </button>
+                </form>
+            )}
 
             {isLoading ? (
                 <p className="text-sm text-slate-500">Loading transactions...</p>
@@ -98,7 +128,9 @@ export default function PaymentsTab() {
                                 tx.player?.fullname ?? "Unknown player";
                             const date =
                                 tx.createdat &&
-                                new Date(tx.createdat).toLocaleDateString();
+                                new Date(
+                                    tx.createdat
+                                ).toLocaleDateString();
 
                             return (
                                 <tr
