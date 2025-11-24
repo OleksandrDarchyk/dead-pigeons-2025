@@ -128,6 +128,7 @@ public class TransactionService(
     {
         return await ctx.Transactions
             .Where(t => t.Playerid == playerId && t.Deletedat == null)
+            .Include(t => t.Player) 
             .OrderByDescending(t => t.Createdat)
             .ToListAsync();
     }
