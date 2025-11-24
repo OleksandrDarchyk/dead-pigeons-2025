@@ -1,85 +1,71 @@
 // src/atoms/auth.ts
 import { atom } from "jotai";
-import { atomWithStorage } from "jotai/utils";
+import { atomWithStorage, createJSONStorage } from "jotai/utils";
 import { useAtom } from "jotai";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "../utilities/authApi";
 import type { JwtClaims } from "@core/generated-client";
 
-// Credentials type used by the login form
+// Types for login credentials
 export type Credentials = {
     email: string;
     password: string;
 };
 
+// Storage key for JWT
 export const TOKEN_KEY = "jwt";
 
-// Simple sessionStorage adapter for atomWithStorage
-const storage: {
-    getItem: (key: string) => string | null;
-    setItem: (key: string, value: string | null) => void;
-    removeItem: (key: string) => void;
-} = {
-    getItem: (key) => {
-        if (typeof window === "undefined") return null;
-        return sessionStorage.getItem(key);
-    },
-    setItem: (key, value) => {
-        if (typeof window === "undefined") return;
-        if (value === null) {
-            sessionStorage.removeItem(key);
-        } else {
-            sessionStorage.setItem(key, value);
-        }
-    },
-    removeItem: (key) => {
-        if (typeof window === "undefined") return;
-        sessionStorage.removeItem(key);
-    },
-};
+// Use Jotai helper to store the token in sessionStorage
+const tokenStorage = createJSONStorage<string | null>(() => sessionStorage);
 
-// JWT token atom stored in sessionStorage
-export const jwtAtom = atomWithStorage<string | null>(TOKEN_KEY, null, storage);
+// Atom for the JWT token (synced with sessionStorage)
+export const jwtAtom = atomWithStorage<string | null>(
+    TOKEN_KEY,
+    null,
+    tokenStorage
+);
 
-// User atom: calls WhoAmI when token changes
+// Atom that loads current user (JwtClaims) when the token changes
 export const userAtom = atom(async (get): Promise<JwtClaims | null> => {
     const token = get(jwtAtom);
 
+    // No token => user is not logged in
     if (!token) return null;
 
     try {
-        const user = await authApi.whoAmI(); // JwtClaims from generated client
+        // Ask backend who is the current user (WhoAmI)
+        const user = await authApi.whoAmI();
         return user;
-    } catch {
-        // If token is invalid, we treat user as not logged in
+    } catch (error) {
+        console.error("Failed to load current user from WhoAmI", error);
         return null;
     }
 });
 
+// Hook that exposes auth functionality to React components
 export const useAuth = () => {
     const [token, setToken] = useAtom(jwtAtom);
     const [user] = useAtom(userAtom);
     const navigate = useNavigate();
 
-    // Login: call API, save token, then ask backend who this user is
+    // Login: call API, save token, then redirect by role
     const login = async (credentials: Credentials) => {
         const result = await authApi.login(credentials);
 
-        // Save token in jotai atom (and sessionStorage via storage adapter)
+        // Save token in atom (and sessionStorage via tokenStorage)
         setToken(result.token);
 
         try {
-            // Ask backend who is logged in (uses JwtBearer + WhoAmI)
-            const me: JwtClaims = await authApi.whoAmI();
-            const role: string = me.role; // type-safe
+            const me = await authApi.whoAmI();
+            const role = me.role;
 
             if (role === "Admin") {
                 navigate("/admin");
             } else {
                 navigate("/player");
             }
-        } catch (e) {
-            console.error("Failed to fetch current user info", e);
+        } catch (error) {
+            console.error("Failed to fetch current user info after login", error);
             navigate("/login");
         }
     };

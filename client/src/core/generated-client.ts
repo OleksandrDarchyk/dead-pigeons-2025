@@ -245,6 +245,39 @@ export class BoardClient {
         }
         return Promise.resolve<Board[]>(null as any);
     }
+
+    getMyBoards(): Promise<Board[]> {
+        let url_ = this.baseUrl + "/GetMyBoards";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetMyBoards(_response);
+        });
+    }
+
+    protected processGetMyBoards(response: Response): Promise<Board[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Board[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<Board[]>(null as any);
+    }
 }
 
 export class GamesClient {
@@ -750,12 +783,8 @@ export class TransactionsClient {
         return Promise.resolve<Transaction>(null as any);
     }
 
-    getTransactionsForPlayer(playerId: string | undefined): Promise<Transaction[]> {
-        let url_ = this.baseUrl + "/GetTransactionsForPlayer?";
-        if (playerId === null)
-            throw new globalThis.Error("The parameter 'playerId' cannot be null.");
-        else if (playerId !== undefined)
-            url_ += "playerId=" + encodeURIComponent("" + playerId) + "&";
+    getMyTransactions(): Promise<Transaction[]> {
+        let url_ = this.baseUrl + "/GetMyTransactions";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -766,11 +795,11 @@ export class TransactionsClient {
         };
 
         return this.http.fetch(url_, options_).then((_response: Response) => {
-            return this.processGetTransactionsForPlayer(_response);
+            return this.processGetMyTransactions(_response);
         });
     }
 
-    protected processGetTransactionsForPlayer(response: Response): Promise<Transaction[]> {
+    protected processGetMyTransactions(response: Response): Promise<Transaction[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
@@ -818,6 +847,39 @@ export class TransactionsClient {
             });
         }
         return Promise.resolve<Transaction[]>(null as any);
+    }
+
+    getMyBalance(): Promise<PlayerBalanceResponseDto> {
+        let url_ = this.baseUrl + "/GetMyBalance";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetMyBalance(_response);
+        });
+    }
+
+    protected processGetMyBalance(response: Response): Promise<PlayerBalanceResponseDto> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlayerBalanceResponseDto;
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PlayerBalanceResponseDto>(null as any);
     }
 
     getPlayerBalance(playerId: string | undefined): Promise<PlayerBalanceResponseDto> {
@@ -931,7 +993,6 @@ export interface Transaction {
 }
 
 export interface CreateBoardRequestDto {
-    playerId: string;
     gameId: string;
     numbers: number[];
     repeatWeeks: number;
@@ -965,6 +1026,14 @@ export interface PlayerBalanceResponseDto {
     playerId: string;
     balance: number;
 }
+
+/** String constants from SieveConstants */
+export interface SieveConstants {
+}
+
+/** Constant values for SieveConstants */
+export const SieveConstants = {
+} as const;
 
 export class ApiException extends Error {
     override message: string;

@@ -1,38 +1,45 @@
+// api/Controllers/BoardController.cs
 using api.Models.Requests;
 using api.Services;
 using dataccess.Entities;
+using Api.Security;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers;
 
 [ApiController]
+[Authorize]
 public class BoardController(IBoardService boardService) : ControllerBase
 {
-    // POST /CreateBoard
-    // Player (through UI) buys a new board for a specific game
+    // Player buys a new board for the current game
+    // PlayerId is resolved from JWT inside the service
     [HttpPost(nameof(CreateBoard))]
     public async Task<Board> CreateBoard([FromBody] CreateBoardRequestDto dto)
     {
-        // Later we can add [Authorize] attributes here
-        var board = await boardService.CreateBoard(dto);
-        return board;
+        return await boardService.CreateBoardForCurrentUser(User, dto);
     }
 
-    // GET /GetBoardsForGame?gameId=...
-    // Admin overview: see all boards for a specific game
+    // Admin overview: all boards for a specific game
     [HttpGet(nameof(GetBoardsForGame))]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<List<Board>> GetBoardsForGame([FromQuery] string gameId)
     {
-        var boards = await boardService.GetBoardsForGame(gameId);
-        return boards;
+        return await boardService.GetBoardsForGame(gameId);
     }
 
-    // GET /GetBoardsForPlayer?playerId=...
-    // Player history: all boards bought by a specific player
+    // Admin: all boards for a specific player
     [HttpGet(nameof(GetBoardsForPlayer))]
+    [Authorize(Roles = Roles.Admin)]
     public async Task<List<Board>> GetBoardsForPlayer([FromQuery] string playerId)
     {
-        var boards = await boardService.GetBoardsForPlayer(playerId);
-        return boards;
+        return await boardService.GetBoardsForPlayer(playerId);
+    }
+
+    // Player: only boards for the current logged-in user
+    [HttpGet(nameof(GetMyBoards))]
+    public async Task<List<Board>> GetMyBoards()
+    {
+        return await boardService.GetBoardsForCurrentUser(User);
     }
 }
