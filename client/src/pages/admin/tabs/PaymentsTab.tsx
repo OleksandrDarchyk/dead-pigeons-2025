@@ -13,8 +13,16 @@ export default function PaymentsTab() {
     const loadPending = async () => {
         try {
             setIsLoading(true);
+
             const list = await transactionsApi.getPendingTransactions();
-            setPending(list);
+
+            console.log("getPendingTransactions result:", list);
+
+            if (Array.isArray(list)) {
+                setPending(list);
+            } else {
+                setPending([]);
+            }
         } catch (err) {
             console.error(err);
             toast.error("Failed to load pending transactions");
@@ -22,6 +30,7 @@ export default function PaymentsTab() {
             setIsLoading(false);
         }
     };
+
 
     useEffect(() => {
         void loadPending();

@@ -1,9 +1,8 @@
 // src/components/admin/WinningNumbersTab.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { gamesApi } from "../../../utilities/gamesApi";
 import type { Game } from "../../../core/generated-client";
 import toast from "react-hot-toast";
-
 
 export default function WinningNumbersTab() {
     const [activeGame, setActiveGame] = useState<Game | null>(null);
@@ -28,7 +27,7 @@ export default function WinningNumbersTab() {
 
     const numbers = Array.from({ length: 16 }, (_, i) => i + 1);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
 
         if (n1 === "" || n2 === "" || n3 === "") {
