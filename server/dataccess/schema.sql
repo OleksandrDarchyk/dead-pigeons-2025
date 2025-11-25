@@ -47,7 +47,7 @@ create table deadpigeons.game
     weekNumber     int              not null,
     year           int              not null,
     winningNumbers int[]            null,
-    isActive       boolean          not null default true,
+    isActive       boolean          not null default false,
     createdAt      timestamp with time zone,
     closedAt       timestamp with time zone,
     deletedAt      timestamp with time zone

@@ -575,12 +575,12 @@
 <path fill="none" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" d="M273.77,-477.98C293.3,-480.17 317.44,-482.87 336.92,-485.06"/>
 <polygon fill="#000000" fill-opacity="0.200000" stroke="#000000" stroke-width="2" stroke-opacity="0.200000" points="336.58,-487.13 342.77,-485.71 337.05,-482.96 336.58,-487.13"/>
 </g>
-<!-- src/pages/auth/registr.tsx -->
+<!-- src/pages/auth/Register.tsx -->
 <g id="node24" class="node">
-<title>src/pages/auth/registr.tsx</title>
-<g id="a_node24"><a xlink:href="src/pages/auth/registr.tsx" xlink:title="no&#45;orphans">
+<title>src/pages/auth/Register.tsx</title>
+<g id="a_node24"><a xlink:href="src/pages/auth/Register.tsx" xlink:title="no&#45;orphans">
 <path fill="#ccffcc" stroke="orange" d="M259.46,-514.62C259.46,-514.62 215.04,-514.62 215.04,-514.62 211.83,-514.62 208.62,-511.42 208.62,-508.21 208.62,-508.21 208.62,-501.79 208.62,-501.79 208.62,-498.58 211.83,-495.38 215.04,-495.38 215.04,-495.38 259.46,-495.38 259.46,-495.38 262.67,-495.38 265.88,-498.58 265.88,-501.79 265.88,-501.79 265.88,-508.21 265.88,-508.21 265.88,-511.42 262.67,-514.62 259.46,-514.62"/>
-<text text-anchor="start" x="216.62" y="-502.07" font-family="Helvetica,sans-Serif" font-size="9.00" fill="orange">registr.tsx</text>
+<text text-anchor="start" x="216.62" y="-502.07" font-family="Helvetica,sans-Serif" font-size="9.00" fill="orange">Register.tsx</text>
 </a>
 </g>
 </g>

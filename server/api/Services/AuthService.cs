@@ -70,18 +70,31 @@ public class AuthService(
 
     public async Task<JwtResponse> Register(RegisterRequestDto dto)
     {
-        // Validate incoming data using DataAnnotations
+        // Validate basic shape (email format, password length etc.)
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
-        // Check for duplicate email among non-deleted users
-        var isEmailTaken = await ctx.Users
+        // Player must already exist in the system with this email
+        var playerExists = await ctx.Players
+            .AnyAsync(p =>
+                p.Email == dto.Email &&
+                p.Deletedat == null);
+
+        if (!playerExists)
+        {
+            // Do not allow random people to create accounts
+            throw new ValidationException(
+                "You must be registered as a player by the club before creating an account.");
+        }
+
+        // A non-deleted user with this email must not already exist
+        var emailTaken = await ctx.Users
             .AnyAsync(u =>
                 u.Email == dto.Email &&
                 u.Deletedat == null);
 
-        if (isEmailTaken)
+        if (emailTaken)
         {
-            throw new ValidationException("Email is already taken");
+            throw new ValidationException("An account with this email already exists.");
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -91,13 +104,11 @@ public class AuthService(
             Id = Guid.NewGuid().ToString(),
             Email = dto.Email,
             Createdat = now,
-            // Use shared role constant instead of hard-coded string
             Role = Roles.User,
-            // Salt column kept for compatibility, but Argon2 hash embeds its own salt
-            Salt = string.Empty
+            Salt = string.Empty // Argon2id hash contains its own salt
         };
 
-        // Hash password with the configured Argon2id hasher
+        // Hash the raw password using Argon2id
         user.Passwordhash = passwordHasher.HashPassword(user, dto.Password);
 
         ctx.Users.Add(user);
@@ -105,8 +116,10 @@ public class AuthService(
 
         logger.LogInformation("User {Email} registered successfully", dto.Email);
 
-        // New users receive a token directly after registration
+        // New users receive a JWT right after registration
         var token = tokenService.CreateToken(user);
         return new JwtResponse(token);
     }
+
+
 }
