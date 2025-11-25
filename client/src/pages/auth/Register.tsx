@@ -1,16 +1,22 @@
-// src/pages/auth/Login.tsx
+// src/pages/auth/Register.tsx
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { useAuth, type LoginCredentials } from "../../atoms/auth";
+import { useAuth } from "../../atoms/auth";
 import toast from "react-hot-toast";
 
-export default function Login() {
-    const { login } = useAuth();
+type RegisterForm = {
+    email: string;
+    password: string;
+    confirmPassword: string;
+};
 
-    // Local state for the form
-    const [form, setForm] = useState<LoginCredentials>({
+export default function Register() {
+    const { register } = useAuth();
+
+    const [form, setForm] = useState<RegisterForm>({
         email: "",
         password: "",
+        confirmPassword: "",
     });
 
     const [isLoading, setIsLoading] = useState(false);
@@ -18,20 +24,35 @@ export default function Login() {
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!form.email || !form.password) {
-            toast.error("Please enter email and password");
+        if (!form.email || !form.password || !form.confirmPassword) {
+            toast.error("Please fill in all fields");
+            return;
+        }
+
+        if (form.password.length < 8) {
+            toast.error("Password must be at least 8 characters");
+            return;
+        }
+
+        if (form.password !== form.confirmPassword) {
+            toast.error("Passwords do not match");
             return;
         }
 
         try {
             setIsLoading(true);
 
-            // Use global auth hook
-            await login(form);
-            // On success, the hook will navigate to /admin or /player
+            // Only email + password are sent to the API
+            await register({
+                email: form.email.trim(),
+                password: form.password,
+                confirmPassword: form.confirmPassword,
+            });
+
+            // On success, the hook will log the user in and redirect
         } catch (err) {
             console.error(err);
-            toast.error("Login failed");
+            toast.error("Registration failed");
         } finally {
             setIsLoading(false);
         }
@@ -44,7 +65,7 @@ export default function Login() {
                     Dead Pigeons
                 </h1>
                 <p className="text-center text-xs uppercase tracking-wide text-slate-400 mb-6">
-                    Jerne IF Lottery Login
+                    Create your Dead Pigeons account
                 </p>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
@@ -82,30 +103,50 @@ export default function Login() {
                         />
                     </div>
 
+                    <div className="form-control">
+                        <label className="label px-0 pb-1">
+                            <span className="text-xs font-semibold text-slate-700">
+                                Confirm password
+                            </span>
+                        </label>
+                        <input
+                            type="password"
+                            className="input input-bordered w-full bg-slate-50 text-sm"
+                            placeholder="********"
+                            value={form.confirmPassword}
+                            onChange={(e) =>
+                                setForm({
+                                    ...form,
+                                    confirmPassword: e.target.value,
+                                })
+                            }
+                        />
+                    </div>
+
                     <button
                         type="submit"
                         className="btn w-full rounded-full bg-slate-900 text-white border-none hover:bg-slate-800"
                         disabled={isLoading}
                     >
-                        {isLoading ? "Logging in..." : "Login"}
+                        {isLoading ? "Creating account..." : "Create account"}
                     </button>
                 </form>
 
-                {/* Link to registration page */}
                 <div className="mt-4 text-center">
                     <span className="text-xs text-slate-500 mr-1">
-                        Need an account?
+                        Already have an account?
                     </span>
                     <Link
-                        to="/register"
+                        to="/login"
                         className="text-xs font-semibold text-slate-900 underline-offset-2 hover:underline"
                     >
-                        Register
+                        Login
                     </Link>
                 </div>
 
                 <p className="mt-6 text-center text-xs text-slate-400">
-                    Access is provided by Jerne IF administrator.
+                    You can only register if a Jerne IF admin has added you as a
+                    player.
                 </p>
             </div>
         </div>
