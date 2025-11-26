@@ -17,6 +17,7 @@ export function usePlayerHistory(enabled: boolean = true) {
     useEffect(() => {
         if (!enabled) {
             setIsLoading(false);
+            setItems([]);
             return;
         }
 
@@ -24,32 +25,22 @@ export function usePlayerHistory(enabled: boolean = true) {
             try {
                 setIsLoading(true);
 
-                // ❗ ТУТ ВАЖЛИВО:
-                // Заміни getAllGames() на правильний метод з GamesClient,
-                // який повертає список усіх ігор.
-                // Напр. gamesApi.getAllGames() або gamesApi.listGames() – перевір у generated-client.ts
-                const games: Game[] = await (gamesApi as any).getGamesHistory();
-
+                // історія всіх ігор
+                const games = await gamesApi.getGamesHistory();
+                // всі борди поточного гравця
                 const myBoards = await boardsApi.getMyBoards();
 
-                const gamesArr = Array.isArray(games) ? games : [];
-                const boardsArr = Array.isArray(myBoards) ? myBoards : [];
-
-                // новіші роки/тижні – вище
-                const sortedGames = [...gamesArr].sort((a, b) => {
-                    const yearA = (a as any).year ?? 0;
-                    const yearB = (b as any).year ?? 0;
-                    if (yearA !== yearB) return yearB - yearA;
-
-                    const weekA = (a as any).weeknumber ?? 0;
-                    const weekB = (b as any).weeknumber ?? 0;
-                    return weekB - weekA;
+                // новіші роки/тижні вище
+                const sortedGames = [...games].sort((a, b) => {
+                    if (a.year !== b.year) return b.year - a.year;
+                    return b.weeknumber - a.weeknumber;
                 });
 
                 const grouped: GameHistoryItem[] = sortedGames
                     .map((game) => {
-                        const boardsForGame = boardsArr.filter(
-                            (b) => b.gameid === game.id && !b.deletedat
+                        const boardsForGame = myBoards.filter(
+                            (board) =>
+                                board.gameid === game.id && !board.deletedat
                         );
 
                         return { game, boards: boardsForGame };
@@ -61,6 +52,7 @@ export function usePlayerHistory(enabled: boolean = true) {
             } catch (err) {
                 console.error(err);
                 toast.error("Failed to load games history");
+                setItems([]);
             } finally {
                 setIsLoading(false);
             }

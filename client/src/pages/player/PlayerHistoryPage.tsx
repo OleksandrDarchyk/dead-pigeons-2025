@@ -3,6 +3,21 @@ import { useAuth } from "../../atoms/auth";
 import { usePlayerHistory } from "../../hooks/usePlayerHistory";
 import PlayerGuard from "./PlayerGuard";
 import PlayerTabs from "./PlayerTabs";
+import type { Game } from "../../core/generated-client";
+
+// Виграшні числа беремо з поля Game.winningnumbers
+function getWinningNumbers(game: Game): number[] {
+    if (!Array.isArray(game.winningnumbers)) {
+        return [];
+    }
+
+    const onlyNumbers = game.winningnumbers.filter(
+        (n): n is number => typeof n === "number"
+    );
+
+    // прибираємо дублікати й сортуємо
+    return [...new Set(onlyNumbers)].sort((a, b) => a - b);
+}
 
 export default function PlayerHistoryPage() {
     const { user, token } = useAuth();
@@ -11,23 +26,6 @@ export default function PlayerHistoryPage() {
     const isPlayer = Boolean(token && user && role === "User");
 
     const { items, isLoading } = usePlayerHistory(isPlayer);
-
-    function getWinningNumbers(game: unknown): number[] {
-        const g: any = game;
-        const nums: number[] = [];
-
-        if (Array.isArray(g.winningnumbers)) {
-            for (const n of g.winningnumbers) {
-                if (typeof n === "number") nums.push(n);
-            }
-        }
-
-        if (typeof g.winningnumber1 === "number") nums.push(g.winningnumber1);
-        if (typeof g.winningnumber2 === "number") nums.push(g.winningnumber2);
-        if (typeof g.winningnumber3 === "number") nums.push(g.winningnumber3);
-
-        return Array.from(new Set(nums)).sort((a, b) => a - b);
-    }
 
     return (
         <PlayerGuard>
@@ -63,24 +61,23 @@ export default function PlayerHistoryPage() {
                                     winningNumbers.length > 0;
 
                                 const created =
-                                    (game as any).createdat &&
-                                    new Date(
-                                        (game as any).createdat
-                                    ).toLocaleDateString();
+                                    game.createdat &&
+                                    new Date(game.createdat).toLocaleDateString();
 
                                 return (
                                     <section
                                         key={game.id}
                                         className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm"
                                     >
+                                        {/* Заголовок раунду + статус */}
                                         <div className="mb-4 flex items-center justify-between gap-3">
                                             <div>
                                                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                                     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-red-500">
                                                         🏆
                                                     </span>
-                                                    Week {(game as any).weeknumber},{" "}
-                                                    {(game as any).year}
+                                                    Week {game.weeknumber},{" "}
+                                                    {game.year}
                                                 </p>
                                                 <p className="mt-1 text-xs text-slate-500">
                                                     Draw date: {created ?? "–"}
