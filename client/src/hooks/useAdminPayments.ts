@@ -1,4 +1,4 @@
-// src/hooks/useAdminPayments.ts
+// client/src/hooks/useAdminPayments.ts
 import { useEffect, useState } from "react";
 import type { Player, TransactionResponseDto } from "@core/generated-client";
 import { transactionsApi } from "@utilities/transactionsApi";
@@ -7,7 +7,7 @@ import toast from "react-hot-toast";
 
 type NewPaymentState = {
     playerId: string;       // selected player
-    amount: string;        // keep as string for controlled input
+    amount: string;         // keep as string for controlled input
     mobilePayNumber: string;
 };
 
@@ -34,15 +34,11 @@ export function useAdminPayments() {
     // Load pending transactions (DTO list)
     const loadPending = async () => {
         try {
-            setIsLoading(true);
-
             const list = await transactionsApi.getPendingTransactions();
             setPending(Array.isArray(list) ? list : []);
         } catch (err) {
             console.error(err);
             toast.error("Failed to load pending transactions");
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -57,9 +53,18 @@ export function useAdminPayments() {
         }
     };
 
+    // Initial load: pending + players at the same time
     useEffect(() => {
-        void loadPending();
-        void loadPlayers();
+        const loadAll = async () => {
+            try {
+                setIsLoading(true);
+                await Promise.all([loadPending(), loadPlayers()]);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        void loadAll();
     }, []);
 
     // Approve a pending transaction
@@ -67,6 +72,8 @@ export function useAdminPayments() {
         try {
             await transactionsApi.approveTransaction(tx.id);
             toast.success("Transaction approved");
+
+            // Refresh pending list (without touching isLoading)
             await loadPending();
         } catch (err) {
             console.error(err);
@@ -79,6 +86,8 @@ export function useAdminPayments() {
         try {
             await transactionsApi.rejectTransaction(tx.id);
             toast.success("Transaction rejected");
+
+            // Refresh pending list (without touching isLoading)
             await loadPending();
         } catch (err) {
             console.error(err);
@@ -103,10 +112,17 @@ export function useAdminPayments() {
             return;
         }
 
-        // 3) validate MobilePay number (not empty)
+        // 3) validate MobilePay number (not empty + simple pattern)
         const mobilePay = form.mobilePayNumber.trim();
         if (!mobilePay) {
             toast.error("MobilePay number is required");
+            return;
+        }
+
+        // Allow digits, spaces, + and -, length between 4 and 30
+        const mobilePayPattern = /^[0-9+\-\s]{4,30}$/;
+        if (!mobilePayPattern.test(mobilePay)) {
+            toast.error("MobilePay number looks invalid");
             return;
         }
 
@@ -130,6 +146,7 @@ export function useAdminPayments() {
             });
             setIsAdding(false);
 
+            // Refresh pending list to include new transaction
             await loadPending();
         } catch (err) {
             console.error(err);

@@ -1,3 +1,4 @@
+// client/src/hooks/usePlayerPayments.ts
 import { useEffect, useState } from "react";
 import { transactionsApi } from "../utilities/transactionsApi";
 import type { TransactionResponseDto } from "../core/generated-client";
@@ -22,9 +23,8 @@ export function usePlayerPayments() {
         try {
             setIsLoading(true);
 
-            // getMyTransactions() вже типізований як TransactionResponseDto[]
+            // getMyTransactions() already returns TransactionResponseDto[]
             const list = await transactionsApi.getMyTransactions();
-
             setPayments(Array.isArray(list) ? list : []);
         } catch (err) {
             console.error(err);
@@ -39,7 +39,7 @@ export function usePlayerPayments() {
     }, []);
 
     const submitPayment = async () => {
-        // Normalize amount: replace comma with dot and trim spaces
+        // 1) Normalize amount: replace comma with dot and trim spaces
         const normalizedAmount = form.amount.replace(",", ".").trim();
         const amountNumber = Number(normalizedAmount);
 
@@ -48,15 +48,24 @@ export function usePlayerPayments() {
             return;
         }
 
+        // 2) Basic MobilePay validation
         const mobilePay = form.mobilePayNumber.trim();
         if (!mobilePay) {
             toast.error("MobilePay number is required");
             return;
         }
 
+        // Allow digits, spaces, + and -, length between 4 and 30
+        const mobilePayPattern = /^[0-9+\-\s]{4,30}$/;
+        if (!mobilePayPattern.test(mobilePay)) {
+            toast.error("MobilePay number looks invalid");
+            return;
+        }
+
         try {
             setIsSaving(true);
 
+            // Player does NOT send playerId; server resolves player from JWT
             await transactionsApi.createTransaction({
                 amount: amountNumber,
                 mobilePayNumber: mobilePay,
