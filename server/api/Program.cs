@@ -41,7 +41,7 @@ public class Program
             .AddJsonFile("appsettings.Development.json", optional: true)
             .AddEnvironmentVariables()
             .Build();
-
+        
         services.AddSingleton<IConfiguration>(configuration);
 
         ConfigureServices(services, configuration);
@@ -182,15 +182,19 @@ public class Program
         app.MapControllers();
 
         // Dev-only: generate TypeScript client and seed the database
+        // Dev-only: generate TypeScript client and seed the database
         if (app.Environment.IsDevelopment())
         {
+          
             app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts")
                 .GetAwaiter()
                 .GetResult();
 
-            using var scope = app.Services.CreateScope();
-            var seeder = scope.ServiceProvider.GetRequiredService<ISeeder>();
-            seeder.Seed().GetAwaiter().GetResult();
+            // ❌ Disabled seeding to prevent data loss during development
+            //using var scope = app.Services.CreateScope();
+            //var seeder = scope.ServiceProvider.GetRequiredService<ISeeder>();
+            //seeder.Seed().GetAwaiter().GetResult();
         }
+
     }
 }

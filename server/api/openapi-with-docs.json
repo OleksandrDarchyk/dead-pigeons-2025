@@ -1110,8 +1110,7 @@
             "type": "string"
           },
           "playerid": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "mobilepaynumber": {
             "type": "string"
@@ -1125,8 +1124,7 @@
           },
           "createdat": {
             "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "format": "date-time"
           },
           "approvedat": {
             "type": "string",
@@ -1138,13 +1136,12 @@
             "format": "date-time",
             "nullable": true
           },
+          "rejectionreason": {
+            "type": "string",
+            "nullable": true
+          },
           "player": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Player"
-              }
-            ]
+            "$ref": "#/components/schemas/Player"
           }
         }
       },

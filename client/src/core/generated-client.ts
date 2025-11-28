@@ -1020,14 +1020,15 @@ export interface Player {
 
 export interface Transaction {
     id: string;
-    playerid: string | undefined;
+    playerid: string;
     mobilepaynumber: string;
     amount: number;
     status: string;
-    createdat: string | undefined;
+    createdat: string;
     approvedat: string | undefined;
     deletedat: string | undefined;
-    player: Player | undefined;
+    rejectionreason: string | undefined;
+    player: Player;
 }
 
 export interface CreateBoardRequestDto {
