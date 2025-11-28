@@ -1,4 +1,4 @@
-// src/components/admin/tabs/PaymentsTab.tsx
+// client/src/components/admin/tabs/PaymentsTab.tsx
 import { useAdminPayments } from "../../../hooks/useAdminPayments";
 
 export default function PaymentsTab() {
@@ -61,7 +61,8 @@ export default function PaymentsTab() {
                         <option value="">Select player…</option>
                         {players.map((p) => (
                             <option key={p.id} value={p.id}>
-                                {p.fullname} ({p.phone})
+                                {p.fullname}
+                                {p.phone ? ` (${p.phone})` : ""}
                             </option>
                         ))}
                     </select>
@@ -124,12 +125,18 @@ export default function PaymentsTab() {
                         </thead>
                         <tbody>
                         {pending.map((tx) => {
+                            // Знаходимо гравця по playerId з DTO
+                            const player = players.find(
+                                (p) => p.id === tx.playerId,
+                            );
+
                             const playerName =
-                                tx.player?.fullname ?? "Unknown player";
+                                player?.fullname ?? "Unknown player";
+
                             const date =
-                                tx.createdat &&
+                                tx.createdAt &&
                                 new Date(
-                                    tx.createdat
+                                    tx.createdAt,
                                 ).toLocaleDateString();
 
                             return (
@@ -144,7 +151,7 @@ export default function PaymentsTab() {
                                         {tx.amount.toFixed(2)} DKK
                                     </td>
                                     <td className="py-3 pr-4 text-slate-700">
-                                        {tx.mobilepaynumber}
+                                        {tx.mobilePayNumber}
                                     </td>
                                     <td className="py-3 pr-4 text-slate-500">
                                         {date ?? "–"}

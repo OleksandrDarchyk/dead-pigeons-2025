@@ -60,10 +60,11 @@ public class Program
         // Controllers + JSON configuration
         services.AddControllers().AddJsonOptions(opts =>
         {
-            // Handle circular references in EF navigation properties
-            opts.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.Preserve;
-            opts.JsonSerializerOptions.MaxDepth = 128;
+            opts.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+            
+            opts.JsonSerializerOptions.MaxDepth = 32;
         });
+
 
         // OpenAPI / Swagger + Sieve string constants
         services.AddOpenApiDocument(options =>
