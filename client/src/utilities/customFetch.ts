@@ -21,7 +21,6 @@ export async function customFetch(
         if (raw) {
             raw = raw.trim();
 
-            // If stored as `"eyJ..."` – strip the outer quotes
             if (raw.startsWith('"') && raw.endsWith('"')) {
                 raw = raw.slice(1, -1);
             }
@@ -30,10 +29,12 @@ export async function customFetch(
         }
     }
 
-    // Start from existing headers (NSwag puts Accept/Content-Type here)
+    // 👉 Insert logs HERE
+    console.log("customFetch → TOKEN:", token);
+    console.log("customFetch → URL:", url);
+
     const headers = new Headers(init?.headers ?? {});
 
-    // Attach Authorization header if token exists
     if (token) {
         headers.set("Authorization", `Bearer ${token}`);
     }
@@ -43,7 +44,6 @@ export async function customFetch(
         headers,
     });
 
-    // If not OK – try to read ProblemDetails and show toast
     if (!response.ok) {
         try {
             const clone = response.clone();

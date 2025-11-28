@@ -71,7 +71,7 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Createdat).HasColumnName("createdat");
             entity.Property(e => e.Deletedat).HasColumnName("deletedat");
             entity.Property(e => e.Isactive)
-                .HasDefaultValue(true)
+                .HasDefaultValue(false)
                 .HasColumnName("isactive");
             entity.Property(e => e.Weeknumber).HasColumnName("weeknumber");
             entity.Property(e => e.Winningnumbers).HasColumnName("winningnumbers");
@@ -109,17 +109,20 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Id).HasColumnName("id");
             entity.Property(e => e.Amount).HasColumnName("amount");
             entity.Property(e => e.Approvedat).HasColumnName("approvedat");
-            entity.Property(e => e.Createdat).HasColumnName("createdat");
+            entity.Property(e => e.Createdat)
+                .HasDefaultValueSql("now()")
+                .HasColumnName("createdat");
             entity.Property(e => e.Deletedat).HasColumnName("deletedat");
             entity.Property(e => e.Mobilepaynumber).HasColumnName("mobilepaynumber");
             entity.Property(e => e.Playerid).HasColumnName("playerid");
+            entity.Property(e => e.Rejectionreason).HasColumnName("rejectionreason");
             entity.Property(e => e.Status)
                 .HasDefaultValueSql("'Pending'::text")
                 .HasColumnName("status");
 
             entity.HasOne(d => d.Player).WithMany(p => p.Transactions)
                 .HasForeignKey(d => d.Playerid)
-                .OnDelete(DeleteBehavior.Cascade)
+                .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("transactions_playerid_fkey");
         });
 

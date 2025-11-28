@@ -80,16 +80,25 @@ create table deadpigeons.board
 create table deadpigeons.transactions
 (
     id              text primary key not null,
-    playerId        text             references deadpigeons.player(id) on delete cascade,
-    mobilePayNumber text             not null,
-    amount          int              not null,
-    status          text             not null default 'Pending',
-    createdAt       timestamp with time zone,
-    approvedAt      timestamp with time zone,
-    deletedAt       timestamp with time zone
+    playerId        text not null references deadpigeons.player(id) on delete restrict,
+    mobilePayNumber text not null,
+    amount          int  not null,
+    status          text not null default 'Pending',
+    createdAt       timestamptz not null default now(),
+    approvedAt      timestamptz,
+    deletedAt       timestamptz,
+    rejectionReason text,
+
+    constraint chk_transactions_amount
+        check (amount > 0),
+
+    constraint chk_transactions_status
+        check (status in ('Pending', 'Approved', 'Rejected'))
 );
 
-create unique index idx_transactions_mp on deadpigeons.transactions(mobilePayNumber);
+create unique index idx_transactions_mp
+    on deadpigeons.transactions (mobilePayNumber);
+
 
 -- ==========================
 -- BALANCES
