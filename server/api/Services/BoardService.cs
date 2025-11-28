@@ -4,6 +4,7 @@ using api.Models.Requests;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
+// Domain validation errors should use Bogus.ValidationException
 using ValidationException = Bogus.ValidationException;
 
 namespace api.Services;
@@ -14,12 +15,12 @@ public class BoardService(
 {
     public async Task<Board> CreateBoard(string playerId, CreateBoardRequestDto dto)
     {
-        // Validate DTO via DataAnnotations
+        // Validate DTO using DataAnnotations attributes
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
         var numbers = dto.Numbers ?? Array.Empty<int>();
 
-        // Extra safety: length 5–8
+        // Extra safety: must be between 5 and 8 numbers
         if (numbers.Length is < 5 or > 8)
         {
             throw new ValidationException("Board must have between 5 and 8 numbers.");
@@ -31,7 +32,7 @@ public class BoardService(
             throw new ValidationException("Board numbers must be distinct.");
         }
 
-        // Numbers must be within 1–16
+        // Numbers must be in allowed range [1;16]
         if (numbers.Any(n => n < 1 || n > 16))
         {
             throw new ValidationException("Board numbers must be between 1 and 16.");
@@ -39,7 +40,7 @@ public class BoardService(
 
         var sortedNumbers = numbers.OrderBy(n => n).ToArray();
 
-        // Ensure player exists, not soft-deleted
+        // Ensure player exists and is not soft-deleted
         var player = await ctx.Players
             .FirstOrDefaultAsync(p =>
                 p.Id == playerId &&
@@ -50,12 +51,13 @@ public class BoardService(
             throw new ValidationException("Player not found.");
         }
 
+        // Only active players can participate in games
         if (!player.Isactive)
         {
             throw new ValidationException("Only active players can buy boards.");
         }
 
-        // Ensure game exists, not soft-deleted
+        // Ensure game exists and is not soft-deleted
         var game = await ctx.Games
             .FirstOrDefaultAsync(g =>
                 g.Id == dto.GameId &&
@@ -66,12 +68,13 @@ public class BoardService(
             throw new ValidationException("Game not found.");
         }
 
+        // Business rule: players cannot buy boards for inactive games
         if (!game.Isactive)
         {
             throw new ValidationException("Cannot buy boards for an inactive game.");
         }
 
-        // Price depends on numbers count
+        // Price is calculated on the server based on number of fields
         var count = sortedNumbers.Length;
         var price = count switch
         {
@@ -82,21 +85,8 @@ public class BoardService(
             _ => throw new ValidationException("Board must have between 5 and 8 numbers.")
         };
 
-        // balance = sum(Approved transactions) - sum(board prices)
-        var approvedAmount = await ctx.Transactions
-            .Where(t =>
-                t.Playerid == playerId &&
-                t.Deletedat == null &&
-                t.Status == "Approved")
-            .SumAsync(t => (int?)t.Amount) ?? 0;
-
-        var spentOnBoards = await ctx.Boards
-            .Where(b =>
-                b.Playerid == playerId &&
-                b.Deletedat == null)
-            .SumAsync(b => (int?)b.Price) ?? 0;
-
-        var currentBalance = approvedAmount - spentOnBoards;
+        // Balance = sum(approved transactions) - sum(board prices)
+        var currentBalance = await GetCurrentBalance(playerId);
 
         if (currentBalance < price)
         {
@@ -127,19 +117,21 @@ public class BoardService(
 
     public async Task<List<Board>> GetBoardsForGame(string gameId)
     {
-        // All non-deleted boards for a specific game, with Player included
+        // All non-deleted boards for a specific game, with Player and Game included
         return await ctx.Boards
             .Where(b => b.Gameid == gameId && b.Deletedat == null)
-            .Include(b => b.Player)
+            .Include(b => b.Player) // used for admin overview (player details)
+            .Include(b => b.Game)   // used for GameWeek / GameYear in DTO
             .OrderBy(b => b.Createdat)
             .ToListAsync();
     }
 
     public async Task<List<Board>> GetBoardsForPlayer(string playerId)
     {
-        // All non-deleted boards for a specific player (latest first)
+        // All non-deleted boards for a specific player (latest first), with Game included
         return await ctx.Boards
             .Where(b => b.Playerid == playerId && b.Deletedat == null)
+            .Include(b => b.Game) // we can expose GameWeek / GameYear in DTO later
             .OrderByDescending(b => b.Createdat)
             .ToListAsync();
     }
@@ -148,7 +140,7 @@ public class BoardService(
         ClaimsPrincipal claims,
         CreateBoardRequestDto dto)
     {
-        // Use email from JWT to resolve the player
+        // Resolve player by email from JWT claims
         var email = claims.FindFirst(ClaimTypes.Email)?.Value;
         if (string.IsNullOrWhiteSpace(email))
         {
@@ -184,5 +176,27 @@ public class BoardService(
         }
 
         return await GetBoardsForPlayer(player.Id);
+    }
+
+    /// <summary>
+    /// Calculates current balance for a player as:
+    /// sum(Approved transactions) - sum(board prices).
+    /// </summary>
+    private async Task<int> GetCurrentBalance(string playerId)
+    {
+        var approvedAmount = await ctx.Transactions
+            .Where(t =>
+                t.Playerid == playerId &&
+                t.Deletedat == null &&
+                t.Status == "Approved")
+            .SumAsync(t => (int?)t.Amount) ?? 0;
+
+        var spentOnBoards = await ctx.Boards
+            .Where(b =>
+                b.Playerid == playerId &&
+                b.Deletedat == null)
+            .SumAsync(b => (int?)b.Price) ?? 0;
+
+        return approvedAmount - spentOnBoards;
     }
 }

@@ -135,7 +135,7 @@ export class BoardClient {
         this.baseUrl = baseUrl ?? "";
     }
 
-    createBoard(dto: CreateBoardRequestDto): Promise<Board> {
+    createBoard(dto: CreateBoardRequestDto): Promise<BoardResponseDto> {
         let url_ = this.baseUrl + "/CreateBoard";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -155,13 +155,13 @@ export class BoardClient {
         });
     }
 
-    protected processCreateBoard(response: Response): Promise<Board> {
+    protected processCreateBoard(response: Response): Promise<BoardResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Board;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BoardResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -169,10 +169,10 @@ export class BoardClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Board>(null as any);
+        return Promise.resolve<BoardResponseDto>(null as any);
     }
 
-    getBoardsForGame(gameId: string | undefined): Promise<Board[]> {
+    getBoardsForGame(gameId: string | undefined): Promise<BoardResponseDto[]> {
         let url_ = this.baseUrl + "/GetBoardsForGame?";
         if (gameId === null)
             throw new globalThis.Error("The parameter 'gameId' cannot be null.");
@@ -192,13 +192,13 @@ export class BoardClient {
         });
     }
 
-    protected processGetBoardsForGame(response: Response): Promise<Board[]> {
+    protected processGetBoardsForGame(response: Response): Promise<BoardResponseDto[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Board[];
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BoardResponseDto[];
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -206,10 +206,10 @@ export class BoardClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Board[]>(null as any);
+        return Promise.resolve<BoardResponseDto[]>(null as any);
     }
 
-    getBoardsForPlayer(playerId: string | undefined): Promise<Board[]> {
+    getBoardsForPlayer(playerId: string | undefined): Promise<BoardResponseDto[]> {
         let url_ = this.baseUrl + "/GetBoardsForPlayer?";
         if (playerId === null)
             throw new globalThis.Error("The parameter 'playerId' cannot be null.");
@@ -229,13 +229,13 @@ export class BoardClient {
         });
     }
 
-    protected processGetBoardsForPlayer(response: Response): Promise<Board[]> {
+    protected processGetBoardsForPlayer(response: Response): Promise<BoardResponseDto[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Board[];
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BoardResponseDto[];
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -243,10 +243,10 @@ export class BoardClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Board[]>(null as any);
+        return Promise.resolve<BoardResponseDto[]>(null as any);
     }
 
-    getMyBoards(): Promise<Board[]> {
+    getMyBoards(): Promise<BoardResponseDto[]> {
         let url_ = this.baseUrl + "/GetMyBoards";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -262,13 +262,13 @@ export class BoardClient {
         });
     }
 
-    protected processGetMyBoards(response: Response): Promise<Board[]> {
+    protected processGetMyBoards(response: Response): Promise<BoardResponseDto[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Board[];
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as BoardResponseDto[];
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -276,7 +276,7 @@ export class BoardClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Board[]>(null as any);
+        return Promise.resolve<BoardResponseDto[]>(null as any);
     }
 }
 
@@ -290,7 +290,7 @@ export class GamesClient {
         this.baseUrl = baseUrl ?? "";
     }
 
-    getActiveGame(): Promise<Game> {
+    getActiveGame(): Promise<GameResponseDto> {
         let url_ = this.baseUrl + "/GetActiveGame";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -306,13 +306,13 @@ export class GamesClient {
         });
     }
 
-    protected processGetActiveGame(response: Response): Promise<Game> {
+    protected processGetActiveGame(response: Response): Promise<GameResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Game;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as GameResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -320,10 +320,10 @@ export class GamesClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Game>(null as any);
+        return Promise.resolve<GameResponseDto>(null as any);
     }
 
-    getGamesHistory(): Promise<Game[]> {
+    getGamesHistory(): Promise<GameResponseDto[]> {
         let url_ = this.baseUrl + "/GetGamesHistory";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -339,13 +339,13 @@ export class GamesClient {
         });
     }
 
-    protected processGetGamesHistory(response: Response): Promise<Game[]> {
+    protected processGetGamesHistory(response: Response): Promise<GameResponseDto[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Game[];
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as GameResponseDto[];
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -353,10 +353,10 @@ export class GamesClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Game[]>(null as any);
+        return Promise.resolve<GameResponseDto[]>(null as any);
     }
 
-    setWinningNumbers(dto: SetWinningNumbersRequestDto): Promise<Game> {
+    setWinningNumbers(dto: SetWinningNumbersRequestDto): Promise<GameResponseDto> {
         let url_ = this.baseUrl + "/SetWinningNumbers";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -376,13 +376,13 @@ export class GamesClient {
         });
     }
 
-    protected processSetWinningNumbers(response: Response): Promise<Game> {
+    protected processSetWinningNumbers(response: Response): Promise<GameResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Game;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as GameResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -390,7 +390,7 @@ export class GamesClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Game>(null as any);
+        return Promise.resolve<GameResponseDto>(null as any);
     }
 }
 
@@ -404,7 +404,7 @@ export class PlayersClient {
         this.baseUrl = baseUrl ?? "";
     }
 
-    createPlayer(dto: CreatePlayerRequestDto): Promise<Player> {
+    createPlayer(dto: CreatePlayerRequestDto): Promise<PlayerResponseDto> {
         let url_ = this.baseUrl + "/CreatePlayer";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -424,13 +424,13 @@ export class PlayersClient {
         });
     }
 
-    protected processCreatePlayer(response: Response): Promise<Player> {
+    protected processCreatePlayer(response: Response): Promise<PlayerResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Player;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlayerResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -438,10 +438,10 @@ export class PlayersClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Player>(null as any);
+        return Promise.resolve<PlayerResponseDto>(null as any);
     }
 
-    getPlayers(isActive: boolean | null | undefined): Promise<Player[]> {
+    getPlayers(isActive: boolean | null | undefined): Promise<PlayerResponseDto[]> {
         let url_ = this.baseUrl + "/GetPlayers?";
         if (isActive !== undefined && isActive !== null)
             url_ += "isActive=" + encodeURIComponent("" + isActive) + "&";
@@ -459,13 +459,13 @@ export class PlayersClient {
         });
     }
 
-    protected processGetPlayers(response: Response): Promise<Player[]> {
+    protected processGetPlayers(response: Response): Promise<PlayerResponseDto[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Player[];
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlayerResponseDto[];
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -473,10 +473,10 @@ export class PlayersClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Player[]>(null as any);
+        return Promise.resolve<PlayerResponseDto[]>(null as any);
     }
 
-    getPlayerById(playerId: string | undefined): Promise<Player> {
+    getPlayerById(playerId: string | undefined): Promise<PlayerResponseDto> {
         let url_ = this.baseUrl + "/GetPlayerById?";
         if (playerId === null)
             throw new globalThis.Error("The parameter 'playerId' cannot be null.");
@@ -496,13 +496,13 @@ export class PlayersClient {
         });
     }
 
-    protected processGetPlayerById(response: Response): Promise<Player> {
+    protected processGetPlayerById(response: Response): Promise<PlayerResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Player;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlayerResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -510,10 +510,10 @@ export class PlayersClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Player>(null as any);
+        return Promise.resolve<PlayerResponseDto>(null as any);
     }
 
-    activatePlayer(playerId: string | undefined): Promise<Player> {
+    activatePlayer(playerId: string | undefined): Promise<PlayerResponseDto> {
         let url_ = this.baseUrl + "/ActivatePlayer?";
         if (playerId === null)
             throw new globalThis.Error("The parameter 'playerId' cannot be null.");
@@ -533,13 +533,13 @@ export class PlayersClient {
         });
     }
 
-    protected processActivatePlayer(response: Response): Promise<Player> {
+    protected processActivatePlayer(response: Response): Promise<PlayerResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Player;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlayerResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -547,10 +547,10 @@ export class PlayersClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Player>(null as any);
+        return Promise.resolve<PlayerResponseDto>(null as any);
     }
 
-    deactivatePlayer(playerId: string | undefined): Promise<Player> {
+    deactivatePlayer(playerId: string | undefined): Promise<PlayerResponseDto> {
         let url_ = this.baseUrl + "/DeactivatePlayer?";
         if (playerId === null)
             throw new globalThis.Error("The parameter 'playerId' cannot be null.");
@@ -570,13 +570,13 @@ export class PlayersClient {
         });
     }
 
-    protected processDeactivatePlayer(response: Response): Promise<Player> {
+    protected processDeactivatePlayer(response: Response): Promise<PlayerResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Player;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlayerResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -584,10 +584,10 @@ export class PlayersClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Player>(null as any);
+        return Promise.resolve<PlayerResponseDto>(null as any);
     }
 
-    deletePlayer(playerId: string | undefined): Promise<Player> {
+    deletePlayer(playerId: string | undefined): Promise<PlayerResponseDto> {
         let url_ = this.baseUrl + "/DeletePlayer?";
         if (playerId === null)
             throw new globalThis.Error("The parameter 'playerId' cannot be null.");
@@ -607,13 +607,13 @@ export class PlayersClient {
         });
     }
 
-    protected processDeletePlayer(response: Response): Promise<Player> {
+    protected processDeletePlayer(response: Response): Promise<PlayerResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Player;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlayerResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -621,10 +621,10 @@ export class PlayersClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Player>(null as any);
+        return Promise.resolve<PlayerResponseDto>(null as any);
     }
 
-    updatePlayer(dto: UpdatePlayerRequestDto): Promise<Player> {
+    updatePlayer(dto: UpdatePlayerRequestDto): Promise<PlayerResponseDto> {
         let url_ = this.baseUrl + "/UpdatePlayer";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -644,13 +644,13 @@ export class PlayersClient {
         });
     }
 
-    protected processUpdatePlayer(response: Response): Promise<Player> {
+    protected processUpdatePlayer(response: Response): Promise<PlayerResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Player;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlayerResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -658,7 +658,7 @@ export class PlayersClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Player>(null as any);
+        return Promise.resolve<PlayerResponseDto>(null as any);
     }
 }
 
@@ -978,57 +978,18 @@ export interface JwtClaims {
     role: string;
 }
 
-export interface Board {
+export interface BoardResponseDto {
     id: string;
-    playerid: string | undefined;
-    gameid: string | undefined;
+    playerId: string;
+    gameId: string;
     numbers: number[];
     price: number;
-    iswinning: boolean;
-    repeatweeks: number;
-    repeatactive: boolean;
-    createdat: string | undefined;
-    deletedat: string | undefined;
-    game: Game | undefined;
-    player: Player | undefined;
-}
-
-export interface Game {
-    id: string;
-    weeknumber: number;
-    year: number;
-    winningnumbers: number[] | undefined;
-    isactive: boolean;
-    createdat: string | undefined;
-    closedat: string | undefined;
-    deletedat: string | undefined;
-    boards: Board[];
-}
-
-export interface Player {
-    id: string;
-    fullname: string;
-    email: string;
-    phone: string;
-    isactive: boolean;
-    activatedat: string | undefined;
-    createdat: string | undefined;
-    deletedat: string | undefined;
-    boards: Board[];
-    transactions: Transaction[];
-}
-
-export interface Transaction {
-    id: string;
-    playerid: string;
-    mobilepaynumber: string;
-    amount: number;
-    status: string;
-    createdat: string;
-    approvedat: string | undefined;
-    deletedat: string | undefined;
-    rejectionreason: string | undefined;
-    player: Player;
+    isWinning: boolean;
+    repeatWeeks: number;
+    repeatActive: boolean;
+    createdAt: string | undefined;
+    gameWeek: number;
+    gameYear: number;
 }
 
 export interface CreateBoardRequestDto {
@@ -1037,9 +998,29 @@ export interface CreateBoardRequestDto {
     repeatWeeks: number;
 }
 
+export interface GameResponseDto {
+    id: string;
+    weekNumber: number;
+    year: number;
+    winningNumbers: number[] | undefined;
+    isActive: boolean;
+    createdAt: string | undefined;
+    closedAt: string | undefined;
+}
+
 export interface SetWinningNumbersRequestDto {
     gameId: string;
     winningNumbers: number[];
+}
+
+export interface PlayerResponseDto {
+    id: string;
+    fullName: string;
+    email: string;
+    phone: string;
+    isActive: boolean;
+    activatedAt: string | undefined;
+    createdAt: string | undefined;
 }
 
 export interface CreatePlayerRequestDto {

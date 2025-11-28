@@ -1,25 +1,22 @@
-namespace api.Models.Responses;
+using System;
 
-public class BoardResponseDto
+namespace api.Models.Board
 {
-    public string Id { get; set; } = null!;
+    public class BoardResponseDto
+    {
+        public string Id { get; set; } = null!;
+        public string PlayerId { get; set; } = null!;
+        public string GameId { get; set; } = null!;
+        public int[] Numbers { get; set; } = null!;
+        public int Price { get; set; }
+        public bool IsWinning { get; set; }
+        public int RepeatWeeks { get; set; }
+        public bool RepeatActive { get; set; }
+        public DateTime? CreatedAt { get; set; }
 
-    public string PlayerId { get; set; } = null!;
+        // NEW: for easier UI, no extra calls
+        public int GameWeek { get; set; }
+        public int GameYear { get; set; }
+    }
 
-    public string GameId { get; set; } = null!;
-
-    // Sorted list of numbers on the board
-    public int[] Numbers { get; set; } = null!;
-
-    // Price paid for this board (DKK)
-    public int Price { get; set; }
-
-    // True if this board is a winning board
-    public bool IsWinning { get; set; }
-
-    public int RepeatWeeks { get; set; }
-
-    public bool RepeatActive { get; set; }
-
-    public DateTime? CreatedAt { get; set; }
 }

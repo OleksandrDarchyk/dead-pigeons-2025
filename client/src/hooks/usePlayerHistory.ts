@@ -2,20 +2,30 @@
 import { useEffect, useState } from "react";
 import { gamesApi } from "../utilities/gamesApi";
 import { boardsApi } from "../utilities/boardsApi";
-import type { Board, Game } from "../core/generated-client";
+import type {
+    BoardResponseDto,
+    GameResponseDto,
+} from "../core/generated-client";
 import toast from "react-hot-toast";
 
 export type GameHistoryItem = {
-    game: Game;
-    boards: Board[];
+    // Game info for one week
+    game: GameResponseDto;
+    // All boards the current player has in that game
+    boards: BoardResponseDto[];
 };
 
+/**
+ * enabled = false → the hook is prepared but does not load anything yet
+ * (for example, when user is not logged in or role is not known).
+ */
 export function usePlayerHistory(enabled: boolean = true) {
     const [items, setItems] = useState<GameHistoryItem[]>([]);
     const [isLoading, setIsLoading] = useState(enabled);
 
     useEffect(() => {
         if (!enabled) {
+            // When disabled, we clear data and mark as not loading
             setIsLoading(false);
             setItems([]);
             return;
@@ -25,27 +35,28 @@ export function usePlayerHistory(enabled: boolean = true) {
             try {
                 setIsLoading(true);
 
-                // історія всіх ігор
+                // Full games history (DTOs)
                 const games = await gamesApi.getGamesHistory();
-                // всі борди поточного гравця
+
+                // All boards for the current player (DTOs)
                 const myBoards = await boardsApi.getMyBoards();
 
-                // новіші роки/тижні вище
+                // Newest games first by year, then by weekNumber
                 const sortedGames = [...games].sort((a, b) => {
                     if (a.year !== b.year) return b.year - a.year;
-                    return b.weeknumber - a.weeknumber;
+                    return b.weekNumber - a.weekNumber;
                 });
 
                 const grouped: GameHistoryItem[] = sortedGames
                     .map((game) => {
+                        // Filter only boards that belong to this game
                         const boardsForGame = myBoards.filter(
-                            (board) =>
-                                board.gameid === game.id && !board.deletedat
+                            (board) => board.gameId === game.id
                         );
 
                         return { game, boards: boardsForGame };
                     })
-                    // показуємо тільки ігри, де у гравця є борди
+                    // Show only games where player actually has boards
                     .filter((item) => item.boards.length > 0);
 
                 setItems(grouped);

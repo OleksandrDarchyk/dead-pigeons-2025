@@ -119,7 +119,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Board"
+                  "$ref": "#/components/schemas/BoardResponseDto"
                 }
               }
             }
@@ -156,7 +156,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Board"
+                    "$ref": "#/components/schemas/BoardResponseDto"
                   }
                 }
               }
@@ -196,7 +196,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Board"
+                    "$ref": "#/components/schemas/BoardResponseDto"
                   }
                 }
               }
@@ -226,7 +226,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Board"
+                    "$ref": "#/components/schemas/BoardResponseDto"
                   }
                 }
               }
@@ -252,7 +252,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Game"
+                  "$ref": "#/components/schemas/GameResponseDto"
                 }
               }
             }
@@ -279,7 +279,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Game"
+                    "$ref": "#/components/schemas/GameResponseDto"
                   }
                 }
               }
@@ -319,7 +319,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Game"
+                  "$ref": "#/components/schemas/GameResponseDto"
                 }
               }
             }
@@ -358,7 +358,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Player"
+                  "$ref": "#/components/schemas/PlayerResponseDto"
                 }
               }
             }
@@ -398,7 +398,7 @@
                 "schema": {
                   "type": "array",
                   "items": {
-                    "$ref": "#/components/schemas/Player"
+                    "$ref": "#/components/schemas/PlayerResponseDto"
                   }
                 }
               }
@@ -436,7 +436,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Player"
+                  "$ref": "#/components/schemas/PlayerResponseDto"
                 }
               }
             }
@@ -473,7 +473,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Player"
+                  "$ref": "#/components/schemas/PlayerResponseDto"
                 }
               }
             }
@@ -510,7 +510,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Player"
+                  "$ref": "#/components/schemas/PlayerResponseDto"
                 }
               }
             }
@@ -547,7 +547,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Player"
+                  "$ref": "#/components/schemas/PlayerResponseDto"
                 }
               }
             }
@@ -586,7 +586,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Player"
+                  "$ref": "#/components/schemas/PlayerResponseDto"
                 }
               }
             }
@@ -941,20 +941,18 @@
           }
         }
       },
-      "Board": {
+      "BoardResponseDto": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
           "id": {
             "type": "string"
           },
-          "playerid": {
-            "type": "string",
-            "nullable": true
+          "playerId": {
+            "type": "string"
           },
-          "gameid": {
-            "type": "string",
-            "nullable": true
+          "gameId": {
+            "type": "string"
           },
           "numbers": {
             "type": "array",
@@ -967,181 +965,28 @@
             "type": "integer",
             "format": "int32"
           },
-          "iswinning": {
+          "isWinning": {
             "type": "boolean"
           },
-          "repeatweeks": {
+          "repeatWeeks": {
             "type": "integer",
             "format": "int32"
           },
-          "repeatactive": {
+          "repeatActive": {
             "type": "boolean"
           },
-          "createdat": {
+          "createdAt": {
             "type": "string",
             "format": "date-time",
             "nullable": true
           },
-          "deletedat": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "game": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Game"
-              }
-            ]
-          },
-          "player": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "$ref": "#/components/schemas/Player"
-              }
-            ]
-          }
-        }
-      },
-      "Game": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "weeknumber": {
+          "gameWeek": {
             "type": "integer",
             "format": "int32"
           },
-          "year": {
+          "gameYear": {
             "type": "integer",
             "format": "int32"
-          },
-          "winningnumbers": {
-            "type": "array",
-            "nullable": true,
-            "items": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          "isactive": {
-            "type": "boolean"
-          },
-          "createdat": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "closedat": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "deletedat": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "boards": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Board"
-            }
-          }
-        }
-      },
-      "Player": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "fullname": {
-            "type": "string"
-          },
-          "email": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          },
-          "isactive": {
-            "type": "boolean"
-          },
-          "activatedat": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "createdat": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "deletedat": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "boards": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Board"
-            }
-          },
-          "transactions": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Transaction"
-            }
-          }
-        }
-      },
-      "Transaction": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "id": {
-            "type": "string"
-          },
-          "playerid": {
-            "type": "string"
-          },
-          "mobilepaynumber": {
-            "type": "string"
-          },
-          "amount": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "status": {
-            "type": "string"
-          },
-          "createdat": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "approvedat": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "deletedat": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
-          },
-          "rejectionreason": {
-            "type": "string",
-            "nullable": true
-          },
-          "player": {
-            "$ref": "#/components/schemas/Player"
           }
         }
       },
@@ -1169,8 +1014,46 @@
           "repeatWeeks": {
             "type": "integer",
             "format": "int32",
-            "maximum": 2147483647.0,
+            "maximum": 52.0,
             "minimum": 0.0
+          }
+        }
+      },
+      "GameResponseDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "weekNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "winningNumbers": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "closedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
@@ -1194,6 +1077,37 @@
               "type": "integer",
               "format": "int32"
             }
+          }
+        }
+      },
+      "PlayerResponseDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "isActive": {
+            "type": "boolean"
+          },
+          "activatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
