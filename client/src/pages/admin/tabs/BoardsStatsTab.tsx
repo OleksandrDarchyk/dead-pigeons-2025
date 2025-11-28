@@ -1,28 +1,40 @@
 // src/components/admin/BoardsStatsTab.tsx
 import { useEffect, useMemo, useState } from "react";
-import type { Board, Game, Player } from "../../../core/generated-client";
+import type {
+    BoardResponseDto,
+    GameResponseDto,
+    PlayerResponseDto,
+} from "../../../core/generated-client";
 import { gamesApi } from "../../../utilities/gamesApi";
 import { boardsApi } from "../../../utilities/boardsApi";
 import { playersApi } from "../../../utilities/playersApi";
 import toast from "react-hot-toast";
 
-
-type BoardWithPlayer = Board & { player?: Player };
+// Boards are DTOs coming from the API
+type BoardWithPlayer = BoardResponseDto;
 
 export default function BoardsStatsTab() {
-    const [activeGame, setActiveGame] = useState<Game | null>(null);
+    // Active game is a safe DTO (no EF navigation properties)
+    const [activeGame, setActiveGame] = useState<GameResponseDto | null>(null);
+
+    // Boards for the current active game (DTOs only)
     const [boards, setBoards] = useState<BoardWithPlayer[]>([]);
-    const [players, setPlayers] = useState<Player[]>([]);
+
+    // Players are PlayerResponseDto, not EF Player entity
+    const [players, setPlayers] = useState<PlayerResponseDto[]>([]);
+
     const [isLoading, setIsLoading] = useState(true);
 
     const loadData = async () => {
         try {
             setIsLoading(true);
 
+            // 1) Load active game (DTO)
             const game = await gamesApi.getActiveGame();
             console.log("Active game:", game);
 
             if (!game || !game.id) {
+                // No active game → clear everything
                 setActiveGame(null);
                 setBoards([]);
                 setPlayers([]);
@@ -31,20 +43,18 @@ export default function BoardsStatsTab() {
 
             setActiveGame(game);
 
+            // 2) Load boards for this game (DTOs) and active players
             const [boardsForGame, allPlayers] = await Promise.all([
                 boardsApi.getBoardsForGame(game.id),
+                // true = only active players
                 playersApi.getPlayers(true),
             ]);
 
             console.log("BoardsForGame:", boardsForGame);
             console.log("AllPlayers:", allPlayers);
 
-            setBoards(
-                Array.isArray(boardsForGame)
-                    ? (boardsForGame as BoardWithPlayer[])
-                    : [],
-            );
-
+            // Defensive checks in case backend returns something unexpected
+            setBoards(Array.isArray(boardsForGame) ? boardsForGame : []);
             setPlayers(Array.isArray(allPlayers) ? allPlayers : []);
         } catch (err) {
             console.error(err);
@@ -52,22 +62,23 @@ export default function BoardsStatsTab() {
 
             setBoards([]);
             setPlayers([]);
+            setActiveGame(null);
         } finally {
             setIsLoading(false);
         }
     };
 
-
     useEffect(() => {
         void loadData();
     }, []);
 
+    // Simple statistics based on DTOs (no direct DB shapes)
     const stats = useMemo(() => {
         const totalPlayers = players.length;
-        const activeBoards = boards.filter((b) => !b.deletedat).length;
-        const repeatingBoards = boards.filter((b) => b.repeatactive).length;
-
-        const winningBoards = boards.filter((b) => b.iswinning).length;
+        // Backend already returns only non-deleted boards in DTO
+        const activeBoards = boards.length;
+        const repeatingBoards = boards.filter((b) => b.repeatActive).length;
+        const winningBoards = boards.filter((b) => b.isWinning).length;
 
         return {
             totalPlayers,
@@ -77,18 +88,20 @@ export default function BoardsStatsTab() {
         };
     }, [boards, players]);
 
-    const getPlayerName = (board: BoardWithPlayer) => {
-        if (board.player?.fullname) return board.player.fullname;
-        const player = players.find((p) => p.id === board.playerid);
-        return player?.fullname ?? "Unknown player";
+    // Resolve player name for a board using playerId from DTO and PlayerResponseDto list
+    const getPlayerName = (board: BoardWithPlayer): string => {
+        const player = players.find((p) => p.id === board.playerId);
+        return player?.fullName ?? "Unknown player";
     };
 
+    // Human-friendly label for current active game
     const weekLabel =
         activeGame &&
-        `Week ${activeGame.weeknumber}, ${activeGame.year.toString()}`;
+        `Week ${activeGame.weekNumber}, ${activeGame.year.toString()}`;
 
     return (
         <section className="space-y-6">
+            {/* Top statistics card */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h2 className="text-lg font-semibold text-slate-900 mb-1">
                     Statistics Overview
@@ -137,6 +150,7 @@ export default function BoardsStatsTab() {
                 )}
             </div>
 
+            {/* List of boards for current active game */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-base font-semibold text-slate-900 mb-1">
                     All Active Boards
@@ -154,15 +168,13 @@ export default function BoardsStatsTab() {
                 ) : (
                     <div className="space-y-3">
                         {boards.map((b) => {
-                            if (b.deletedat) return null;
-
                             const playerName = getPlayerName(b);
                             const created =
-                                b.createdat &&
-                                new Date(b.createdat).toLocaleDateString();
+                                b.createdAt &&
+                                new Date(b.createdAt).toLocaleDateString();
 
-                            const isRepeating = b.repeatactive;
-                            const isWinning = b.iswinning;
+                            const isRepeating = b.repeatActive;
+                            const isWinning = b.isWinning;
 
                             return (
                                 <div
@@ -179,6 +191,7 @@ export default function BoardsStatsTab() {
                                     </div>
 
                                     <div className="flex flex-wrap items-center gap-2">
+                                        {/* Numbers */}
                                         <div className="flex flex-wrap gap-1">
                                             {b.numbers.map((n) => (
                                                 <span
@@ -195,21 +208,22 @@ export default function BoardsStatsTab() {
                                             ))}
                                         </div>
 
+                                        {/* Tags: repeating / single + winning */}
                                         <div className="flex items-center gap-2">
                                             {isRepeating ? (
                                                 <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
-                                                Repeating
-                                            </span>
+                                                    Repeating
+                                                </span>
                                             ) : (
                                                 <span className="inline-flex items-center rounded-full bg-slate-200 px-3 py-1 text-xs font-semibold text-slate-700">
-                                                Single
-                                            </span>
+                                                    Single
+                                                </span>
                                             )}
 
                                             {isWinning && (
                                                 <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                                                Winning
-                                            </span>
+                                                    Winning
+                                                </span>
                                             )}
                                         </div>
                                     </div>

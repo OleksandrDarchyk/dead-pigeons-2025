@@ -5,7 +5,7 @@ import PlayerPaymentsSection from "./PlayerPaymentsSection";
 import { usePlayerBoards } from "../../hooks/usePlayerBoards";
 import { usePlayerBalance } from "../../hooks/usePlayerBalance";
 import PlayerGuard from "./PlayerGuard";
-import type { Board } from "@core/generated-client";
+import type { BoardResponseDto } from "@core/generated-client";
 import toast from "react-hot-toast";
 import PlayerTabs from "./PlayerTabs";
 
@@ -31,9 +31,11 @@ export default function PlayerDashboardPage() {
         isSaving: isSavingBoard,
     } = usePlayerBoards(isPlayer);
 
-    const visibleBoards = boards.filter((b) => !b.deletedat);
+    // Server already filters out soft-deleted boards, so we can use boards directly
+    const visibleBoards = boards;
 
-    const handleStopRepeating = async (board: Board) => {
+    const handleStopRepeating = async (board: BoardResponseDto) => {
+        // Placeholder: repeating logic will be implemented later
         console.log("Stop repeating board", board.id);
         toast("Stopping repeating boards will be implemented on the server later.", {
             icon: "ℹ️",
@@ -44,7 +46,7 @@ export default function PlayerDashboardPage() {
         <PlayerGuard>
             <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
                 <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
-                    {/* HEADLINE + TABS (як у адміна) */}
+                    {/* HEADER WITH TABS */}
                     <header className="pb-1">
                         <h1 className="text-2xl font-bold text-slate-900">
                             Player Dashboard
@@ -100,7 +102,7 @@ export default function PlayerDashboardPage() {
                                         Current week&apos;s lottery round
                                     </p>
                                     <p className="mt-2 text-sm font-semibold text-slate-900">
-                                        Week {activeGame.weeknumber},{" "}
+                                        Week {activeGame.weekNumber},{" "}
                                         {activeGame.year}
                                     </p>
 
@@ -244,12 +246,12 @@ export default function PlayerDashboardPage() {
                             <div className="space-y-4">
                                 {visibleBoards.map((b) => {
                                     const created =
-                                        b.createdat &&
+                                        b.createdAt &&
                                         new Date(
-                                            b.createdat
+                                            b.createdAt
                                         ).toLocaleDateString();
 
-                                    const isRepeating = b.repeatactive;
+                                    const isRepeating = b.repeatActive;
                                     const numbers = [...b.numbers].sort(
                                         (a, c) => a - c
                                     );
@@ -289,7 +291,7 @@ export default function PlayerDashboardPage() {
                                                     </span>
                                                 </p>
 
-                                                {b.iswinning && (
+                                                {b.isWinning && (
                                                     <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
                                                         Winning board
                                                     </span>

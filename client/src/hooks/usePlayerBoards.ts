@@ -2,7 +2,10 @@
 import { useEffect, useState } from "react";
 import { boardsApi } from "../utilities/boardsApi";
 import { gamesApi } from "../utilities/gamesApi";
-import type { Board, Game } from "../core/generated-client";
+import type {
+    BoardResponseDto,
+    GameResponseDto,
+} from "../core/generated-client";
 import toast from "react-hot-toast";
 
 type BoardFormState = {
@@ -26,14 +29,19 @@ function getPriceForCount(count: number): number | null {
 }
 
 /**
- * enabled = false → хук підготовлений, але запити не відправляє,
- * поки ми не знаємо, що користувач точно гравець.
+ * enabled = false → the hook is prepared but does not fire requests yet
+ * (for example, until we know the user is logged in as a player).
  */
 export function usePlayerBoards(enabled: boolean = true) {
-    const [boards, setBoards] = useState<Board[]>([]);
-    const [activeGame, setActiveGame] = useState<Game | null>(null);
+    // Boards for the current logged-in player (DTOs, not raw EF entities)
+    const [boards, setBoards] = useState<BoardResponseDto[]>([]);
+
+    // Active game (DTO)
+    const [activeGame, setActiveGame] = useState<GameResponseDto | null>(null);
+
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+
     const [form, setForm] = useState<BoardFormState>({
         selectedNumbers: [],
     });
@@ -59,8 +67,8 @@ export function usePlayerBoards(enabled: boolean = true) {
     };
 
     useEffect(() => {
+        // If hook is disabled (for example, user is not ready yet), skip loading
         if (!enabled) {
-            // користувач ще не готовий (нема токена / ролі) – не робимо запити
             return;
         }
 
@@ -91,6 +99,7 @@ export function usePlayerBoards(enabled: boolean = true) {
     const submitBoard = async () => {
         const count = form.selectedNumbers.length;
 
+        // Basic client-side validation for UX
         if (count < 5 || count > 8) {
             toast.error("You must pick between 5 and 8 numbers");
             return;
@@ -110,6 +119,7 @@ export function usePlayerBoards(enabled: boolean = true) {
         try {
             setIsSaving(true);
 
+            // Server will validate gameId, numbers, repeatWeeks and balance
             await boardsApi.createBoard({
                 gameId: activeGame.id,
                 numbers: form.selectedNumbers,
@@ -118,10 +128,12 @@ export function usePlayerBoards(enabled: boolean = true) {
 
             toast.success("Board created");
 
+            // Reset form after successful creation
             setForm({
                 selectedNumbers: [],
             });
 
+            // Reload boards to reflect the new purchase
             await loadBoards();
         } catch (err) {
             console.error(err);
@@ -131,6 +143,7 @@ export function usePlayerBoards(enabled: boolean = true) {
         }
     };
 
+    // Current price preview for UI, based on how many numbers are selected
     const currentPrice = getPriceForCount(form.selectedNumbers.length);
 
     return {

@@ -1,5 +1,8 @@
 // api/Controllers/BoardController.cs
+
+using api.Models.Board;
 using api.Models.Requests;
+using api.Models.Responses;
 using api.Services;
 using dataccess.Entities;
 using Api.Security;
@@ -9,37 +12,65 @@ using Microsoft.AspNetCore.Mvc;
 namespace api.Controllers;
 
 [ApiController]
-[Authorize]
+[Authorize] // all endpoints here require an authenticated user
 public class BoardController(IBoardService boardService) : ControllerBase
 {
     // Player buys a new board for the current game
     // PlayerId is resolved from JWT inside the service
     [HttpPost(nameof(CreateBoard))]
-    public async Task<Board> CreateBoard([FromBody] CreateBoardRequestDto dto)
+    public async Task<BoardResponseDto> CreateBoard([FromBody] CreateBoardRequestDto dto)
     {
-        return await boardService.CreateBoardForCurrentUser(User, dto);
+        var board = await boardService.CreateBoardForCurrentUser(User, dto);
+        return MapToDto(board);
     }
 
     // Admin overview: all boards for a specific game
     [HttpGet(nameof(GetBoardsForGame))]
     [Authorize(Roles = Roles.Admin)]
-    public async Task<List<Board>> GetBoardsForGame([FromQuery] string gameId)
+    public async Task<List<BoardResponseDto>> GetBoardsForGame([FromQuery] string gameId)
     {
-        return await boardService.GetBoardsForGame(gameId);
+        var boards = await boardService.GetBoardsForGame(gameId);
+        return boards
+            .Select(MapToDto)
+            .ToList();
     }
 
     // Admin: all boards for a specific player
     [HttpGet(nameof(GetBoardsForPlayer))]
     [Authorize(Roles = Roles.Admin)]
-    public async Task<List<Board>> GetBoardsForPlayer([FromQuery] string playerId)
+    public async Task<List<BoardResponseDto>> GetBoardsForPlayer([FromQuery] string playerId)
     {
-        return await boardService.GetBoardsForPlayer(playerId);
+        var boards = await boardService.GetBoardsForPlayer(playerId);
+        return boards
+            .Select(MapToDto)
+            .ToList();
     }
 
     // Player: only boards for the current logged-in user
     [HttpGet(nameof(GetMyBoards))]
-    public async Task<List<Board>> GetMyBoards()
+    public async Task<List<BoardResponseDto>> GetMyBoards()
     {
-        return await boardService.GetBoardsForCurrentUser(User);
+        var boards = await boardService.GetBoardsForCurrentUser(User);
+        return boards
+            .Select(MapToDto)
+            .ToList();
     }
+
+    // Maps EF entity to a safe API response DTO
+    private static BoardResponseDto MapToDto(Board b) => new()
+    {
+        Id = b.Id,
+        PlayerId = b.Playerid ?? string.Empty,
+        GameId = b.Gameid ?? string.Empty,
+        Numbers = b.Numbers.ToArray(),
+        Price = b.Price,
+        IsWinning = b.Iswinning,
+        RepeatWeeks = b.Repeatweeks,
+        RepeatActive = b.Repeatactive,
+        CreatedAt = b.Createdat,
+
+        // Extra convenience for UI – game info comes from navigation property
+        GameWeek = b.Game?.Weeknumber ?? 0,
+        GameYear = b.Game?.Year ?? 0
+    };
 }

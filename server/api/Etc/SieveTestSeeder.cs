@@ -89,8 +89,6 @@ public class SieveTestSeeder(
         };
         ctx.Players.Add(player);
 
-        // You can add more players here if needed
-
         // ------------------------
         // GAMES (one past game + one active game)
         // ------------------------
@@ -121,6 +119,48 @@ public class SieveTestSeeder(
             Deletedat = null
         };
         ctx.Games.Add(activeGame);
+
+        // ------------------------
+        // FUTURE GAMES (pre-seeded rounds)
+        // ------------------------
+
+        // We pre-generate many future weekly games so the API can always activate the next one
+        var futureWeek = activeGame.Weeknumber;
+        var futureYear = activeGame.Year;
+        var futureCreatedAt = activeGame.Createdat ?? now;
+
+        // How many future games to pre-generate (dev/test only)
+        const int futureGamesToCreate = 200;
+
+        for (var i = 0; i < futureGamesToCreate; i++)
+        {
+            // Simple week/year increment: 1..52 then wrap to next year
+            if (futureWeek < 52)
+            {
+                futureWeek++;
+            }
+            else
+            {
+                futureWeek = 1;
+                futureYear++;
+            }
+
+            futureCreatedAt = futureCreatedAt.AddDays(7);
+
+            var futureGame = new Game
+            {
+                Id = Guid.NewGuid().ToString(),
+                Weeknumber = futureWeek,
+                Year = futureYear,
+                Isactive = false,
+                Createdat = futureCreatedAt,
+                Closedat = null,
+                Deletedat = null,
+                Winningnumbers = null
+            };
+
+            ctx.Games.Add(futureGame);
+        }
 
         // ------------------------
         // TRANSACTIONS (MobilePay)

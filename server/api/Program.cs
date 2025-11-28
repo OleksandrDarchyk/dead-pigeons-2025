@@ -192,9 +192,9 @@ public class Program
                 .GetResult();
 
             // ❌ Disabled seeding to prevent data loss during development
-            //using var scope = app.Services.CreateScope();
-            //var seeder = scope.ServiceProvider.GetRequiredService<ISeeder>();
-            //seeder.Seed().GetAwaiter().GetResult();
+            using var scope = app.Services.CreateScope();
+            var seeder = scope.ServiceProvider.GetRequiredService<ISeeder>();
+            seeder.Seed().GetAwaiter().GetResult();
         }
 
     }

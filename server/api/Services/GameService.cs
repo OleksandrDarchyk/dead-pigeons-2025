@@ -42,7 +42,7 @@ public class GameService(
 
     public async Task<Game> SetWinningNumbers(SetWinningNumbersRequestDto dto)
     {
-        // Attribute-based validation on the DTO
+        // Validate DTO via DataAnnotations attributes
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
         var numbers = dto.WinningNumbers;
@@ -59,6 +59,7 @@ public class GameService(
             throw new ValidationException("Winning numbers must be between 1 and 16.");
         }
 
+        // We always sort them so order never matters
         var sortedNumbers = numbers.OrderBy(n => n).ToArray();
 
         // Load the game with its boards (only if not soft-deleted)
@@ -69,6 +70,12 @@ public class GameService(
         if (game == null)
         {
             throw new ValidationException("Game not found.");
+        }
+
+        // Business rule: only the currently active game can be closed
+        if (!game.Isactive)
+        {
+            throw new ValidationException("Only the active game can be closed and assigned winning numbers.");
         }
 
         // Do not allow closing the same game twice

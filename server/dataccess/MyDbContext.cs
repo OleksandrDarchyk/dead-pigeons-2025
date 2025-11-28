@@ -49,12 +49,12 @@ public partial class MyDbContext : DbContext
 
             entity.HasOne(d => d.Game).WithMany(p => p.Boards)
                 .HasForeignKey(d => d.Gameid)
-                .OnDelete(DeleteBehavior.Cascade)
+                .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("board_gameid_fkey");
 
             entity.HasOne(d => d.Player).WithMany(p => p.Boards)
                 .HasForeignKey(d => d.Playerid)
-                .OnDelete(DeleteBehavior.Cascade)
+                .OnDelete(DeleteBehavior.Restrict)
                 .HasConstraintName("board_playerid_fkey");
         });
 
@@ -63,6 +63,10 @@ public partial class MyDbContext : DbContext
             entity.HasKey(e => e.Id).HasName("game_pkey");
 
             entity.ToTable("game", "deadpigeons");
+
+            entity.HasIndex(e => e.Isactive, "idx_game_single_active")
+                .IsUnique()
+                .HasFilter("(isactive = true)");
 
             entity.HasIndex(e => new { e.Weeknumber, e.Year }, "idx_game_week_year").IsUnique();
 
