@@ -3,20 +3,15 @@ import { useAuth } from "../../atoms/auth";
 import { usePlayerHistory } from "../../hooks/usePlayerHistory";
 import PlayerGuard from "./PlayerGuard";
 import PlayerTabs from "./PlayerTabs";
-import type { Game } from "../../core/generated-client";
+import type { GameResponseDto } from "../../core/generated-client";
 
-// Виграшні числа беремо з поля Game.winningnumbers
-function getWinningNumbers(game: Game): number[] {
-    if (!Array.isArray(game.winningnumbers)) {
-        return [];
-    }
+// Helper to read winning numbers from GameResponseDto.winningNumbers
+function getWinningNumbers(game: GameResponseDto): number[] {
+    // If there are no winning numbers yet, return an empty array
+    const numbers = game.winningNumbers ?? [];
 
-    const onlyNumbers = game.winningnumbers.filter(
-        (n): n is number => typeof n === "number"
-    );
-
-    // прибираємо дублікати й сортуємо
-    return [...new Set(onlyNumbers)].sort((a, b) => a - b);
+    // Return a sorted copy (smallest → biggest)
+    return [...numbers].sort((a, b) => a - b);
 }
 
 export default function PlayerHistoryPage() {
@@ -25,16 +20,17 @@ export default function PlayerHistoryPage() {
 
     const isPlayer = Boolean(token && user && role === "User");
 
+    // Custom hook returns grouped history (GameResponseDto + BoardResponseDto[])
     const { items, isLoading } = usePlayerHistory(isPlayer);
 
     return (
         <PlayerGuard>
             <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
                 <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
-                    {/* HEADLINE + TABS */}
+                    {/* HEADER + TABS */}
                     <header className="pb-1">
                         <h1 className="text-2xl font-bold text-slate-900">
-                            Player Dashboard
+                            Player History
                         </h1>
                         <p className="mt-1 text-sm text-slate-500">
                             Logged in as{" "}
@@ -60,23 +56,24 @@ export default function PlayerHistoryPage() {
                                 const hasWinningNumbers =
                                     winningNumbers.length > 0;
 
+                                // GameResponseDto uses createdAt (PascalCase)
                                 const created =
-                                    game.createdat &&
-                                    new Date(game.createdat).toLocaleDateString();
+                                    game.createdAt &&
+                                    new Date(game.createdAt).toLocaleDateString();
 
                                 return (
                                     <section
                                         key={game.id}
                                         className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm"
                                     >
-                                        {/* Заголовок раунду + статус */}
+                                        {/* Round header + status */}
                                         <div className="mb-4 flex items-center justify-between gap-3">
                                             <div>
                                                 <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-600">
                                                     <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-red-50 text-red-500">
                                                         🏆
                                                     </span>
-                                                    Week {game.weeknumber},{" "}
+                                                    Week {game.weekNumber},{" "}
                                                     {game.year}
                                                 </p>
                                                 <p className="mt-1 text-xs text-slate-500">
@@ -137,6 +134,7 @@ export default function PlayerHistoryPage() {
                                             ) : (
                                                 <div className="space-y-3">
                                                     {boards.map((b) => {
+                                                        // How many numbers from this board match the winning ones
                                                         const matchedCount =
                                                             winningNumbers.length >
                                                             0
@@ -148,6 +146,7 @@ export default function PlayerHistoryPage() {
                                                                 ).length
                                                                 : 0;
 
+                                                        // Simple "winner" rule: all winning numbers are present in the board
                                                         const isWinner =
                                                             winningNumbers.length >
                                                             0 &&
