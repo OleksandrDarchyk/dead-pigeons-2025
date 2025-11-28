@@ -1,18 +1,20 @@
 // api/Services/ITransactionService.cs
 using System.Security.Claims;
-using api.Models.Requests;
 using api.Models.Responses;
+using api.Models.Transactions;
 using dataccess.Entities;
 
 namespace api.Services;
 
 public interface ITransactionService
 {
-    // Creates a new MobilePay transaction with "Pending" status
-    Task<Transaction> CreateTransaction(CreateTransactionRequestDto dto);
+    // Admin: create transaction for a specific player
+    Task<Transaction> CreateTransaction(AdminCreateTransactionRequestDto dto);
 
-    // Creates a new transaction for the currently logged-in user (resource-based)
-    Task<Transaction> CreateTransactionForCurrentUser(ClaimsPrincipal claims, CreateTransactionRequestDto dto);
+    // Player: create transaction for the currently logged-in user
+    Task<Transaction> CreateTransactionForCurrentUser(
+        ClaimsPrincipal claims,
+        CreateTransactionForCurrentUserRequestDto dto);
 
     // Approves a pending transaction (admin action)
     Task<Transaction> ApproveTransaction(string transactionId);

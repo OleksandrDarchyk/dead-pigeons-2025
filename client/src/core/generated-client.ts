@@ -672,8 +672,8 @@ export class TransactionsClient {
         this.baseUrl = baseUrl ?? "";
     }
 
-    createTransaction(dto: CreateTransactionRequestDto): Promise<Transaction> {
-        let url_ = this.baseUrl + "/CreateTransaction";
+    createTransaction(dto: CreateTransactionForCurrentUserRequestDto): Promise<TransactionResponseDto> {
+        let url_ = this.baseUrl + "/Transactions/CreateTransaction";
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(dto);
@@ -692,13 +692,13 @@ export class TransactionsClient {
         });
     }
 
-    protected processCreateTransaction(response: Response): Promise<Transaction> {
+    protected processCreateTransaction(response: Response): Promise<TransactionResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Transaction;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TransactionResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -706,11 +706,11 @@ export class TransactionsClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Transaction>(null as any);
+        return Promise.resolve<TransactionResponseDto>(null as any);
     }
 
-    createTransactionForPlayer(dto: CreateTransactionRequestDto): Promise<Transaction> {
-        let url_ = this.baseUrl + "/CreateTransactionForPlayer";
+    createTransactionForPlayer(dto: AdminCreateTransactionRequestDto): Promise<TransactionResponseDto> {
+        let url_ = this.baseUrl + "/Transactions/CreateTransactionForPlayer";
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(dto);
@@ -729,13 +729,13 @@ export class TransactionsClient {
         });
     }
 
-    protected processCreateTransactionForPlayer(response: Response): Promise<Transaction> {
+    protected processCreateTransactionForPlayer(response: Response): Promise<TransactionResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Transaction;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TransactionResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -743,11 +743,11 @@ export class TransactionsClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Transaction>(null as any);
+        return Promise.resolve<TransactionResponseDto>(null as any);
     }
 
-    approveTransaction(transactionId: string | undefined): Promise<Transaction> {
-        let url_ = this.baseUrl + "/ApproveTransaction?";
+    approveTransaction(transactionId: string | undefined): Promise<TransactionResponseDto> {
+        let url_ = this.baseUrl + "/Transactions/ApproveTransaction?";
         if (transactionId === null)
             throw new globalThis.Error("The parameter 'transactionId' cannot be null.");
         else if (transactionId !== undefined)
@@ -766,13 +766,13 @@ export class TransactionsClient {
         });
     }
 
-    protected processApproveTransaction(response: Response): Promise<Transaction> {
+    protected processApproveTransaction(response: Response): Promise<TransactionResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Transaction;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TransactionResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -780,11 +780,11 @@ export class TransactionsClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Transaction>(null as any);
+        return Promise.resolve<TransactionResponseDto>(null as any);
     }
 
-    rejectTransaction(transactionId: string | undefined): Promise<Transaction> {
-        let url_ = this.baseUrl + "/RejectTransaction?";
+    rejectTransaction(transactionId: string | undefined): Promise<TransactionResponseDto> {
+        let url_ = this.baseUrl + "/Transactions/RejectTransaction?";
         if (transactionId === null)
             throw new globalThis.Error("The parameter 'transactionId' cannot be null.");
         else if (transactionId !== undefined)
@@ -803,13 +803,13 @@ export class TransactionsClient {
         });
     }
 
-    protected processRejectTransaction(response: Response): Promise<Transaction> {
+    protected processRejectTransaction(response: Response): Promise<TransactionResponseDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Transaction;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TransactionResponseDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -817,11 +817,11 @@ export class TransactionsClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Transaction>(null as any);
+        return Promise.resolve<TransactionResponseDto>(null as any);
     }
 
-    getMyTransactions(): Promise<Transaction[]> {
-        let url_ = this.baseUrl + "/GetMyTransactions";
+    getMyTransactions(): Promise<TransactionResponseDto[]> {
+        let url_ = this.baseUrl + "/Transactions/GetMyTransactions";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -836,13 +836,13 @@ export class TransactionsClient {
         });
     }
 
-    protected processGetMyTransactions(response: Response): Promise<Transaction[]> {
+    protected processGetMyTransactions(response: Response): Promise<TransactionResponseDto[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Transaction[];
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TransactionResponseDto[];
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -850,11 +850,11 @@ export class TransactionsClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Transaction[]>(null as any);
+        return Promise.resolve<TransactionResponseDto[]>(null as any);
     }
 
-    getPendingTransactions(): Promise<Transaction[]> {
-        let url_ = this.baseUrl + "/GetPendingTransactions";
+    getPendingTransactions(): Promise<TransactionResponseDto[]> {
+        let url_ = this.baseUrl + "/Transactions/GetPendingTransactions";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -869,13 +869,13 @@ export class TransactionsClient {
         });
     }
 
-    protected processGetPendingTransactions(response: Response): Promise<Transaction[]> {
+    protected processGetPendingTransactions(response: Response): Promise<TransactionResponseDto[]> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as Transaction[];
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as TransactionResponseDto[];
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -883,11 +883,11 @@ export class TransactionsClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<Transaction[]>(null as any);
+        return Promise.resolve<TransactionResponseDto[]>(null as any);
     }
 
     getMyBalance(): Promise<PlayerBalanceResponseDto> {
-        let url_ = this.baseUrl + "/GetMyBalance";
+        let url_ = this.baseUrl + "/Transactions/GetMyBalance";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -920,7 +920,7 @@ export class TransactionsClient {
     }
 
     getPlayerBalance(playerId: string | undefined): Promise<PlayerBalanceResponseDto> {
-        let url_ = this.baseUrl + "/GetPlayerBalance?";
+        let url_ = this.baseUrl + "/Transactions/GetPlayerBalance?";
         if (playerId === null)
             throw new globalThis.Error("The parameter 'playerId' cannot be null.");
         else if (playerId !== undefined)
@@ -1055,7 +1055,23 @@ export interface UpdatePlayerRequestDto {
     phone: string;
 }
 
-export interface CreateTransactionRequestDto {
+export interface TransactionResponseDto {
+    id: string;
+    playerId: string;
+    mobilePayNumber: string;
+    amount: number;
+    status: string;
+    createdAt: string;
+    approvedAt: string | undefined;
+    rejectionReason: string | undefined;
+}
+
+export interface CreateTransactionForCurrentUserRequestDto {
+    mobilePayNumber: string;
+    amount: number;
+}
+
+export interface AdminCreateTransactionRequestDto {
     playerId: string;
     mobilePayNumber: string;
     amount: number;

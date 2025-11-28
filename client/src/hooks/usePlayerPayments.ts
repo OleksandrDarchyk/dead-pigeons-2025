@@ -1,7 +1,6 @@
-// client/src/hooks/usePlayerPayments.ts
 import { useEffect, useState } from "react";
 import { transactionsApi } from "../utilities/transactionsApi";
-import type { Transaction } from "../core/generated-client";
+import type { TransactionResponseDto } from "../core/generated-client";
 import toast from "react-hot-toast";
 
 type NewPaymentForm = {
@@ -10,7 +9,7 @@ type NewPaymentForm = {
 };
 
 export function usePlayerPayments() {
-    const [payments, setPayments] = useState<Transaction[]>([]);
+    const [payments, setPayments] = useState<TransactionResponseDto[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [form, setForm] = useState<NewPaymentForm>({
@@ -22,7 +21,10 @@ export function usePlayerPayments() {
     const loadPayments = async () => {
         try {
             setIsLoading(true);
+
+            // getMyTransactions() вже типізований як TransactionResponseDto[]
             const list = await transactionsApi.getMyTransactions();
+
             setPayments(Array.isArray(list) ? list : []);
         } catch (err) {
             console.error(err);
@@ -37,14 +39,17 @@ export function usePlayerPayments() {
     }, []);
 
     const submitPayment = async () => {
-        const amountNumber = Number(form.amount.replace(",", "."));
+        // Normalize amount: replace comma with dot and trim spaces
+        const normalizedAmount = form.amount.replace(",", ".").trim();
+        const amountNumber = Number(normalizedAmount);
 
         if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
             toast.error("Amount must be a positive number");
             return;
         }
 
-        if (!form.mobilePayNumber.trim()) {
+        const mobilePay = form.mobilePayNumber.trim();
+        if (!mobilePay) {
             toast.error("MobilePay number is required");
             return;
         }
@@ -53,13 +58,13 @@ export function usePlayerPayments() {
             setIsSaving(true);
 
             await transactionsApi.createTransaction({
-                playerId: "", // player is resolved from the logged-in user on the server
                 amount: amountNumber,
-                mobilePayNumber: form.mobilePayNumber.trim(),
+                mobilePayNumber: mobilePay,
             });
 
             toast.success("Payment submitted for approval");
 
+            // Reset form and reload list
             setForm({
                 amount: "",
                 mobilePayNumber: "",

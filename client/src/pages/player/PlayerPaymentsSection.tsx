@@ -1,4 +1,3 @@
-// client/src/pages/player/PlayerPaymentsSection.tsx
 import { usePlayerPayments } from "../../hooks/usePlayerPayments";
 import type { FormEvent } from "react";
 
@@ -84,10 +83,11 @@ export default function PlayerPaymentsSection() {
                         </thead>
                         <tbody>
                         {payments.map((tx) => {
+                            // ✅ createdAt з API, форматування в локальну дату
                             const date =
-                                tx.createdat &&
+                                tx.createdAt &&
                                 new Date(
-                                    tx.createdat,
+                                    tx.createdAt,
                                 ).toLocaleDateString();
 
                             const status = tx.status;
@@ -107,7 +107,7 @@ export default function PlayerPaymentsSection() {
                                         {tx.amount.toFixed(2)} DKK
                                     </td>
                                     <td className="py-3 pr-4 text-slate-700">
-                                        {tx.mobilepaynumber}
+                                        {tx.mobilePayNumber}
                                     </td>
                                     <td className="py-3 pr-4">
                                             <span

@@ -1,27 +1,38 @@
 // api/Services/TransactionService.cs
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
-using api.Models.Requests;
 using api.Models.Responses;
+using api.Models.Transactions;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
-using ValidationException = Bogus.ValidationException;
 
 namespace api.Services;
 
-public class TransactionService(
-    MyDbContext ctx,
-    TimeProvider timeProvider) : ITransactionService
+public class TransactionService : ITransactionService
 {
-    // Create transaction (used by admin path)
-    public async Task<Transaction> CreateTransaction(CreateTransactionRequestDto dto)
+    private readonly MyDbContext _ctx;
+    private readonly TimeProvider _timeProvider;
+
+    // Local status constants to avoid magic strings
+    private const string StatusPending  = "Pending";
+    private const string StatusApproved = "Approved";
+    private const string StatusRejected = "Rejected";
+
+    public TransactionService(MyDbContext ctx, TimeProvider timeProvider)
     {
-        // Validate basic DTO attributes
+        _ctx = ctx;
+        _timeProvider = timeProvider;
+    }
+
+    // Admin: create transaction for a specific player
+    public async Task<Transaction> CreateTransaction(AdminCreateTransactionRequestDto dto)
+    {
+        // Validate DTO attributes (Required, MinLength, Range)
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
         // Player must exist and not be soft-deleted
-        var player = await ctx.Players
+        var player = await _ctx.Players
             .FirstOrDefaultAsync(p => p.Id == dto.PlayerId && p.Deletedat == null);
 
         if (player == null)
@@ -29,8 +40,8 @@ public class TransactionService(
             throw new ValidationException("Player not found.");
         }
 
-        // Prevent duplicate MobilePay numbers
-        var exists = await ctx.Transactions
+        // Prevent duplicate MobilePay numbers (among non-deleted transactions)
+        var exists = await _ctx.Transactions
             .AnyAsync(t => t.Mobilepaynumber == dto.MobilePayNumber && t.Deletedat == null);
 
         if (exists)
@@ -38,31 +49,35 @@ public class TransactionService(
             throw new ValidationException("A transaction with this MobilePay number already exists.");
         }
 
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var now = _timeProvider.GetUtcNow().UtcDateTime;
 
         var transaction = new Transaction
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = dto.PlayerId,
+            Id              = Guid.NewGuid().ToString(),
+            Playerid        = dto.PlayerId,
             Mobilepaynumber = dto.MobilePayNumber,
-            Amount = dto.Amount,
-            Status = "Pending",
-            Createdat = now,
-            Approvedat = null,
-            Deletedat = null
+            Amount          = dto.Amount,
+            Status          = StatusPending,
+            Createdat       = now,
+            Approvedat      = null,
+            Deletedat       = null,
+            Rejectionreason = null
         };
 
-        ctx.Transactions.Add(transaction);
-        await ctx.SaveChangesAsync();
+        _ctx.Transactions.Add(transaction);
+        await _ctx.SaveChangesAsync();
 
         return transaction;
     }
 
-    // Create transaction for the currently logged-in user
+    // Player: create transaction for the currently logged-in user
     public async Task<Transaction> CreateTransactionForCurrentUser(
         ClaimsPrincipal claims,
-        CreateTransactionRequestDto dto)
+        CreateTransactionForCurrentUserRequestDto dto)
     {
+        // Validate basic DTO attributes
+        Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
+
         // Email must be present in token
         var email = claims.FindFirst(ClaimTypes.Email)?.Value;
         if (string.IsNullOrWhiteSpace(email))
@@ -71,7 +86,7 @@ public class TransactionService(
         }
 
         // Look up player by email
-        var player = await ctx.Players
+        var player = await _ctx.Players
             .FirstOrDefaultAsync(p => p.Email == email && p.Deletedat == null);
 
         if (player == null)
@@ -79,78 +94,106 @@ public class TransactionService(
             throw new ValidationException("Player not found for this user.");
         }
 
-        // Force ownership to current player, ignore whatever client sent
-        dto.PlayerId = player.Id;
+        // Reuse admin creation logic with correct PlayerId
+        var adminDto = new AdminCreateTransactionRequestDto
+        {
+            PlayerId        = player.Id,
+            MobilePayNumber = dto.MobilePayNumber,
+            Amount          = dto.Amount
+        };
 
-        return await CreateTransaction(dto);
+        return await CreateTransaction(adminDto);
     }
 
     // Admin: approve transaction
     public async Task<Transaction> ApproveTransaction(string transactionId)
     {
-        var transaction = await ctx.Transactions
+        if (string.IsNullOrWhiteSpace(transactionId))
+        {
+            throw new ValidationException("Transaction id is required.");
+        }
+
+        var transaction = await _ctx.Transactions
             .FirstOrDefaultAsync(t => t.Id == transactionId && t.Deletedat == null)
             ?? throw new ValidationException("Transaction not found.");
 
-        if (transaction.Status != "Pending")
+        if (transaction.Status != StatusPending)
         {
             throw new ValidationException("Only pending transactions can be approved.");
         }
 
-        transaction.Status = "Approved";
-        transaction.Approvedat = timeProvider.GetUtcNow().UtcDateTime;
+        transaction.Status = StatusApproved;
+        transaction.Approvedat = _timeProvider.GetUtcNow().UtcDateTime;
+        transaction.Rejectionreason = null;
 
-        await ctx.SaveChangesAsync();
+        await _ctx.SaveChangesAsync();
         return transaction;
     }
 
     // Admin: reject transaction
     public async Task<Transaction> RejectTransaction(string transactionId)
     {
-        var transaction = await ctx.Transactions
+        if (string.IsNullOrWhiteSpace(transactionId))
+        {
+            throw new ValidationException("Transaction id is required.");
+        }
+
+        var transaction = await _ctx.Transactions
             .FirstOrDefaultAsync(t => t.Id == transactionId && t.Deletedat == null)
             ?? throw new ValidationException("Transaction not found.");
 
-        if (transaction.Status != "Pending")
+        if (transaction.Status != StatusPending)
         {
             throw new ValidationException("Only pending transactions can be rejected.");
         }
 
-        transaction.Status = "Rejected";
+        transaction.Status = StatusRejected;
         transaction.Approvedat = null;
+        // Optionally later you can add a Reject(reason) overload and set Rejectionreason
 
-        await ctx.SaveChangesAsync();
+        await _ctx.SaveChangesAsync();
         return transaction;
     }
 
     // Admin: all transactions for a specific player
     public async Task<List<Transaction>> GetTransactionsForPlayer(string playerId)
     {
-        return await ctx.Transactions
+        // For read-only list AsNoTracking is fine
+        return await _ctx.Transactions
             .Where(t => t.Playerid == playerId && t.Deletedat == null)
-            .Include(t => t.Player) 
+            .Include(t => t.Player)
             .OrderByDescending(t => t.Createdat)
+            .AsNoTracking()
             .ToListAsync();
     }
 
     // Admin: all pending transactions
     public async Task<List<Transaction>> GetPendingTransactions()
     {
-        return await ctx.Transactions
-            .Where(t => t.Deletedat == null && t.Status == "Pending")
+        return await _ctx.Transactions
+            .Where(t => t.Deletedat == null && t.Status == StatusPending)
+            .Include(t => t.Player)
             .OrderBy(t => t.Createdat)
+            .AsNoTracking()
             .ToListAsync();
     }
 
     // Current user: balance based on own boards and approved payments
     public async Task<PlayerBalanceResponseDto> GetBalanceForCurrentUser(ClaimsPrincipal claims)
     {
-        var email = claims.FindFirst(ClaimTypes.Email)?.Value
-            ?? throw new ValidationException("Email not found in token.");
+        var email = claims.FindFirst(ClaimTypes.Email)?.Value;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ValidationException("Email not found in token.");
+        }
 
-        var player = await ctx.Players
-            .FirstOrDefaultAsync(p => p.Email == email && p.Deletedat == null)
-            ?? throw new ValidationException("Player not found for this user.");
+        var player = await _ctx.Players
+            .FirstOrDefaultAsync(p => p.Email == email && p.Deletedat == null);
+
+        if (player == null)
+        {
+            throw new ValidationException("Player not found for this user.");
+        }
 
         return await GetPlayerBalance(player.Id);
     }
@@ -158,12 +201,19 @@ public class TransactionService(
     // Current user: own transactions
     public async Task<List<Transaction>> GetTransactionsForCurrentUser(ClaimsPrincipal claims)
     {
-        var email = claims.FindFirst(ClaimTypes.Email)?.Value
-            ?? throw new ValidationException("Email not found in token.");
+        var email = claims.FindFirst(ClaimTypes.Email)?.Value;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ValidationException("Email not found in token.");
+        }
 
-        var player = await ctx.Players
-            .FirstOrDefaultAsync(p => p.Email == email && p.Deletedat == null)
-            ?? throw new ValidationException("Player not found for this user.");
+        var player = await _ctx.Players
+            .FirstOrDefaultAsync(p => p.Email == email && p.Deletedat == null);
+
+        if (player == null)
+        {
+            throw new ValidationException("Player not found for this user.");
+        }
 
         return await GetTransactionsForPlayer(player.Id);
     }
@@ -171,7 +221,7 @@ public class TransactionService(
     // Shared balance calculation logic
     public async Task<PlayerBalanceResponseDto> GetPlayerBalance(string playerId)
     {
-        var playerExists = await ctx.Players
+        var playerExists = await _ctx.Players
             .AnyAsync(p => p.Id == playerId && p.Deletedat == null);
 
         if (!playerExists)
@@ -179,14 +229,16 @@ public class TransactionService(
             throw new ValidationException("Player not found.");
         }
 
-        var approvedAmount = await ctx.Transactions
+        // Sum of approved transactions
+        var approvedAmount = await _ctx.Transactions
             .Where(t =>
                 t.Playerid == playerId &&
                 t.Deletedat == null &&
-                t.Status == "Approved")
+                t.Status == StatusApproved)
             .SumAsync(t => (int?)t.Amount) ?? 0;
 
-        var spentOnBoards = await ctx.Boards
+        // Sum of all board prices for this player
+        var spentOnBoards = await _ctx.Boards
             .Where(b =>
                 b.Playerid == playerId &&
                 b.Deletedat == null)

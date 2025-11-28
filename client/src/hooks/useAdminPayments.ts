@@ -1,19 +1,25 @@
 // src/hooks/useAdminPayments.ts
 import { useEffect, useState } from "react";
-import type { Player, Transaction } from "@core/generated-client";
+import type { Player, TransactionResponseDto } from "@core/generated-client";
 import { transactionsApi } from "@utilities/transactionsApi";
 import { playersApi } from "@utilities/playersApi";
 import toast from "react-hot-toast";
 
 type NewPaymentState = {
-    playerId: string;
-    amount: string;        // keep as string for the input
+    playerId: string;       // selected player
+    amount: string;        // keep as string for controlled input
     mobilePayNumber: string;
 };
 
-// Hook with all admin payments logic (data + form)
+/**
+ * Admin payments hook:
+ * - loads pending transactions (DTOs)
+ * - loads active players
+ * - exposes approve/reject actions
+ * - exposes form state for creating new payments
+ */
 export function useAdminPayments() {
-    const [pending, setPending] = useState<Transaction[]>([]);
+    const [pending, setPending] = useState<TransactionResponseDto[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -25,10 +31,11 @@ export function useAdminPayments() {
         mobilePayNumber: "",
     });
 
-    // Load pending transactions
+    // Load pending transactions (DTO list)
     const loadPending = async () => {
         try {
             setIsLoading(true);
+
             const list = await transactionsApi.getPendingTransactions();
             setPending(Array.isArray(list) ? list : []);
         } catch (err) {
@@ -39,7 +46,7 @@ export function useAdminPayments() {
         }
     };
 
-    // Load active players for the dropdown
+    // Load active players for the dropdown (only active = true)
     const loadPlayers = async () => {
         try {
             const list = await playersApi.getPlayers(true);
@@ -56,7 +63,7 @@ export function useAdminPayments() {
     }, []);
 
     // Approve a pending transaction
-    const approve = async (tx: Transaction) => {
+    const approve = async (tx: TransactionResponseDto) => {
         try {
             await transactionsApi.approveTransaction(tx.id);
             toast.success("Transaction approved");
@@ -68,7 +75,7 @@ export function useAdminPayments() {
     };
 
     // Reject a pending transaction
-    const reject = async (tx: Transaction) => {
+    const reject = async (tx: TransactionResponseDto) => {
         try {
             await transactionsApi.rejectTransaction(tx.id);
             toast.success("Transaction rejected");
@@ -79,20 +86,26 @@ export function useAdminPayments() {
         }
     };
 
-    // Validate and create new payment
+    // Validate and create new payment (admin creates MobilePay tx for a player)
     const saveNewPayment = async () => {
+        // 1) validate player
         if (!form.playerId) {
             toast.error("Please select a player");
             return;
         }
 
-        const amountNumber = Number(form.amount.replace(",", "."));
+        // 2) validate amount (normalize comma → dot)
+        const normalizedAmount = form.amount.replace(",", ".").trim();
+        const amountNumber = Number(normalizedAmount);
+
         if (!Number.isFinite(amountNumber) || amountNumber <= 0) {
             toast.error("Amount must be a positive number");
             return;
         }
 
-        if (!form.mobilePayNumber.trim()) {
+        // 3) validate MobilePay number (not empty)
+        const mobilePay = form.mobilePayNumber.trim();
+        if (!mobilePay) {
             toast.error("MobilePay number is required");
             return;
         }
@@ -100,9 +113,10 @@ export function useAdminPayments() {
         try {
             setIsSaving(true);
 
+            // Admin explicitly chooses playerId; server still checks that player exists
             await transactionsApi.createTransactionForPlayer({
                 playerId: form.playerId,
-                mobilePayNumber: form.mobilePayNumber.trim(),
+                mobilePayNumber: mobilePay,
                 amount: amountNumber,
             });
 
@@ -115,6 +129,7 @@ export function useAdminPayments() {
                 mobilePayNumber: "",
             });
             setIsAdding(false);
+
             await loadPending();
         } catch (err) {
             console.error(err);
