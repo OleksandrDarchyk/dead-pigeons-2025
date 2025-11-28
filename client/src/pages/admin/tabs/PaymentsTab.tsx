@@ -1,7 +1,15 @@
-// client/src/components/admin/tabs/PaymentsTab.tsx
+// client/src/pages/admin/tabs/PaymentsTab.tsx
+
 import { useAdminPayments } from "../../../hooks/useAdminPayments";
 
+/**
+ * Admin Payments tab:
+ * - shows all pending MobilePay transactions
+ * - lets admin approve / reject them
+ * - lets admin create a new payment for a selected player
+ */
 export default function PaymentsTab() {
+    // All payment-related data and actions come from the hook
     const {
         pending,
         players,
@@ -16,169 +24,224 @@ export default function PaymentsTab() {
         saveNewPayment,
     } = useAdminPayments();
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        await saveNewPayment();
+    // Helper to show a nice player name from playerId
+    const getPlayerName = (playerId: string): string => {
+        const player = players.find((p) => p.id === playerId);
+        return player?.fullName ?? "Unknown player";
+    };
+
+    // Handle simple form field changes for the "new payment" form
+    const handleChange = (
+        field: "playerId" | "amount" | "mobilePayNumber",
+        value: string
+    ) => {
+        setForm((prev) => ({
+            ...prev,
+            [field]: value,
+        }));
     };
 
     return (
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <div className="flex items-center justify-between mb-4">
+            {/* HEADER */}
+            <div className="mb-4 flex items-center justify-between">
                 <div>
                     <h2 className="text-lg font-semibold text-slate-900">
-                        Payment Approval Queue
+                        Payments &amp; Balances
                     </h2>
                     <p className="text-xs text-slate-500">
-                        {pending.length} pending transaction
-                        {pending.length === 1 ? "" : "s"}
+                        Review pending MobilePay transactions and create new
+                        payments for players.
                     </p>
                 </div>
 
                 <button
                     type="button"
-                    onClick={() => setIsAdding((x) => !x)}
+                    onClick={() => setIsAdding((prev) => !prev)}
                     className="inline-flex items-center rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
                 >
                     {isAdding ? "Close" : "Add Payment"}
                 </button>
             </div>
 
+            {/* NEW PAYMENT FORM */}
             {isAdding && (
                 <form
-                    onSubmit={handleSubmit}
-                    className="mb-6 grid gap-3 md:grid-cols-[2fr,1fr,1fr,auto]"
+                    onSubmit={(e) => {
+                        e.preventDefault();
+                        void saveNewPayment();
+                    }}
+                    className="mb-6 rounded-2xl bg-slate-50 p-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
                 >
-                    <select
-                        className="select select-bordered w-full text-sm bg-slate-50"
-                        value={form.playerId}
-                        onChange={(e) =>
-                            setForm((prev) => ({
-                                ...prev,
-                                playerId: e.target.value,
-                            }))
-                        }
-                    >
-                        <option value="">Select player…</option>
-                        {players.map((p) => (
-                            <option key={p.id} value={p.id}>
-                                {p.fullname}
-                                {p.phone ? ` (${p.phone})` : ""}
-                            </option>
-                        ))}
-                    </select>
+                    {/* Player select */}
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Player
+                        </label>
+                        <select
+                            className="select select-bordered w-full text-sm bg-white"
+                            value={form.playerId}
+                            onChange={(e) =>
+                                handleChange("playerId", e.target.value)
+                            }
+                        >
+                            <option value="">Select player</option>
+                            {players.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                    {p.fullName}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-                    <input
-                        type="text"
-                        className="input input-bordered w-full text-sm bg-slate-50"
-                        placeholder="Amount (DKK)"
-                        value={form.amount}
-                        onChange={(e) =>
-                            setForm((prev) => ({
-                                ...prev,
-                                amount: e.target.value,
-                            }))
-                        }
-                    />
+                    {/* Amount */}
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            Amount (DKK)
+                        </label>
+                        <input
+                            type="text"
+                            className="input input-bordered w-full text-sm bg-white"
+                            placeholder="e.g. 100"
+                            value={form.amount}
+                            onChange={(e) =>
+                                handleChange("amount", e.target.value)
+                            }
+                        />
+                        <p className="mt-1 text-[11px] text-slate-500">
+                            Use dot or comma, e.g. <code>100</code> or{" "}
+                            <code>100,50</code>.
+                        </p>
+                    </div>
 
-                    <input
-                        type="text"
-                        className="input input-bordered w-full text-sm bg-slate-50"
-                        placeholder="MobilePay number"
-                        value={form.mobilePayNumber}
-                        onChange={(e) =>
-                            setForm((prev) => ({
-                                ...prev,
-                                mobilePayNumber: e.target.value,
-                            }))
-                        }
-                    />
+                    {/* MobilePay number */}
+                    <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1">
+                            MobilePay Transaction Number
+                        </label>
+                        <input
+                            type="text"
+                            className="input input-bordered w-full text-sm bg-white"
+                            placeholder="MP-000123"
+                            value={form.mobilePayNumber}
+                            onChange={(e) =>
+                                handleChange(
+                                    "mobilePayNumber",
+                                    e.target.value
+                                )
+                            }
+                        />
+                    </div>
 
-                    <button
-                        type="submit"
-                        disabled={isSaving}
-                        className="rounded-full bg-red-600 px-4 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-                    >
-                        {isSaving ? "Saving…" : "Save"}
-                    </button>
+                    {/* Buttons */}
+                    <div className="flex items-end justify-end gap-2 md:col-span-2 xl:col-span-1">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsAdding(false);
+                            }}
+                            className="rounded-full border border-slate-300 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isSaving}
+                            className="rounded-full bg-slate-900 px-5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                        >
+                            {isSaving ? "Saving..." : "Save Payment"}
+                        </button>
+                    </div>
                 </form>
             )}
 
-            {isLoading ? (
-                <p className="text-sm text-slate-500">Loading transactions...</p>
-            ) : pending.length === 0 ? (
-                <p className="text-sm text-slate-500">
-                    No pending transactions.
+            {/* PENDING TRANSACTIONS LIST */}
+            <div>
+                <h3 className="mb-2 text-sm font-semibold text-slate-900">
+                    Pending Transactions
+                </h3>
+                <p className="mb-4 text-xs text-slate-500">
+                    These payments are waiting for approval or rejection.
                 </p>
-            ) : (
-                <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                        <thead>
-                        <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
-                            <th className="py-2 pr-4">Player</th>
-                            <th className="py-2 pr-4">Amount</th>
-                            <th className="py-2 pr-4">MobilePay #</th>
-                            <th className="py-2 pr-4">Date</th>
-                            <th className="py-2 pr-4 text-right">
-                                Actions
-                            </th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {pending.map((tx) => {
-                            // Знаходимо гравця по playerId з DTO
-                            const player = players.find(
-                                (p) => p.id === tx.playerId,
-                            );
 
-                            const playerName =
-                                player?.fullname ?? "Unknown player";
+                {isLoading ? (
+                    <p className="text-sm text-slate-500">
+                        Loading transactions...
+                    </p>
+                ) : pending.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                        No pending transactions at the moment.
+                    </p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                            <thead>
+                            <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
+                                <th className="py-2 pr-4">Player</th>
+                                <th className="py-2 pr-4">
+                                    MobilePay No.
+                                </th>
+                                <th className="py-2 pr-4">Amount</th>
+                                <th className="py-2 pr-4">Created</th>
+                                <th className="py-2 pr-4 text-right">
+                                    Actions
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {pending.map((tx) => {
+                                const playerName = getPlayerName(
+                                    tx.playerId
+                                );
+                                const created = new Date(
+                                    tx.createdAt
+                                ).toLocaleString();
 
-                            const date =
-                                tx.createdAt &&
-                                new Date(
-                                    tx.createdAt,
-                                ).toLocaleDateString();
-
-                            return (
-                                <tr
-                                    key={tx.id}
-                                    className="border-b border-slate-100 last:border-0"
-                                >
-                                    <td className="py-3 pr-4 text-slate-900">
-                                        {playerName}
-                                    </td>
-                                    <td className="py-3 pr-4 text-slate-900">
-                                        {tx.amount.toFixed(2)} DKK
-                                    </td>
-                                    <td className="py-3 pr-4 text-slate-700">
-                                        {tx.mobilePayNumber}
-                                    </td>
-                                    <td className="py-3 pr-4 text-slate-500">
-                                        {date ?? "–"}
-                                    </td>
-                                    <td className="py-3 pl-4 text-right space-x-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => approve(tx)}
-                                            className="inline-flex items-center rounded-full bg-green-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-green-700"
-                                        >
-                                            Approve
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => reject(tx)}
-                                            className="inline-flex items-center rounded-full bg-red-600 px-4 py-1.5 text-xs font-semibold text-white hover:bg-red-700"
-                                        >
-                                            Reject
-                                        </button>
-                                    </td>
-                                </tr>
-                            );
-                        })}
-                        </tbody>
-                    </table>
-                </div>
-            )}
+                                return (
+                                    <tr
+                                        key={tx.id}
+                                        className="border-b border-slate-100 last:border-0"
+                                    >
+                                        <td className="py-3 pr-4 font-medium text-slate-900">
+                                            {playerName}
+                                        </td>
+                                        <td className="py-3 pr-4 text-slate-700">
+                                            {tx.mobilePayNumber}
+                                        </td>
+                                        <td className="py-3 pr-4 text-slate-900">
+                                            {tx.amount.toFixed(2)} DKK
+                                        </td>
+                                        <td className="py-3 pr-4 text-slate-500">
+                                            {created}
+                                        </td>
+                                        <td className="py-3 pl-4 text-right">
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    void approve(tx)
+                                                }
+                                                className="mr-2 inline-flex items-center rounded-full border border-green-300 px-3 py-1 text-xs font-semibold text-green-700 hover:bg-green-50"
+                                            >
+                                                Approve
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    void reject(tx)
+                                                }
+                                                className="inline-flex items-center rounded-full border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"
+                                            >
+                                                Reject
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
         </section>
     );
 }
