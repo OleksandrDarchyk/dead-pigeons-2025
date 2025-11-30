@@ -16,6 +16,8 @@ public class CreatePlayerRequestDto
     public string Email { get; set; } = null!;
 
     [Required]
-    [MinLength(5)] // simple check, we don't do real phone validation here
+    [RegularExpression(@"^[0-9+\-\s]{4,30}$", 
+        ErrorMessage = "Phone number can only contain digits, +, - and spaces.")]
     public string Phone { get; set; } = null!;
+
 }
