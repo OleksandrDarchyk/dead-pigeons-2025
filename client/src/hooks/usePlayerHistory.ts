@@ -1,69 +1,117 @@
 // client/src/hooks/usePlayerHistory.ts
 import { useEffect, useState } from "react";
 import { gamesApi } from "../utilities/gamesApi";
-import { boardsApi } from "../utilities/boardsApi";
 import type {
-    BoardResponseDto,
     GameResponseDto,
+    PlayerGameHistoryItemDto,
 } from "../core/generated-client";
+import { ApiException } from "../core/generated-client";
 import toast from "react-hot-toast";
 
 export type GameHistoryItem = {
-    // Game info for one week
+    // One game (one week / round)
     game: GameResponseDto;
-    // All boards the current player has in that game
-    boards: BoardResponseDto[];
+    // All history entries (boards) that the current player has in this game
+    boards: PlayerGameHistoryItemDto[];
 };
 
-/**
- * enabled = false → the hook is prepared but does not load anything yet
- * (for example, when user is not logged in or role is not known).
- */
 export function usePlayerHistory(enabled: boolean = true) {
     const [items, setItems] = useState<GameHistoryItem[]>([]);
     const [isLoading, setIsLoading] = useState(enabled);
+    const [isNotPlayer, setIsNotPlayer] = useState(false);
 
     useEffect(() => {
         if (!enabled) {
-            // When disabled, we clear data and mark as not loading
             setIsLoading(false);
             setItems([]);
+            setIsNotPlayer(false);
             return;
         }
 
         const load = async () => {
             try {
                 setIsLoading(true);
+                setIsNotPlayer(false);
 
-                // Full games history (DTOs)
-                const games = await gamesApi.getGamesHistory();
+                // Load flat history from backend:
+                // each item is (one game + one board of the current player)
+                const history: PlayerGameHistoryItemDto[] =
+                    await gamesApi.getMyGameHistory();
 
-                // All boards for the current player (DTOs)
-                const myBoards = await boardsApi.getMyBoards();
+                // Group by GameId so that the UI can show:
+                // "one game + all my boards in that game"
+                const groupedByGame = new Map<string, GameHistoryItem>();
 
-                // Newest games first by year, then by weekNumber
-                const sortedGames = [...games].sort((a, b) => {
-                    if (a.year !== b.year) return b.year - a.year;
-                    return b.weekNumber - a.weekNumber;
+                for (const entry of history ?? []) {
+                    const gameId = entry.gameId ?? "";
+                    if (!gameId) continue;
+
+                    let existing = groupedByGame.get(gameId);
+
+                    if (!existing) {
+                        const game: GameResponseDto = {
+                            id: entry.gameId!,
+                            weekNumber: entry.weekNumber ?? 0,
+                            year: entry.year ?? 0,
+                            winningNumbers: entry.winningNumbers ?? undefined,
+                            isActive: false,
+                            createdAt: undefined,
+                            closedAt: entry.gameClosedAt ?? undefined,
+                        };
+
+                        existing = { game, boards: [] };
+                        groupedByGame.set(gameId, existing);
+                    }
+
+                    existing.boards.push(entry);
+                }
+
+                const groupedArray: GameHistoryItem[] = Array.from(
+                    groupedByGame.values()
+                ).sort((a, b) => {
+                    const yearDiff = (b.game.year ?? 0) - (a.game.year ?? 0);
+                    if (yearDiff !== 0) return yearDiff;
+
+                    return (b.game.weekNumber ?? 0) - (a.game.weekNumber ?? 0);
                 });
 
-                const grouped: GameHistoryItem[] = sortedGames
-                    .map((game) => {
-                        // Filter only boards that belong to this game
-                        const boardsForGame = myBoards.filter(
-                            (board) => board.gameId === game.id
-                        );
-
-                        return { game, boards: boardsForGame };
-                    })
-                    // Show only games where player actually has boards
-                    .filter((item) => item.boards.length > 0);
-
-                setItems(grouped);
+                setItems(groupedArray);
             } catch (err) {
                 console.error(err);
-                toast.error("Failed to load games history");
+
+                if (err instanceof ApiException) {
+                    // Try to read ProblemDetails from the response body
+                    let problemTitle: string | undefined;
+
+                    try {
+                        if (err.response) {
+                            const parsed = JSON.parse(err.response) as {
+                                title?: string;
+                                detail?: string;
+                            };
+                            problemTitle = parsed?.title ?? parsed?.detail;
+                        }
+                    } catch {
+                        // ignore JSON parse errors
+                    }
+
+                    // Domain case: user is logged in, but there is no Player for this email
+                    if (
+                        problemTitle &&
+                        problemTitle.includes("Player not found for the current user.")
+                    ) {
+                        setItems([]);
+                        setIsNotPlayer(true);
+                        setIsLoading(false);
+                        // No error toast here – this is a normal domain situation
+                        return;
+                    }
+                }
+
+                // Any other error is treated as a real failure
+                setIsNotPlayer(false);
                 setItems([]);
+                toast.error("Failed to load game history");
             } finally {
                 setIsLoading(false);
             }
@@ -75,5 +123,6 @@ export function usePlayerHistory(enabled: boolean = true) {
     return {
         items,
         isLoading,
+        isNotPlayer, // UI can show a friendly message if true
     };
 }

@@ -5,7 +5,7 @@ import PlayerGuard from "./PlayerGuard";
 import PlayerTabs from "./PlayerTabs";
 import type { GameResponseDto } from "../../core/generated-client";
 
-// Helper to read winning numbers from GameResponseDto.winningNumbers
+// Helper: read winning numbers from GameResponseDto and sort them
 function getWinningNumbers(game: GameResponseDto): number[] {
     // If there are no winning numbers yet, return an empty array
     const numbers = game.winningNumbers ?? [];
@@ -18,9 +18,10 @@ export default function PlayerHistoryPage() {
     const { user, token } = useAuth();
     const role = user?.role;
 
+    // Only real players (role "User") should see this page
     const isPlayer = Boolean(token && user && role === "User");
 
-    // Custom hook returns grouped history (GameResponseDto + BoardResponseDto[])
+    // Custom hook returns grouped history (GameResponseDto + PlayerGameHistoryItemDto[])
     const { items, isLoading } = usePlayerHistory(isPlayer);
 
     return (
@@ -56,7 +57,7 @@ export default function PlayerHistoryPage() {
                                 const hasWinningNumbers =
                                     winningNumbers.length > 0;
 
-                                // GameResponseDto uses createdAt (PascalCase)
+                                // GameResponseDto uses createdAt (PascalCase in C#, camelCase in TS)
                                 const created =
                                     game.createdAt &&
                                     new Date(game.createdAt).toLocaleDateString();
@@ -133,12 +134,20 @@ export default function PlayerHistoryPage() {
                                                 </p>
                                             ) : (
                                                 <div className="space-y-3">
-                                                    {boards.map((b) => {
+                                                    {boards.map((b, index) => {
+                                                        // Board numbers from the history DTO (fallback to empty array)
+                                                        const boardNumbers =
+                                                            b.numbers ?? [];
+
+                                                        // Stable key for React: prefer BoardId, fallback to index
+                                                        const boardKey =
+                                                            b.boardId ??
+                                                            `${game.id}-board-${index}`;
+
                                                         // How many numbers from this board match the winning ones
                                                         const matchedCount =
-                                                            winningNumbers.length >
-                                                            0
-                                                                ? b.numbers.filter(
+                                                            hasWinningNumbers
+                                                                ? boardNumbers.filter(
                                                                     (n) =>
                                                                         winningNumbers.includes(
                                                                             n
@@ -146,16 +155,26 @@ export default function PlayerHistoryPage() {
                                                                 ).length
                                                                 : 0;
 
-                                                        // Simple "winner" rule: all winning numbers are present in the board
-                                                        const isWinner =
-                                                            winningNumbers.length >
-                                                            0 &&
+                                                        // What backend says about this board
+                                                        const isWinnerFromServer =
+                                                            b.isWinning ?? false;
+
+                                                        // Simple backup rule: board is winning
+                                                        // if it contains all winning numbers
+                                                        const isWinnerByNumbers =
+                                                            hasWinningNumbers &&
                                                             matchedCount ===
                                                             winningNumbers.length;
 
+                                                        // Final winner flag: trust the server first,
+                                                        // but keep our own calculation as a backup
+                                                        const isWinner =
+                                                            isWinnerFromServer ||
+                                                            isWinnerByNumbers;
+
                                                         return (
                                                             <div
-                                                                key={b.id}
+                                                                key={boardKey}
                                                                 className={
                                                                     "rounded-2xl border px-4 py-3 " +
                                                                     (isWinner
@@ -181,8 +200,9 @@ export default function PlayerHistoryPage() {
                                                                     )}
                                                                 </div>
 
+                                                                {/* Board numbers with match highlighting */}
                                                                 <div className="flex flex-wrap gap-1">
-                                                                    {b.numbers.map(
+                                                                    {boardNumbers.map(
                                                                         (n) => {
                                                                             const isMatch =
                                                                                 winningNumbers.includes(

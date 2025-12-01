@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using api.Models.Game;
 using api.Models.Requests;
 using dataccess;
 using dataccess.Entities;
@@ -121,4 +122,58 @@ public class GameService(
 
         return game;
     }
+
+    public async Task<List<PlayerGameHistoryItemDto>> GetPlayerHistory(string playerEmail)
+    {
+        // Email must be present in the token
+        if (string.IsNullOrWhiteSpace(playerEmail))
+        {
+            throw new ValidationException("Email claim is missing for the current user.");
+        }
+
+        // Find the player by email (ignore soft-deleted)
+        var player = await ctx.Players
+            .Where(p => p.Deletedat == null && p.Email == playerEmail)
+            .FirstOrDefaultAsync();
+
+        if (player == null)
+        {
+            // Domain-level error: logged in user is not registered as a player
+            throw new ValidationException("Player not found for the current user.");
+        }
+
+        // Load all boards for this player, including related games
+        var boards = await ctx.Boards
+            .Include(b => b.Game)
+            .Where(b =>
+                b.Deletedat == null &&
+                b.Playerid == player.Id &&
+                b.Game != null &&
+                b.Game.Deletedat == null)
+            .OrderByDescending(b => b.Game!.Year)
+            .ThenByDescending(b => b.Game!.Weeknumber)
+            .ToListAsync();
+
+        // Map boards + games to a flat list of DTOs for the UI
+        var history = boards
+            .Select(b => new PlayerGameHistoryItemDto
+            {
+                GameId = b.Gameid,
+                WeekNumber = b.Game!.Weeknumber,
+                Year = b.Game.Year,
+                GameClosedAt = b.Game.Closedat,
+
+                BoardId = b.Id,
+                Numbers = b.Numbers.ToArray(),
+                Price = b.Price,
+                BoardCreatedAt = b.Createdat,
+
+                WinningNumbers = b.Game.Winningnumbers?.ToArray(),
+                IsWinning = b.Iswinning
+            })
+            .ToList();
+
+        return history;
+    }
+
 }

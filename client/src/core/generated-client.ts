@@ -136,7 +136,7 @@ export class BoardClient {
     }
 
     createBoard(dto: CreateBoardRequestDto): Promise<BoardResponseDto> {
-        let url_ = this.baseUrl + "/CreateBoard";
+        let url_ = this.baseUrl + "/Board/CreateBoard";
         url_ = url_.replace(/[?&]$/, "");
 
         const content_ = JSON.stringify(dto);
@@ -173,7 +173,7 @@ export class BoardClient {
     }
 
     getBoardsForGame(gameId: string | undefined): Promise<BoardResponseDto[]> {
-        let url_ = this.baseUrl + "/GetBoardsForGame?";
+        let url_ = this.baseUrl + "/Board/GetBoardsForGame?";
         if (gameId === null)
             throw new globalThis.Error("The parameter 'gameId' cannot be null.");
         else if (gameId !== undefined)
@@ -210,7 +210,7 @@ export class BoardClient {
     }
 
     getBoardsForPlayer(playerId: string | undefined): Promise<BoardResponseDto[]> {
-        let url_ = this.baseUrl + "/GetBoardsForPlayer?";
+        let url_ = this.baseUrl + "/Board/GetBoardsForPlayer?";
         if (playerId === null)
             throw new globalThis.Error("The parameter 'playerId' cannot be null.");
         else if (playerId !== undefined)
@@ -247,7 +247,7 @@ export class BoardClient {
     }
 
     getMyBoards(): Promise<BoardResponseDto[]> {
-        let url_ = this.baseUrl + "/GetMyBoards";
+        let url_ = this.baseUrl + "/Board/GetMyBoards";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
@@ -354,6 +354,39 @@ export class GamesClient {
             });
         }
         return Promise.resolve<GameResponseDto[]>(null as any);
+    }
+
+    getMyGameHistory(): Promise<PlayerGameHistoryItemDto[]> {
+        let url_ = this.baseUrl + "/GetMyGameHistory";
+        url_ = url_.replace(/[?&]$/, "");
+
+        let options_: RequestInit = {
+            method: "GET",
+            headers: {
+                "Accept": "application/json"
+            }
+        };
+
+        return this.http.fetch(url_, options_).then((_response: Response) => {
+            return this.processGetMyGameHistory(_response);
+        });
+    }
+
+    protected processGetMyGameHistory(response: Response): Promise<PlayerGameHistoryItemDto[]> {
+        const status = response.status;
+        let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
+        if (status === 200) {
+            return response.text().then((_responseText) => {
+            let result200: any = null;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as PlayerGameHistoryItemDto[];
+            return result200;
+            });
+        } else if (status !== 200 && status !== 204) {
+            return response.text().then((_responseText) => {
+            return throwException("An unexpected server error occurred.", status, _responseText, _headers);
+            });
+        }
+        return Promise.resolve<PlayerGameHistoryItemDto[]>(null as any);
     }
 
     setWinningNumbers(dto: SetWinningNumbersRequestDto): Promise<GameResponseDto> {
@@ -1045,6 +1078,19 @@ export interface GameResponseDto {
     isActive: boolean;
     createdAt: string | undefined;
     closedAt: string | undefined;
+}
+
+export interface PlayerGameHistoryItemDto {
+    gameId: string;
+    weekNumber: number;
+    year: number;
+    gameClosedAt: string | undefined;
+    boardId: string;
+    numbers: number[];
+    price: number;
+    boardCreatedAt: string | undefined;
+    winningNumbers: number[] | undefined;
+    isWinning: boolean;
 }
 
 export interface SetWinningNumbersRequestDto {

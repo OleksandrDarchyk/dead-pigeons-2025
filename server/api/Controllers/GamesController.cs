@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using api.Models.Game;
 using api.Models.Requests;
 using api.Models.Responses;
 using api.Services;
@@ -13,6 +15,7 @@ namespace api.Controllers;
 public class GamesController(IGameService gameService) : ControllerBase
 {
     // GET /GetActiveGame
+    // Returns the currently active game as a DTO
     [HttpGet(nameof(GetActiveGame))]
     public async Task<GameResponseDto> GetActiveGame()
     {
@@ -31,6 +34,22 @@ public class GamesController(IGameService gameService) : ControllerBase
         return games
             .Select(MapToDto)
             .ToList();
+    }
+
+    // GET /GetMyGameHistory
+    // Player-specific game history for the current logged-in user
+    [HttpGet(nameof(GetMyGameHistory))]
+    public async Task<List<PlayerGameHistoryItemDto>> GetMyGameHistory()
+    {
+        // Try to read email from standard ClaimTypes.Email first,
+        // then fallback to a custom "email" claim if used.
+        var email =
+            User.FindFirst(ClaimTypes.Email)?.Value ??
+            User.FindFirst("email")?.Value;
+
+        var history = await gameService.GetPlayerHistory(email!);
+
+        return history;
     }
 
     // POST /SetWinningNumbers
