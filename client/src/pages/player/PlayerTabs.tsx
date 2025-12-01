@@ -4,6 +4,7 @@ import { NavLink } from "react-router-dom";
 export default function PlayerTabs() {
     const tabs = [
         { to: "/player", label: "Dashboard" },
+        { to: "/buy-board", label: "Buy Board" },
         { to: "/balance", label: "Balance & Payments" },
         { to: "/history", label: "Games History" },
     ];
