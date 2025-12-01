@@ -1,15 +1,22 @@
 // client/src/pages/admin/tabs/PaymentsTab.tsx
 
+import { useState } from "react";
 import { useAdminPayments } from "../../../hooks/useAdminPayments";
+import type { TransactionResponseDto } from "@core/generated-client";
+import { transactionsApi } from "@utilities/transactionsApi";
+import toast from "react-hot-toast";
+
+type HistoryStatusFilter = "All" | "Pending" | "Approved" | "Rejected";
 
 /**
  * Admin Payments tab:
  * - shows all pending MobilePay transactions
  * - lets admin approve / reject them
  * - lets admin create a new payment for a selected player
+ * - shows transaction history for a chosen player
  */
 export default function PaymentsTab() {
-    // All payment-related data and actions come from the hook
+    // Pending payments + add-payment form state come from the hook
     const {
         pending,
         players,
@@ -24,21 +31,65 @@ export default function PaymentsTab() {
         saveNewPayment,
     } = useAdminPayments();
 
-    // Helper to show a nice player name from playerId
+    // History filter and data (admin side)
+    const [historyPlayerId, setHistoryPlayerId] = useState<string>("");
+    const [historyStatus, setHistoryStatus] =
+        useState<HistoryStatusFilter>("All");
+    const [history, setHistory] = useState<TransactionResponseDto[]>([]);
+    const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+
+    // Helper: show a readable player name from playerId
     const getPlayerName = (playerId: string): string => {
         const player = players.find((p) => p.id === playerId);
         return player?.fullName ?? "Unknown player";
     };
 
-    // Handle simple form field changes for the "new payment" form
+    // Helper: update a single field in the "new payment" form
     const handleChange = (
         field: "playerId" | "amount" | "mobilePayNumber",
-        value: string
+        value: string,
     ) => {
         setForm((prev) => ({
             ...prev,
             [field]: value,
         }));
+    };
+
+    // Helper: reset form to default empty values
+    const resetForm = () => {
+        setForm({
+            playerId: "",
+            amount: "",
+            mobilePayNumber: "",
+        });
+    };
+
+    // Load transaction history for selected player + status
+    const loadHistory = async () => {
+        if (!historyPlayerId) {
+            toast.error("Please select a player for history");
+            return;
+        }
+
+        try {
+            setIsHistoryLoading(true);
+
+            // "All" means no status filter on the API call
+            const statusParam =
+                historyStatus === "All" ? undefined : historyStatus;
+
+            const list = await transactionsApi.getTransactionsHistory(
+                historyPlayerId,
+                statusParam,
+            );
+
+            setHistory(Array.isArray(list) ? list : []);
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to load transaction history");
+        } finally {
+            setIsHistoryLoading(false);
+        }
     };
 
     return (
@@ -57,7 +108,16 @@ export default function PaymentsTab() {
 
                 <button
                     type="button"
-                    onClick={() => setIsAdding((prev) => !prev)}
+                    onClick={() => {
+                        // When opening the form → start with a clean state
+                        if (!isAdding) {
+                            resetForm();
+                            setIsAdding(true);
+                        } else {
+                            // When closing → just hide the form
+                            setIsAdding(false);
+                        }
+                    }}
                     className="inline-flex items-center rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
                 >
                     {isAdding ? "Close" : "Add Payment"}
@@ -127,7 +187,7 @@ export default function PaymentsTab() {
                             onChange={(e) =>
                                 handleChange(
                                     "mobilePayNumber",
-                                    e.target.value
+                                    e.target.value,
                                 )
                             }
                         />
@@ -138,6 +198,8 @@ export default function PaymentsTab() {
                         <button
                             type="button"
                             onClick={() => {
+                                // Cancel → clear form + hide panel
+                                resetForm();
                                 setIsAdding(false);
                             }}
                             className="rounded-full border border-slate-300 px-4 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
@@ -191,10 +253,10 @@ export default function PaymentsTab() {
                             <tbody>
                             {pending.map((tx) => {
                                 const playerName = getPlayerName(
-                                    tx.playerId
+                                    tx.playerId,
                                 );
                                 const created = new Date(
-                                    tx.createdAt
+                                    tx.createdAt,
                                 ).toLocaleString();
 
                                 return (
@@ -233,6 +295,136 @@ export default function PaymentsTab() {
                                             >
                                                 Reject
                                             </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+            </div>
+
+            {/* TRANSACTION HISTORY */}
+            <div className="mt-8 border-t border-slate-200 pt-6">
+                <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+                    <div>
+                        <h3 className="text-sm font-semibold text-slate-900">
+                            Transaction history
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                            View previously approved or rejected payments for a
+                            player.
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col gap-2 md:flex-row md:items-end">
+                        {/* Player filter */}
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                Player
+                            </label>
+                            <select
+                                className="select select-bordered w-full text-sm bg-white min-w-[180px]"
+                                value={historyPlayerId}
+                                onChange={(e) =>
+                                    setHistoryPlayerId(e.target.value)
+                                }
+                            >
+                                <option value="">Select player</option>
+                                {players.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.fullName}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Status filter */}
+                        <div>
+                            <label className="block text-xs font-semibold text-slate-700 mb-1">
+                                Status
+                            </label>
+                            <select
+                                className="select select-bordered w-full text-sm bg-white"
+                                value={historyStatus}
+                                onChange={(e) =>
+                                    setHistoryStatus(
+                                        e.target.value as HistoryStatusFilter,
+                                    )
+                                }
+                            >
+                                <option value="All">All</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Approved">Approved</option>
+                                <option value="Rejected">Rejected</option>
+                            </select>
+                        </div>
+
+                        {/* Load button */}
+                        <button
+                            type="button"
+                            onClick={() => void loadHistory()}
+                            disabled={isHistoryLoading || !historyPlayerId}
+                            className="mt-2 md:mt-0 rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
+                        >
+                            {isHistoryLoading ? "Loading..." : "Load history"}
+                        </button>
+                    </div>
+                </div>
+
+                {/* History table */}
+                {history.length === 0 ? (
+                    <p className="text-sm text-slate-500">
+                        No transactions to show yet. Select a player and load
+                        history.
+                    </p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full text-sm">
+                            <thead>
+                            <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
+                                <th className="py-2 pr-4">Status</th>
+                                <th className="py-2 pr-4">
+                                    MobilePay No.
+                                </th>
+                                <th className="py-2 pr-4">Amount</th>
+                                <th className="py-2 pr-4">Created</th>
+                                <th className="py-2 pr-4">
+                                    Approved / Rejected
+                                </th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {history.map((tx) => {
+                                const created = new Date(
+                                    tx.createdAt,
+                                ).toLocaleString();
+                                const approved = tx.approvedAt
+                                    ? new Date(
+                                        tx.approvedAt,
+                                    ).toLocaleString()
+                                    : "-";
+
+                                return (
+                                    <tr
+                                        key={tx.id}
+                                        className="border-b border-slate-100 last:border-0"
+                                    >
+                                        <td className="py-3 pr-4 font-medium text-slate-900">
+                                            {tx.status}
+                                        </td>
+                                        <td className="py-3 pr-4 text-slate-700">
+                                            {tx.mobilePayNumber}
+                                        </td>
+                                        <td className="py-3 pr-4 text-slate-900">
+                                            {tx.amount.toFixed(2)} DKK
+                                        </td>
+                                        <td className="py-3 pr-4 text-slate-500">
+                                            {created}
+                                        </td>
+                                        <td className="py-3 pr-4 text-slate-500">
+                                            {approved}
                                         </td>
                                     </tr>
                                 );

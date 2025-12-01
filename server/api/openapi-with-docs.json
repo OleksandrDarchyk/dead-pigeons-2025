@@ -870,6 +870,55 @@
           }
         ]
       }
+    },
+    "/Transactions/GetTransactionsHistory": {
+      "get": {
+        "tags": [
+          "Transactions"
+        ],
+        "operationId": "Transactions_GetTransactionsHistory",
+        "parameters": [
+          {
+            "name": "playerId",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "x-position": 1
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "nullable": true
+            },
+            "x-position": 2
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TransactionResponseDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": [
+              "Admin"
+            ]
+          }
+        ]
+      }
     }
   },
   "components": {
@@ -1122,6 +1171,7 @@
         "properties": {
           "fullName": {
             "type": "string",
+            "maxLength": 100,
             "minLength": 3
           },
           "email": {
@@ -1132,7 +1182,7 @@
           "phone": {
             "type": "string",
             "minLength": 1,
-            "pattern": "^[0-9+\\-\\s]{4,30}$"
+            "pattern": "^[0-9+\\-\\s]{6,20}$"
           }
         }
       },
