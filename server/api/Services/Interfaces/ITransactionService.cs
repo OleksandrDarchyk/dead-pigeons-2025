@@ -28,6 +28,11 @@ public interface ITransactionService
     // Returns all pending transactions (for admin overview)
     Task<List<Transaction>> GetPendingTransactions();
 
+    // ✅ NEW: history of transactions (Approved/Rejected by default)
+    Task<List<Transaction>> GetTransactionsHistory(
+        string? playerId = null,
+        string? status = null);
+
     // Calculates the current balance for a player:
     // sum(Approved transactions) - sum(boards.Price)
     Task<PlayerBalanceResponseDto> GetPlayerBalance(string playerId);

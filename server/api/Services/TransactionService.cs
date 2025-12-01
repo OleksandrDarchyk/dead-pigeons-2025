@@ -178,6 +178,44 @@ public class TransactionService : ITransactionService
             .ToListAsync();
     }
 
+    //  history (Approved/Rejected, optionally filtered)
+    // ✅ History (Approved/Rejected, optionally filtered)
+    public async Task<List<Transaction>> GetTransactionsHistory(
+        string? playerId = null,
+        string? status = null)
+    {
+        IQueryable<Transaction> query = _ctx.Transactions
+            .Where(t => t.Deletedat == null);
+        
+        if (!string.IsNullOrWhiteSpace(playerId))
+        {
+            query = query.Where(t => t.Playerid == playerId);
+        }
+        
+        if (!string.IsNullOrWhiteSpace(status))
+        {
+            if (status != StatusPending &&
+                status != StatusApproved &&
+                status != StatusRejected)
+            {
+                throw new ValidationException("Invalid transaction status filter.");
+            }
+
+            query = query.Where(t => t.Status == status);
+        }
+        else
+        {
+            query = query.Where(t => t.Status != StatusPending);
+        }
+        
+        return await query
+            .Include(t => t.Player)
+            .OrderByDescending(t => t.Createdat)
+            .AsNoTracking()
+            .ToListAsync();
+    }
+
+
     // Current user: balance based on own boards and approved payments
     public async Task<PlayerBalanceResponseDto> GetBalanceForCurrentUser(ClaimsPrincipal claims)
     {
