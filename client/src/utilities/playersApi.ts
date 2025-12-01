@@ -1,21 +1,26 @@
 // src/utilities/playersApi.ts
-import { PlayersClient, type PlayerResponseDto } from "@core/generated-client.ts";
+import {
+    PlayersClient,
+    type PlayerResponseDto,
+    type CreatePlayerRequestDto,
+    type UpdatePlayerRequestDto,
+} from "@core/generated-client.ts";
 import { baseUrl } from "@core/baseUrl.ts";
 import { customFetch } from "@utilities/customFetch.ts";
 
 /**
  * Small wrapper around the NSwag-generated PlayersClient.
  *
- * Security / architecture notes:
- * - We work only with PlayerResponseDto (DTO), not with EF entities.
- * - customFetch attaches the JWT token and handles ProblemDetails responses.
- * - No dotnet-json-refs is needed anymore, because the backend uses
- *   ReferenceHandler.IgnoreCycles and returns a clean JSON array.
+ * Notes:
+ * - We use DTOs (PlayerResponseDto, CreatePlayerRequestDto, UpdatePlayerRequestDto).
+ * - customFetch attaches JWT token and handles ProblemDetails from backend.
  */
 export const playersApi = new PlayersClient(baseUrl, { fetch: customFetch });
 
 /**
- * Convenience type alias so the rest of the app can use PlayerDto
- * instead of importing PlayerResponseDto directly from generated-client.
+ * Convenience aliases so the rest of the app can import these types
+ * directly from "@utilities/playersApi.ts".
  */
 export type PlayerDto = PlayerResponseDto;
+export type CreatePlayerDto = CreatePlayerRequestDto;
+export type UpdatePlayerDto = UpdatePlayerRequestDto;

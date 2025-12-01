@@ -8,7 +8,7 @@ import {
 import { baseUrl } from "@core/baseUrl.ts";
 import { customFetch } from "@utilities/customFetch.ts";
 
-// Shared AuthClient instance
+// Shared AuthClient instance using our customFetch (JWT + ProblemDetails)
 const client = new AuthClient(baseUrl, { fetch: customFetch });
 
 export const authApi = {
@@ -24,3 +24,6 @@ export const authApi = {
         return client.whoAmI();
     },
 };
+
+// Optional convenient type re-exports
+export type { LoginRequestDto, RegisterRequestDto, JwtResponse };

@@ -1,27 +1,20 @@
 // src/pages/admin/tabs/PlayersTab.tsx
-// or: src/components/admin/PlayersTab.tsx – use the path you already have
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { playersApi, type PlayerDto } from "../../../utilities/playersApi";
 import { transactionsApi } from "../../../utilities/transactionsApi";
 import toast from "react-hot-toast";
 
 type BalanceMap = Record<string, number>;
 
-/**
- * Admin Players tab:
- * - shows all players (DTOs, not EF entities)
- * - shows their current balance
- * - allows creating new players
- * - allows toggling active/inactive state
- */
 export default function PlayersTab() {
-    // We use PlayerDto from the API, not the old Player EF entity
+    // List of players from the API
     const [players, setPlayers] = useState<PlayerDto[]>([]);
+    // Map: playerId -> balance
     const [balances, setBalances] = useState<BalanceMap>({});
     const [isLoading, setIsLoading] = useState(true);
 
-    // Form state for "Add Player"
+    // Form state (used for both create and edit)
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [fullName, setFullName] = useState("");
     const [phone, setPhone] = useState("");
@@ -29,12 +22,16 @@ export default function PlayersTab() {
     const [active, setActive] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    // Reset form fields to default values
+    // If not null, form is in "edit" mode for this player id
+    const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
+
+    // Reset form to default "create new player" state
     const resetForm = () => {
         setFullName("");
         setPhone("");
         setEmail("");
         setActive(false);
+        setEditingPlayerId(null);
     };
 
     // Load players and their balances from the server
@@ -46,7 +43,7 @@ export default function PlayersTab() {
             const list = await playersApi.getPlayers(null);
             setPlayers(list);
 
-            // For each player, load their balance (DTO with balance number)
+            // For each player, load their balance (DTO with "balance" number)
             const entries = await Promise.all(
                 list.map(async (p) => {
                     try {
@@ -61,7 +58,7 @@ export default function PlayersTab() {
             );
 
             setBalances(Object.fromEntries(entries));
-        } catch (err) {
+        } catch (err: unknown) {
             console.error(err);
             toast.error("Failed to load players");
         } finally {
@@ -85,60 +82,91 @@ export default function PlayersTab() {
                 toast.success("Player activated");
             }
             await loadData();
-        } catch (err) {
+        } catch (err: unknown) {
             console.error(err);
             toast.error("Failed to update player status");
         }
     };
 
-    // Create a new player from the form
-    const handleCreatePlayer = async (e: React.FormEvent) => {
-        e.preventDefault();
+    // Start editing an existing player (fill the form with current values)
+    const startEditPlayer = (player: PlayerDto) => {
+        setFullName(player.fullName);
+        setPhone(player.phone);
+        setEmail(player.email);
+        setActive(player.isActive);
+        setEditingPlayerId(player.id);
+        setIsFormOpen(true);
+    };
 
-        // Basic client-side validation: all fields required
-        if (!fullName.trim() || !phone.trim() || !email.trim()) {
-            toast.error("Please fill in all fields");
-            return;
-        }
+    // Create a new player OR update an existing one
+    const handleSavePlayer = async (e: FormEvent<HTMLFormElement>) => {
+        // If any HTML validation fails (required / pattern / type),
+        // this handler will not be called at all.
+        e.preventDefault();
 
         try {
             setIsSaving(true);
 
-            const dto = {
-                fullName,
-                phone,
-                email,
-            };
+            const trimmedFullName = fullName.trim();
+            const trimmedPhone = phone.trim();
+            const trimmedEmail = email.trim();
 
-            // Server returns PlayerResponseDto (alias PlayerDto)
-            const player = await playersApi.createPlayer(dto);
+            if (editingPlayerId) {
+                // ✅ Update existing player:
+                // UpdatePlayerRequestDto { id, fullName, email?, phone }
+                await playersApi.updatePlayer({
+                    id: editingPlayerId,
+                    fullName: trimmedFullName,
+                    phone: trimmedPhone,
+                    email: trimmedEmail,
+                });
 
-            // Optionally activate immediately if checkbox is set
-            if (active) {
-                try {
-                    await playersApi.activatePlayer(player.id);
-                } catch (err) {
-                    console.error(err);
-                    toast.error("Player created, but activating failed");
+                toast.success("Player updated");
+            } else {
+                // ✅ Create new player:
+                // CreatePlayerRequestDto { fullName, email, phone }
+                const player = await playersApi.createPlayer({
+                    fullName: trimmedFullName,
+                    phone: trimmedPhone,
+                    email: trimmedEmail,
+                });
+
+                // Optionally activate immediately if checkbox is set
+                if (active) {
+                    try {
+                        await playersApi.activatePlayer(player.id);
+                    } catch (err: unknown) {
+                        console.error(err);
+                        toast.error("Player created, but activating failed");
+                    }
                 }
+
+                toast.success("Player created");
             }
 
-            toast.success("Player created");
             resetForm();
             setIsFormOpen(false);
             await loadData();
-        } catch (err) {
+        } catch (err: unknown) {
             console.error(err);
-            toast.error("Failed to create player");
+            toast.error(
+                editingPlayerId
+                    ? "Failed to update player"
+                    : "Failed to create player"
+            );
         } finally {
             setIsSaving(false);
         }
     };
 
-    // Toggle form open/close and reset when opening
+    // Open/close the form; when closing, leave edit mode
     const handleOpenForm = () => {
         if (!isFormOpen) {
+            // Opening: always start with fresh "create" form
             resetForm();
+        } else {
+            // Closing: make sure we are not in edit mode anymore
+            setEditingPlayerId(null);
         }
         setIsFormOpen((prev) => !prev);
     };
@@ -151,7 +179,7 @@ export default function PlayersTab() {
                         Player Management
                     </h2>
                     <p className="text-xs text-slate-500">
-                        Manage all registered players
+                        Create, edit and manage all registered players
                     </p>
                 </div>
 
@@ -164,10 +192,10 @@ export default function PlayersTab() {
                 </button>
             </div>
 
-            {/* Create Player form */}
+            {/* Create / Edit Player form */}
             {isFormOpen && (
                 <form
-                    onSubmit={handleCreatePlayer}
+                    onSubmit={handleSavePlayer}
                     className="mb-6 rounded-2xl bg-slate-50 p-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
                 >
                     <div className="md:col-span-2">
@@ -175,7 +203,10 @@ export default function PlayersTab() {
                             Full Name
                         </label>
                         <input
+                            // Text input with basic HTML validation
                             type="text"
+                            required
+                            minLength={3}
                             className="input input-bordered w-full text-sm bg-white"
                             placeholder="John Doe"
                             value={fullName}
@@ -188,7 +219,13 @@ export default function PlayersTab() {
                             Phone Number
                         </label>
                         <input
-                            type="text"
+                            // Use native validation for phone:
+                            // only digits, spaces, '+' or '-'
+                            type="tel"
+                            required
+                            pattern="^[0-9+\-\s]{4,30}$"
+                            title="Phone number looks invalid. Use only digits, spaces, '+' or '-'."
+                            inputMode="tel"
                             className="input input-bordered w-full text-sm bg-white"
                             placeholder="+45 12 34 56 78"
                             value={phone}
@@ -201,7 +238,9 @@ export default function PlayersTab() {
                             Email
                         </label>
                         <input
+                            // Browser will show a nice message if email is invalid
                             type="email"
+                            required
                             className="input input-bordered w-full text-sm bg-white"
                             placeholder="john@example.com"
                             value={email}
@@ -237,7 +276,11 @@ export default function PlayersTab() {
                             disabled={isSaving}
                             className="rounded-full bg-slate-900 px-5 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-60"
                         >
-                            {isSaving ? "Saving..." : "Save"}
+                            {isSaving
+                                ? "Saving..."
+                                : editingPlayerId
+                                    ? "Update"
+                                    : "Save"}
                         </button>
                     </div>
                 </form>
@@ -304,14 +347,26 @@ export default function PlayersTab() {
                                     <td className="py-3 pr-4 text-slate-500">
                                         {created ?? "–"}
                                     </td>
-                                    <td className="py-3 pl-4 text-right">
+                                    <td className="py-3 pl-4 text-right space-x-2">
+                                        {/* Edit button: fills the form with this player's data */}
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                startEditPlayer(p)
+                                            }
+                                            className="inline-flex items-center rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                                        >
+                                            Edit
+                                        </button>
+
+                                        {/* Activate / Deactivate button */}
                                         <button
                                             type="button"
                                             onClick={() =>
                                                 toggleActive(p)
                                             }
                                             className={
-                                                "ml-2 inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold " +
+                                                "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold " +
                                                 (p.isActive
                                                     ? "border-red-300 text-red-700 hover:bg-red-50"
                                                     : "border-green-300 text-green-700 hover:bg-green-50")

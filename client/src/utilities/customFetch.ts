@@ -5,8 +5,9 @@ import toast from "react-hot-toast";
 /**
  * HTTP client that:
  * - reads JWT from sessionStorage ("jwt")
- * - removes quotes around token if they exist
+ * - trims and removes quotes around token if they exist
  * - adds Authorization: Bearer <token>
+ * - sets Accept: application/json if not provided
  * - shows toast if response is not ok and has ProblemDetails
  */
 export async function customFetch(
@@ -16,7 +17,7 @@ export async function customFetch(
     let token: string | null = null;
 
     if (typeof window !== "undefined") {
-        let raw = sessionStorage.getItem("jwt");
+        let raw = window.sessionStorage.getItem("jwt");
 
         if (raw) {
             raw = raw.trim();
@@ -29,33 +30,42 @@ export async function customFetch(
         }
     }
 
-    // 👉 Insert logs HERE
-    console.log("customFetch → TOKEN:", token);
-    console.log("customFetch → URL:", url);
-
     const headers = new Headers(init?.headers ?? {});
 
     if (token) {
         headers.set("Authorization", `Bearer ${token}`);
     }
 
-    const response = await fetch(url, {
-        ...init,
-        headers,
-    });
+    if (!headers.has("Accept")) {
+        headers.set("Accept", "application/json");
+    }
+
+    let response: Response;
+
+    try {
+        response = await fetch(url, {
+            ...init,
+            headers,
+        });
+    } catch (error) {
+        toast.error("Network error. Please try again.");
+        throw error;
+    }
 
     if (!response.ok) {
         try {
             const clone = response.clone();
-            const problem = (await clone.json()) as ProblemDetails;
+            const problem = (await clone.json()) as ProblemDetails | null;
 
-            if (problem?.title) {
-                toast(problem.title);
-            } else {
-                toast("Unexpected error");
-            }
+            const message =
+                (problem &&
+                    typeof problem.title === "string" &&
+                    problem.title.trim()) ||
+                "Unexpected error";
+
+            toast.error(message);
         } catch {
-            toast("Unexpected error");
+            toast.error("Unexpected error");
         }
     }
 
