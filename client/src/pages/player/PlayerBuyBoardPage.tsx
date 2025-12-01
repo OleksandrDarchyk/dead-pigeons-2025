@@ -25,11 +25,28 @@ export default function PlayerBuyBoardPage() {
     const {
         balance,
         isLoading: isBalanceLoading,
+        reloadBalance, // used to refresh balance after buying a board
     } = usePlayerBalance(isPlayer);
 
     const numbersCount = form.selectedNumbers.length;
+
+    // Repeat is invalid when the user enters something outside 1–52
     const isRepeatInvalid =
         form.repeatEnabled && (form.repeatWeeks < 1 || form.repeatWeeks > 52);
+
+    // Do not allow buying a board if the total price (with repeat)
+    // is higher than the current balance.
+    const notEnoughBalance =
+        totalPrice !== null &&
+        !isBalanceLoading &&
+        balance !== null &&
+        totalPrice > balance;
+
+    // After creating a board, also reload the balance from the server
+    const handleConfirmBoard = async () => {
+        await submitBoard();
+        await reloadBalance();
+    };
 
     return (
         <PlayerGuard>
@@ -213,18 +230,27 @@ export default function PlayerBuyBoardPage() {
                                                     ).toFixed(2)} DKK`}
                                             </span>
                                         </p>
+
+                                        {notEnoughBalance && (
+                                            <p className="text-[11px] text-red-600">
+                                                You do not have enough balance
+                                                to buy this board with the
+                                                selected repeat settings.
+                                            </p>
+                                        )}
                                     </div>
 
-                                    {/* SMALLER, COMPACT BUTTON */}
+                                    {/* ACTION BUTTON */}
                                     <button
                                         type="button"
-                                        onClick={() => void submitBoard()}
+                                        onClick={() => void handleConfirmBoard()}
                                         disabled={
                                             isSaving ||
                                             !activeGame ||
                                             numbersCount < 5 ||
                                             numbersCount > 8 ||
-                                            isRepeatInvalid
+                                            isRepeatInvalid ||
+                                            notEnoughBalance
                                         }
                                         className="inline-flex items-center justify-center rounded-full bg-red-600 px-5 py-2 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60 whitespace-nowrap"
                                     >
@@ -232,7 +258,6 @@ export default function PlayerBuyBoardPage() {
                                             ? "Creating board..."
                                             : "Confirm board purchase"}
                                     </button>
-
                                 </div>
                             </>
                         )}
