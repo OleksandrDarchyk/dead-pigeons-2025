@@ -95,7 +95,7 @@
         ]
       }
     },
-    "/CreateBoard": {
+    "/Board/CreateBoard": {
       "post": {
         "tags": [
           "Board"
@@ -132,7 +132,7 @@
         ]
       }
     },
-    "/GetBoardsForGame": {
+    "/Board/GetBoardsForGame": {
       "get": {
         "tags": [
           "Board"
@@ -172,7 +172,7 @@
         ]
       }
     },
-    "/GetBoardsForPlayer": {
+    "/Board/GetBoardsForPlayer": {
       "get": {
         "tags": [
           "Board"
@@ -212,7 +212,7 @@
         ]
       }
     },
-    "/GetMyBoards": {
+    "/Board/GetMyBoards": {
       "get": {
         "tags": [
           "Board"
@@ -291,6 +291,34 @@
             "JWT": [
               "Admin"
             ]
+          }
+        ]
+      }
+    },
+    "/GetMyGameHistory": {
+      "get": {
+        "tags": [
+          "Games"
+        ],
+        "operationId": "Games_GetMyGameHistory",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PlayerGameHistoryItemDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
           }
         ]
       }
@@ -1103,6 +1131,58 @@
             "type": "string",
             "format": "date-time",
             "nullable": true
+          }
+        }
+      },
+      "PlayerGameHistoryItemDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameId": {
+            "type": "string"
+          },
+          "weekNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "gameClosedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "boardId": {
+            "type": "string"
+          },
+          "numbers": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "price": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "boardCreatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "winningNumbers": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "isWinning": {
+            "type": "boolean"
           }
         }
       },

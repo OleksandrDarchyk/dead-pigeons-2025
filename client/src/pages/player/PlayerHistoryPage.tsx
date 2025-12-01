@@ -5,7 +5,7 @@ import PlayerGuard from "./PlayerGuard";
 import PlayerTabs from "./PlayerTabs";
 import type { GameResponseDto } from "../../core/generated-client";
 
-// Helper to read winning numbers from GameResponseDto.winningNumbers
+// Helper: read winning numbers from GameResponseDto and sort them
 function getWinningNumbers(game: GameResponseDto): number[] {
     // If there are no winning numbers yet, return an empty array
     const numbers = game.winningNumbers ?? [];
@@ -18,6 +18,7 @@ export default function PlayerHistoryPage() {
     const { user, token } = useAuth();
     const role = user?.role;
 
+    // Only real players (role "User") should see this page
     const isPlayer = Boolean(token && user && role === "User");
 
     // Custom hook returns grouped history (GameResponseDto + BoardResponseDto[])
@@ -146,12 +147,23 @@ export default function PlayerHistoryPage() {
                                                                 ).length
                                                                 : 0;
 
-                                                        // Simple "winner" rule: all winning numbers are present in the board
-                                                        const isWinner =
+                                                        // What backend says about this board
+                                                        const isWinnerFromServer =
+                                                            b.isWinning ?? false;
+
+                                                        // Simple backup rule: board is winning
+                                                        // if it contains all winning numbers
+                                                        const isWinnerByNumbers =
                                                             winningNumbers.length >
                                                             0 &&
                                                             matchedCount ===
                                                             winningNumbers.length;
+
+                                                        // Final winner flag: trust the server first,
+                                                        // but keep our own calculation as a backup
+                                                        const isWinner =
+                                                            isWinnerFromServer ||
+                                                            isWinnerByNumbers;
 
                                                         return (
                                                             <div
@@ -181,6 +193,7 @@ export default function PlayerHistoryPage() {
                                                                     )}
                                                                 </div>
 
+                                                                {/* Board numbers with match highlighting */}
                                                                 <div className="flex flex-wrap gap-1">
                                                                     {b.numbers.map(
                                                                         (n) => {

@@ -1,4 +1,4 @@
-// src/components/admin/BoardsStatsTab.tsx
+// client/src/components/admin/BoardsStatsTab.tsx
 import { useEffect, useMemo, useState } from "react";
 import type {
     BoardResponseDto,
@@ -10,26 +10,27 @@ import { boardsApi } from "../../../utilities/boardsApi";
 import { playersApi } from "../../../utilities/playersApi";
 import toast from "react-hot-toast";
 
-// Boards are DTOs coming from the API
+// Boards are safe DTOs coming from the API
 type BoardWithPlayer = BoardResponseDto;
 
 export default function BoardsStatsTab() {
-    // Active game is a safe DTO (no EF navigation properties)
+    // Active game is a safe DTO (no EF entities on the client)
     const [activeGame, setActiveGame] = useState<GameResponseDto | null>(null);
 
-    // Boards for the current active game (DTOs only)
+    // Boards for the current active game
     const [boards, setBoards] = useState<BoardWithPlayer[]>([]);
 
-    // Players are PlayerResponseDto, not EF Player entity
+    // Active players as DTOs
     const [players, setPlayers] = useState<PlayerResponseDto[]>([]);
 
     const [isLoading, setIsLoading] = useState(true);
 
+    // Load active game, boards for that game, and active players
     const loadData = async () => {
         try {
             setIsLoading(true);
 
-            // 1) Load active game (DTO)
+            // 1) Ask backend for the current active game
             const game = await gamesApi.getActiveGame();
             console.log("Active game:", game);
 
@@ -43,7 +44,7 @@ export default function BoardsStatsTab() {
 
             setActiveGame(game);
 
-            // 2) Load boards for this game (DTOs) and active players
+            // 2) Load boards for this game and all active players in parallel
             const [boardsForGame, allPlayers] = await Promise.all([
                 boardsApi.getBoardsForGame(game.id),
                 // true = only active players
@@ -72,21 +73,24 @@ export default function BoardsStatsTab() {
         void loadData();
     }, []);
 
-    // Simple statistics based on DTOs (no direct DB shapes)
+    // High-level statistics for the current active game
     const stats = useMemo(() => {
-        const totalPlayers = players.length;
+        // Unique players who actually bought at least one board in this game
+        const playersInGame = new Set(boards.map((b) => b.playerId));
+        const totalPlayersInGame = playersInGame.size;
+
         // Backend already returns only non-deleted boards in DTO
         const activeBoards = boards.length;
         const repeatingBoards = boards.filter((b) => b.repeatActive).length;
         const winningBoards = boards.filter((b) => b.isWinning).length;
 
         return {
-            totalPlayers,
+            totalPlayersInGame,
             activeBoards,
             repeatingBoards,
             winningBoards,
         };
-    }, [boards, players]);
+    }, [boards]);
 
     // Resolve player name for a board using playerId from DTO and PlayerResponseDto list
     const getPlayerName = (board: BoardWithPlayer): string => {
@@ -97,11 +101,11 @@ export default function BoardsStatsTab() {
     // Human-friendly label for current active game
     const weekLabel =
         activeGame &&
-        `Week ${activeGame.weekNumber}, ${activeGame.year.toString()}`;
+        `Week ${activeGame.weekNumber}, ${activeGame.year?.toString()}`;
 
     return (
         <section className="space-y-6">
-            {/* Top statistics card */}
+            {/* Top statistics card for the current active game */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h2 className="text-lg font-semibold text-slate-900 mb-1">
                     Statistics Overview
@@ -114,14 +118,17 @@ export default function BoardsStatsTab() {
                     <p className="text-sm text-slate-500">Loading stats...</p>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        {/* How many unique players actually play in this game */}
                         <div className="rounded-xl bg-slate-50 px-4 py-3">
                             <p className="text-xs text-slate-500 mb-1">
-                                Total Players
+                                Players in this game
                             </p>
                             <p className="text-2xl font-bold text-slate-900">
-                                {stats.totalPlayers}
+                                {stats.totalPlayersInGame}
                             </p>
                         </div>
+
+                        {/* Total number of boards in this game */}
                         <div className="rounded-xl bg-green-50 px-4 py-3">
                             <p className="text-xs text-slate-500 mb-1">
                                 Active Boards
@@ -130,6 +137,8 @@ export default function BoardsStatsTab() {
                                 {stats.activeBoards}
                             </p>
                         </div>
+
+                        {/* Boards marked as repeating */}
                         <div className="rounded-xl bg-violet-50 px-4 py-3">
                             <p className="text-xs text-slate-500 mb-1">
                                 Repeating Boards
@@ -138,6 +147,8 @@ export default function BoardsStatsTab() {
                                 {stats.repeatingBoards}
                             </p>
                         </div>
+
+                        {/* Boards marked as winning by the backend */}
                         <div className="rounded-xl bg-amber-50 px-4 py-3">
                             <p className="text-xs text-slate-500 mb-1">
                                 Winning Boards
@@ -150,7 +161,7 @@ export default function BoardsStatsTab() {
                 )}
             </div>
 
-            {/* List of boards for current active game */}
+            {/* List of boards for the current active game */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-base font-semibold text-slate-900 mb-1">
                     All Active Boards
@@ -181,6 +192,7 @@ export default function BoardsStatsTab() {
                                     key={b.id}
                                     className="flex flex-col md:flex-row md:items-center md:justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3"
                                 >
+                                    {/* Player info and date */}
                                     <div className="mb-2 md:mb-0">
                                         <p className="text-sm font-semibold text-slate-900">
                                             {playerName}
@@ -190,8 +202,9 @@ export default function BoardsStatsTab() {
                                         </p>
                                     </div>
 
+                                    {/* Board numbers and small tags */}
                                     <div className="flex flex-wrap items-center gap-2">
-                                        {/* Numbers */}
+                                        {/* Numbers on the board */}
                                         <div className="flex flex-wrap gap-1">
                                             {b.numbers.map((n) => (
                                                 <span
@@ -208,7 +221,7 @@ export default function BoardsStatsTab() {
                                             ))}
                                         </div>
 
-                                        {/* Tags: repeating / single + winning */}
+                                        {/* Tags: repeating / single and winning */}
                                         <div className="flex items-center gap-2">
                                             {isRepeating ? (
                                                 <span className="inline-flex items-center rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-700">
