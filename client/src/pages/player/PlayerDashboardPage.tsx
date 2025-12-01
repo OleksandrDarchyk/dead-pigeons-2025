@@ -24,11 +24,6 @@ export default function PlayerDashboardPage() {
         boards,
         activeGame,
         isLoading: isBoardsLoading,
-        form,
-        toggleNumber,
-        submitBoard,
-        currentPrice,
-        isSaving: isSavingBoard,
     } = usePlayerBoards(isPlayer);
 
     // Server already filters out soft-deleted boards, so we can use boards directly
@@ -117,106 +112,21 @@ export default function PlayerDashboardPage() {
                             )}
                         </div>
 
-                        <button
-                            type="button"
-                            onClick={() => {
-                                document
-                                    .getElementById("buy-board-section")
-                                    ?.scrollIntoView({ behavior: "smooth" });
-                            }}
-                            className="rounded-full bg-red-100 px-5 py-2 text-xs font-semibold text-red-700 hover:bg-red-200 disabled:opacity-60"
-                            disabled={!activeGame}
-                        >
-                            Buy Board
-                        </button>
-                    </section>
-
-                    {/* BUY BOARD */}
-                    <section
-                        id="buy-board-section"
-                        className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm"
-                    >
-                        <h2 className="mb-1 text-lg font-semibold text-slate-900">
-                            Buy a Board
-                        </h2>
-                        <p className="mb-4 text-xs text-slate-500">
-                            Pick between 5 and 8 numbers from 1–16 for this
-                            week&apos;s round.
-                        </p>
-
-                        {!activeGame ? (
-                            <p className="text-sm text-slate-500">
-                                You can buy a board when there is an active
-                                round.
-                            </p>
+                        {activeGame ? (
+                            <Link
+                                to="/buy-board"
+                                className="rounded-full bg-red-100 px-5 py-2 text-xs font-semibold text-red-700 hover:bg-red-200"
+                            >
+                                Buy Board
+                            </Link>
                         ) : (
-                            <>
-                                <div className="mb-4 grid grid-cols-4 gap-2 sm:grid-cols-8">
-                                    {Array.from({ length: 16 }, (_, i) => i + 1).map(
-                                        (num) => {
-                                            const isSelected =
-                                                form.selectedNumbers.includes(num);
-
-                                            return (
-                                                <button
-                                                    key={num}
-                                                    type="button"
-                                                    onClick={() =>
-                                                        toggleNumber(num)
-                                                    }
-                                                    className={
-                                                        "inline-flex h-10 w-10 items-center justify-center rounded-lg border text-sm font-semibold transition " +
-                                                        (isSelected
-                                                            ? "border-red-600 bg-red-600 text-white shadow-sm"
-                                                            : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50")
-                                                    }
-                                                    disabled={isSavingBoard}
-                                                >
-                                                    {num}
-                                                </button>
-                                            );
-                                        }
-                                    )}
-                                </div>
-
-                                <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
-                                    <div className="text-xs text-slate-600">
-                                        <p>
-                                            Selected:{" "}
-                                            <span className="font-semibold text-slate-900">
-                                                {form.selectedNumbers.length}
-                                            </span>{" "}
-                                            numbers
-                                        </p>
-                                        <p>
-                                            Price:{" "}
-                                            <span className="font-semibold text-slate-900">
-                                                {currentPrice !== null
-                                                    ? `${currentPrice.toFixed(
-                                                        2
-                                                    )} DKK`
-                                                    : "–"}
-                                            </span>
-                                        </p>
-                                    </div>
-
-                                    <button
-                                        type="button"
-                                        onClick={() => void submitBoard()}
-                                        disabled={
-                                            isSavingBoard ||
-                                            !activeGame ||
-                                            form.selectedNumbers.length < 5 ||
-                                            form.selectedNumbers.length > 8
-                                        }
-                                        className="w-full rounded-full bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60 sm:w-auto"
-                                    >
-                                        {isSavingBoard
-                                            ? "Creating board..."
-                                            : "Confirm board purchase"}
-                                    </button>
-                                </div>
-                            </>
+                            <button
+                                type="button"
+                                disabled
+                                className="rounded-full bg-red-100 px-5 py-2 text-xs font-semibold text-red-700 opacity-60"
+                            >
+                                Buy Board
+                            </button>
                         )}
                     </section>
 

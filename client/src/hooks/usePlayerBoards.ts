@@ -1,4 +1,3 @@
-// client/src/hooks/usePlayerBoards.ts
 import { useEffect, useState } from "react";
 import { boardsApi } from "../utilities/boardsApi";
 import { gamesApi } from "../utilities/gamesApi";
@@ -10,6 +9,8 @@ import toast from "react-hot-toast";
 
 type BoardFormState = {
     selectedNumbers: number[];
+    repeatEnabled: boolean;
+    repeatWeeks: number;
 };
 
 // Simple price table based on how many numbers are picked
@@ -44,6 +45,8 @@ export function usePlayerBoards(enabled: boolean = true) {
 
     const [form, setForm] = useState<BoardFormState>({
         selectedNumbers: [],
+        repeatEnabled: false,
+        repeatWeeks: 1,
     });
 
     // Load active game and current player's boards
@@ -67,11 +70,7 @@ export function usePlayerBoards(enabled: boolean = true) {
     };
 
     useEffect(() => {
-        // If hook is disabled (for example, user is not ready yet), skip loading
-        if (!enabled) {
-            return;
-        }
-
+        if (!enabled) return;
         void loadBoards();
     }, [enabled]);
 
@@ -95,6 +94,22 @@ export function usePlayerBoards(enabled: boolean = true) {
         });
     };
 
+    const setRepeatEnabled = (enabled: boolean) => {
+        setForm((prev) => ({
+            ...prev,
+            repeatEnabled: enabled,
+        }));
+    };
+
+    const setRepeatWeeks = (weeks: number) => {
+        const raw = Number.isFinite(weeks) ? weeks : 1;
+        const clamped = Math.max(1, Math.min(52, Math.floor(raw))); // 1–52 weeks
+        setForm((prev) => ({
+            ...prev,
+            repeatWeeks: clamped,
+        }));
+    };
+
     // Create a new board for the active game
     const submitBoard = async () => {
         const count = form.selectedNumbers.length;
@@ -110,11 +125,18 @@ export function usePlayerBoards(enabled: boolean = true) {
             return;
         }
 
+        if (form.repeatEnabled && (form.repeatWeeks < 1 || form.repeatWeeks > 52)) {
+            toast.error("Repeat weeks must be between 1 and 52");
+            return;
+        }
+
         const price = getPriceForCount(count);
         if (price === null) {
             toast.error("Could not calculate board price");
             return;
         }
+
+        const repeatWeeksToSend = form.repeatEnabled ? form.repeatWeeks : 0;
 
         try {
             setIsSaving(true);
@@ -123,7 +145,7 @@ export function usePlayerBoards(enabled: boolean = true) {
             await boardsApi.createBoard({
                 gameId: activeGame.id,
                 numbers: form.selectedNumbers,
-                repeatWeeks: 0, // 0 = only this week's game
+                repeatWeeks: repeatWeeksToSend,
             });
 
             toast.success("Board created");
@@ -131,6 +153,8 @@ export function usePlayerBoards(enabled: boolean = true) {
             // Reset form after successful creation
             setForm({
                 selectedNumbers: [],
+                repeatEnabled: false,
+                repeatWeeks: 1,
             });
 
             // Reload boards to reflect the new purchase
@@ -143,8 +167,12 @@ export function usePlayerBoards(enabled: boolean = true) {
         }
     };
 
-    // Current price preview for UI, based on how many numbers are selected
+    // Price preview
     const currentPrice = getPriceForCount(form.selectedNumbers.length);
+    const totalPrice =
+        currentPrice !== null
+            ? currentPrice * (form.repeatEnabled ? form.repeatWeeks : 1)
+            : null;
 
     return {
         boards,
@@ -156,5 +184,8 @@ export function usePlayerBoards(enabled: boolean = true) {
         toggleNumber,
         submitBoard,
         currentPrice,
+        totalPrice,
+        setRepeatEnabled,
+        setRepeatWeeks,
     };
 }

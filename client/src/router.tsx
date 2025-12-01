@@ -13,6 +13,7 @@ import RegisterPage from "./pages/auth/RegisterPage";
 import PlayerDashboardPage from "./pages/player/PlayerDashboardPage";
 import PlayerBalancePage from "./pages/player/PlayerBalancePage";
 import PlayerHistoryPage from "./pages/player/PlayerHistoryPage";
+import PlayerBuyBoardPage from "./pages/player/PlayerBuyBoardPage";
 
 const router = createBrowserRouter(
     createRoutesFromElements(
@@ -25,6 +26,7 @@ const router = createBrowserRouter(
 
             {/* player area */}
             <Route path="player" element={<PlayerDashboardPage />} />
+            <Route path="buy-board" element={<PlayerBuyBoardPage />} />
             <Route path="balance" element={<PlayerBalancePage />} />
             <Route path="history" element={<PlayerHistoryPage />} />
         </Route>
