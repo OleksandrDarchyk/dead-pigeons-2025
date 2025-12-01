@@ -21,7 +21,7 @@ export default function PlayerHistoryPage() {
     // Only real players (role "User") should see this page
     const isPlayer = Boolean(token && user && role === "User");
 
-    // Custom hook returns grouped history (GameResponseDto + BoardResponseDto[])
+    // Custom hook returns grouped history (GameResponseDto + PlayerGameHistoryItemDto[])
     const { items, isLoading } = usePlayerHistory(isPlayer);
 
     return (
@@ -57,7 +57,7 @@ export default function PlayerHistoryPage() {
                                 const hasWinningNumbers =
                                     winningNumbers.length > 0;
 
-                                // GameResponseDto uses createdAt (PascalCase)
+                                // GameResponseDto uses createdAt (PascalCase in C#, camelCase in TS)
                                 const created =
                                     game.createdAt &&
                                     new Date(game.createdAt).toLocaleDateString();
@@ -134,12 +134,20 @@ export default function PlayerHistoryPage() {
                                                 </p>
                                             ) : (
                                                 <div className="space-y-3">
-                                                    {boards.map((b) => {
+                                                    {boards.map((b, index) => {
+                                                        // Board numbers from the history DTO (fallback to empty array)
+                                                        const boardNumbers =
+                                                            b.numbers ?? [];
+
+                                                        // Stable key for React: prefer BoardId, fallback to index
+                                                        const boardKey =
+                                                            b.boardId ??
+                                                            `${game.id}-board-${index}`;
+
                                                         // How many numbers from this board match the winning ones
                                                         const matchedCount =
-                                                            winningNumbers.length >
-                                                            0
-                                                                ? b.numbers.filter(
+                                                            hasWinningNumbers
+                                                                ? boardNumbers.filter(
                                                                     (n) =>
                                                                         winningNumbers.includes(
                                                                             n
@@ -154,8 +162,7 @@ export default function PlayerHistoryPage() {
                                                         // Simple backup rule: board is winning
                                                         // if it contains all winning numbers
                                                         const isWinnerByNumbers =
-                                                            winningNumbers.length >
-                                                            0 &&
+                                                            hasWinningNumbers &&
                                                             matchedCount ===
                                                             winningNumbers.length;
 
@@ -167,7 +174,7 @@ export default function PlayerHistoryPage() {
 
                                                         return (
                                                             <div
-                                                                key={b.id}
+                                                                key={boardKey}
                                                                 className={
                                                                     "rounded-2xl border px-4 py-3 " +
                                                                     (isWinner
@@ -195,7 +202,7 @@ export default function PlayerHistoryPage() {
 
                                                                 {/* Board numbers with match highlighting */}
                                                                 <div className="flex flex-wrap gap-1">
-                                                                    {b.numbers.map(
+                                                                    {boardNumbers.map(
                                                                         (n) => {
                                                                             const isMatch =
                                                                                 winningNumbers.includes(
