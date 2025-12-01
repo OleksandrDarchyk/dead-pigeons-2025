@@ -1131,7 +1131,8 @@
           },
           "phone": {
             "type": "string",
-            "minLength": 5
+            "minLength": 1,
+            "pattern": "^[0-9+\\-\\s]{4,30}$"
           }
         }
       },
