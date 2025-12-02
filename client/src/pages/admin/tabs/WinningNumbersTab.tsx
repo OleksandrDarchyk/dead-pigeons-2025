@@ -28,6 +28,7 @@ export default function WinningNumbersTab() {
         } catch (err) {
             console.error(err);
             toast.error("Failed to load active game");
+            setActiveGame(null);
         }
     };
 
@@ -80,7 +81,7 @@ export default function WinningNumbersTab() {
                 )} saved. Game ${result.weekNumber} is now finished.`
             );
 
-            // Optionally reset local selects
+            // Reset local selects
             setN1("");
             setN2("");
             setN3("");
@@ -89,8 +90,8 @@ export default function WinningNumbersTab() {
             await loadActiveGame();
         } catch (err) {
             console.error(err);
-            // Global fetch wrapper should show server message,
-            // but we add a generic one for safety
+            // Глобальний customFetch покаже текст помилки з сервера,
+            // тут просто резервний тост
             toast.error("Failed to save winning numbers");
         } finally {
             setIsSaving(false);
@@ -127,6 +128,7 @@ export default function WinningNumbersTab() {
                                         : Number(e.target.value)
                                 )
                             }
+                            disabled={isSaving || !activeGame}
                         >
                             <option value="">Select number</option>
                             {numbers.map((num) => (
@@ -151,6 +153,7 @@ export default function WinningNumbersTab() {
                                         : Number(e.target.value)
                                 )
                             }
+                            disabled={isSaving || !activeGame}
                         >
                             <option value="">Select number</option>
                             {numbers.map((num) => (
@@ -175,6 +178,7 @@ export default function WinningNumbersTab() {
                                         : Number(e.target.value)
                                 )
                             }
+                            disabled={isSaving || !activeGame}
                         >
                             <option value="">Select number</option>
                             {numbers.map((num) => (
@@ -188,7 +192,7 @@ export default function WinningNumbersTab() {
 
                 <button
                     type="submit"
-                    disabled={isSaving}
+                    disabled={isSaving || !activeGame}
                     className="w-full rounded-full bg-red-600 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
                 >
                     {isSaving ? "Saving..." : "Submit Winning Numbers"}

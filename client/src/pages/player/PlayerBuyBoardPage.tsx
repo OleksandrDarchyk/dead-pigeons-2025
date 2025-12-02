@@ -42,6 +42,33 @@ export default function PlayerBuyBoardPage() {
         balance !== null &&
         totalPrice > balance;
 
+    // Preview: list of weeks where this repeating board will be active
+    const repeatSchedule =
+        activeGame &&
+        form.repeatEnabled &&
+        !isRepeatInvalid &&
+        form.repeatWeeks > 0
+            ? (() => {
+                const list: { week: number; year: number }[] = [];
+
+                let week = activeGame.weekNumber;
+                let year = activeGame.year;
+                const totalWeeks = form.repeatWeeks; // includes current week
+
+                for (let i = 0; i < totalWeeks; i++) {
+                    list.push({ week, year });
+
+                    week += 1;
+                    if (week > 52) {
+                        week = 1;
+                        year += 1;
+                    }
+                }
+
+                return list;
+            })()
+            : [];
+
     // After creating a board, also reload the balance from the server
     const handleConfirmBoard = async () => {
         await submitBoard();
@@ -204,6 +231,35 @@ export default function PlayerBuyBoardPage() {
                                                         and 52 weeks.
                                                     </p>
                                                 )}
+
+                                                {/* PREVIEW OF WEEKS FOR REPEATING BOARD */}
+                                                {repeatSchedule &&
+                                                    repeatSchedule.length > 0 && (
+                                                        <div className="mt-2 text-[11px] text-slate-500">
+                                                            <p>
+                                                                This board will
+                                                                be active in:
+                                                            </p>
+                                                            <ul className="mt-1 space-y-0.5">
+                                                                {repeatSchedule.map(
+                                                                    (w) => (
+                                                                        <li
+                                                                            key={`${w.year}-${w.week}`}
+                                                                        >
+                                                                            Week{" "}
+                                                                            {
+                                                                                w.week
+                                                                            }
+                                                                            ,{" "}
+                                                                            {
+                                                                                w.year
+                                                                            }
+                                                                        </li>
+                                                                    )
+                                                                )}
+                                                            </ul>
+                                                        </div>
+                                                    )}
                                             </div>
                                         )}
 

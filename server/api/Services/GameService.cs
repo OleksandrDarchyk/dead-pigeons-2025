@@ -43,7 +43,7 @@ public class GameService(
 
     public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersRequestDto dto)
     {
-        // Validate DTO via DataAnnotations attributes
+        // 1) Validate DTO via DataAnnotations attributes
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
         var numbers = dto.WinningNumbers;
@@ -63,7 +63,7 @@ public class GameService(
         // We always sort them so order never matters
         var sortedNumbers = numbers.OrderBy(n => n).ToArray();
 
-        // Load the game with its boards (only if not soft-deleted)
+        // 2) Load the game with its boards (only if not soft-deleted)
         var game = await ctx.Games
             .Include(g => g.Boards)
             .FirstOrDefaultAsync(g => g.Id == dto.GameId && g.Deletedat == null);
@@ -85,13 +85,13 @@ public class GameService(
             throw new ValidationException("Winning numbers already set for this game.");
         }
 
-        // Close current game and set winning numbers
+        // 3) Close current game and set winning numbers
         game.Winningnumbers = sortedNumbers.ToList();
         game.Closedat = timeProvider.GetUtcNow().UtcDateTime;
         game.Isactive = false;
 
-        // Mark winning boards:
-        // a board wins if it contains all 3 winning numbers
+        // 4) Mark winning boards:
+        //    a board wins if it contains all 3 winning numbers
         var winningSet = sortedNumbers.ToHashSet();
 
         foreach (var board in game.Boards.Where(b => b.Deletedat == null))
@@ -101,7 +101,7 @@ public class GameService(
             board.Iswinning = isWinning;
         }
 
-        // Activate the next upcoming game by (year, weekNumber)
+        // 5) Activate the next upcoming game by (year, weekNumber)
         var nextGame = await ctx.Games
             .Where(g =>
                 g.Deletedat == null &&
@@ -114,10 +114,14 @@ public class GameService(
 
         if (nextGame != null)
         {
+            // Make the next week active
             nextGame.Isactive = true;
+
+            // 6) Create new boards for all repeating boards of the just-closed game
+            CreateRepeatingBoardsForNextGame(game, nextGame);
         }
 
-        // Calculate summary for the just-closed game
+        // 7) Calculate summary for the just-closed game
         var totalBoards = game.Boards
             .Count(b => b.Deletedat == null);
 
@@ -128,20 +132,62 @@ public class GameService(
             .Where(b => b.Deletedat == null)
             .Sum(b => b.Price);
 
-        // Save all changes in one go
+        // 8) Save all changes in one go
         await ctx.SaveChangesAsync();
 
-        // Return a summary DTO for the UI
+        // 9) Return a summary DTO for the UI
         return new GameResultSummaryDto
         {
-            GameId = game.Id,
-            WeekNumber = game.Weeknumber,
-            Year = game.Year,
+            GameId         = game.Id,
+            WeekNumber     = game.Weeknumber,
+            Year           = game.Year,
             WinningNumbers = sortedNumbers,
-            TotalBoards = totalBoards,
-            WinningBoards = winningBoards,
+            TotalBoards    = totalBoards,
+            WinningBoards  = winningBoards,
             DigitalRevenue = digitalRevenue
         };
+    }
+
+    /// <summary>
+    /// For all boards in the current game that are marked as repeating,
+    /// create a new board in the next game and decrease remaining weeks.
+    /// </summary>
+    private void CreateRepeatingBoardsForNextGame(Game currentGame, Game nextGame)
+    {
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+
+        // Take only non-deleted boards that:
+        // - are marked as repeating
+        // - still have more than 1 week left (this week + future)
+        var repeatingBoards = currentGame.Boards
+            .Where(b =>
+                b.Deletedat == null &&
+                b.Repeatactive &&
+                b.Repeatweeks > 1)
+            .ToList();
+
+        foreach (var board in repeatingBoards)
+        {
+            // This week is already played, so for the next week we decrease by 1
+            var remainingWeeks = board.Repeatweeks - 1;
+
+            var newBoard = new Board
+            {
+                Id           = Guid.NewGuid().ToString(),
+                Playerid     = board.Playerid,
+                Gameid       = nextGame.Id,
+                Numbers      = board.Numbers.ToList(),
+                // Price is per week – same as the original board
+                Price        = board.Price,
+                Iswinning    = false,
+                Repeatweeks  = remainingWeeks,
+                Repeatactive = remainingWeeks > 1,
+                Createdat    = now,
+                Deletedat    = null
+            };
+
+            ctx.Boards.Add(newBoard);
+        }
     }
 
     public async Task<List<PlayerGameHistoryItemDto>> GetPlayerHistory(string playerEmail)
@@ -179,18 +225,18 @@ public class GameService(
         var history = boards
             .Select(b => new PlayerGameHistoryItemDto
             {
-                GameId = b.Gameid,
-                WeekNumber = b.Game!.Weeknumber,
-                Year = b.Game.Year,
-                GameClosedAt = b.Game.Closedat,
+                GameId        = b.Gameid,
+                WeekNumber    = b.Game!.Weeknumber,
+                Year          = b.Game.Year,
+                GameClosedAt  = b.Game.Closedat,
 
-                BoardId = b.Id,
-                Numbers = b.Numbers.ToArray(),
-                Price = b.Price,
+                BoardId       = b.Id,
+                Numbers       = b.Numbers.ToArray(),
+                Price         = b.Price,
                 BoardCreatedAt = b.Createdat,
 
                 WinningNumbers = b.Game.Winningnumbers?.ToArray(),
-                IsWinning = b.Iswinning
+                IsWinning      = b.Iswinning
             })
             .ToList();
 
