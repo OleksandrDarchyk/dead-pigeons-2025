@@ -1,3 +1,4 @@
+// api/Services/BoardService.cs
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
 using api.Models.Requests;
@@ -99,9 +100,13 @@ public class BoardService(
         // How many weeks we must be able to cover with current balance:
         // 0 -> no repeat -> at least 1 week
         var weeksToCover = dto.RepeatWeeks <= 0 ? 1 : dto.RepeatWeeks;
+
+        // ❗ New logic:
+        // We charge the FULL amount for all selected weeks *now*,
+        // and store this full charge in Board.Price.
         var totalCost = weeklyPrice * weeksToCover;
 
-        // Balance = sum(approved transactions) - sum(board prices)
+        // Balance = sum(approved transactions) - sum(board charges)
         var currentBalance = await GetCurrentBalance(playerId);
 
         if (currentBalance < totalCost)
@@ -118,8 +123,13 @@ public class BoardService(
             Playerid = playerId,
             Gameid = dto.GameId,
             Numbers = sortedNumbers.ToList(),
-            // We still store price for a single week; repeated rounds will be handled later
-            Price = weeklyPrice,
+
+            // ❗ Very important:
+            // For non-repeating boards: Price = weeklyPrice (1 week).
+            // For repeating boards: Price = totalCost for ALL weeks (prepaid).
+            // Repeating copies created later will have Price = 0.
+            Price = totalCost,
+
             Iswinning = false,
             Repeatweeks = dto.RepeatWeeks,
             Repeatactive = dto.RepeatWeeks > 0,
@@ -198,7 +208,12 @@ public class BoardService(
 
     /// <summary>
     /// Calculates current balance for a player as:
-    /// sum(Approved transactions) - sum(board prices).
+    ///   sum(Approved transactions) - sum(board charges).
+    ///
+    /// Important:
+    /// - For non-repeating boards: board.Price = weekly price (one game).
+    /// - For repeating boards: board.Price = full prepaid amount for all weeks.
+    ///   Repeating copies created later have Price = 0 and do not change the balance.
     /// </summary>
     private async Task<int> GetCurrentBalance(string playerId)
     {
