@@ -347,7 +347,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/GameResponseDto"
+                  "$ref": "#/components/schemas/GameResultSummaryDto"
                 }
               }
             }
@@ -1201,6 +1201,42 @@
           },
           "isWinning": {
             "type": "boolean"
+          }
+        }
+      },
+      "GameResultSummaryDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gameId": {
+            "type": "string"
+          },
+          "weekNumber": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "year": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "winningNumbers": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          "totalBoards": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "winningBoards": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "digitalRevenue": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },

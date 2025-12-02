@@ -12,9 +12,9 @@ public interface IGameService
     // Returns the full history of games (both active and closed, but not soft-deleted)
     Task<List<Game>> GetGamesHistory();
 
-    // Sets winning numbers for a game, marks winning boards, closes this game
-    // and activates the next upcoming game (if any)
-    Task<Game> SetWinningNumbers(SetWinningNumbersRequestDto dto);
+    // Sets winning numbers for a game, marks winning boards, closes this game,
+    // activates the next upcoming game (if any) and returns a summary for the UI
+    Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersRequestDto dto);
 
     // Returns game history only for a specific player identified by email
     Task<List<PlayerGameHistoryItemDto>> GetPlayerHistory(string playerEmail);
