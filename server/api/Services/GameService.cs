@@ -1,3 +1,4 @@
+// api/Services/GameService.cs
 using System.ComponentModel.DataAnnotations;
 using api.Models.Game;
 using api.Models.Requests;
@@ -128,9 +129,13 @@ public class GameService(
         var winningBoards = game.Boards
             .Count(b => b.Deletedat == null && b.Iswinning);
 
+        // ❗Digital revenue per week:
+        // We do NOT use Board.Price here, because for repeating boards
+        // Price contains the full prepaid amount for ALL weeks.
+        // For game revenue we only care about weekly price.
         var digitalRevenue = game.Boards
             .Where(b => b.Deletedat == null)
-            .Sum(b => b.Price);
+            .Sum(b => CalculateWeeklyPrice(b));
 
         // 8) Save all changes in one go
         await ctx.SaveChangesAsync();
@@ -151,6 +156,10 @@ public class GameService(
     /// <summary>
     /// For all boards in the current game that are marked as repeating,
     /// create a new board in the next game and decrease remaining weeks.
+    ///
+    /// Important:
+    /// - The player already paid for ALL weeks up front (Board.Price = total prepaid).
+    /// - Repeating boards created here get Price = 0, so they do not change balance again.
     /// </summary>
     private void CreateRepeatingBoardsForNextGame(Game currentGame, Game nextGame)
     {
@@ -177,8 +186,11 @@ public class GameService(
                 Playerid     = board.Playerid,
                 Gameid       = nextGame.Id,
                 Numbers      = board.Numbers.ToList(),
-                // Price is per week – same as the original board
-                Price        = board.Price,
+
+                // ❗Repeating boards for future games do not charge again.
+                // The full amount was already charged when the user bought the original board.
+                Price        = 0,
+
                 Iswinning    = false,
                 Repeatweeks  = remainingWeeks,
                 Repeatactive = remainingWeeks > 1,
@@ -225,14 +237,15 @@ public class GameService(
         var history = boards
             .Select(b => new PlayerGameHistoryItemDto
             {
-                GameId        = b.Gameid,
-                WeekNumber    = b.Game!.Weeknumber,
-                Year          = b.Game.Year,
-                GameClosedAt  = b.Game.Closedat,
+                GameId         = b.Gameid,
+                WeekNumber     = b.Game!.Weeknumber,
+                Year           = b.Game.Year,
+                GameClosedAt   = b.Game.Closedat,
 
-                BoardId       = b.Id,
-                Numbers       = b.Numbers.ToArray(),
-                Price         = b.Price,
+                BoardId        = b.Id,
+                Numbers        = b.Numbers.ToArray(),
+                // For UI we show weekly price, not total prepaid amount
+                Price          = CalculateWeeklyPrice(b),
                 BoardCreatedAt = b.Createdat,
 
                 WinningNumbers = b.Game.Winningnumbers?.ToArray(),
@@ -241,5 +254,24 @@ public class GameService(
             .ToList();
 
         return history;
+    }
+
+    /// <summary>
+    /// Helper for weekly board price based on count of numbers:
+    /// 5 -> 20, 6 -> 40, 7 -> 80, 8 -> 160, otherwise 0.
+    /// We use the same rule as in BoardService.
+    /// </summary>
+    private static int CalculateWeeklyPrice(Board board)
+    {
+        var count = board.Numbers?.Count ?? 0;
+
+        return count switch
+        {
+            5 => 20,
+            6 => 40,
+            7 => 80,
+            8 => 160,
+            _ => 0
+        };
     }
 }
