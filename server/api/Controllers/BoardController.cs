@@ -69,7 +69,8 @@ public class BoardController(IBoardService boardService) : ControllerBase
 
     /// <summary>
     /// Maps EF Board entity to a safe API response DTO.
-    /// GameWeek / GameYear are populated from the navigation property (if loaded).
+    /// GameWeek / GameYear / GameIsActive / GameClosedAt
+    /// are populated from the navigation property (if loaded).
     /// </summary>
     private static BoardResponseDto MapToDto(Board b) => new()
     {
@@ -84,7 +85,9 @@ public class BoardController(IBoardService boardService) : ControllerBase
         CreatedAt    = b.Createdat,
 
         // Extra convenience for UI – game info comes from navigation property
-        GameWeek = b.Game?.Weeknumber ?? 0,
-        GameYear = b.Game?.Year       ?? 0
+        GameWeek     = b.Game?.Weeknumber ?? 0,
+        GameYear     = b.Game?.Year       ?? 0,
+        GameIsActive = b.Game?.Isactive   ?? false,
+        GameClosedAt = b.Game?.Closedat
     };
 }
