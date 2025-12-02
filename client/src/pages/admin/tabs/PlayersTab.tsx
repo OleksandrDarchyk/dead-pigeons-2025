@@ -1,11 +1,20 @@
 // src/pages/admin/tabs/PlayersTab.tsx
 
-import { useEffect, useState, type FormEvent } from "react";
+import {
+    useEffect,
+    useState,
+    type FormEvent,
+    useCallback,
+} from "react";
 import { playersApi, type PlayerDto } from "../../../utilities/playersApi";
 import { transactionsApi } from "../../../utilities/transactionsApi";
 import toast from "react-hot-toast";
 
 type BalanceMap = Record<string, number>;
+
+type StatusFilter = "all" | "active" | "inactive";
+type SortBy = "fullName" | "createdAt";
+type SortDirection = "asc" | "desc";
 
 export default function PlayersTab() {
     // List of players from the API
@@ -13,6 +22,12 @@ export default function PlayersTab() {
     // Map: playerId -> balance
     const [balances, setBalances] = useState<BalanceMap>({});
     const [isLoading, setIsLoading] = useState(true);
+
+    // Filters and sorting
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+    const [sortBy, setSortBy] = useState<SortBy>("fullName");
+    const [sortDirection, setSortDirection] =
+        useState<SortDirection>("asc");
 
     // Form state (used for both create and edit)
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -23,7 +38,8 @@ export default function PlayersTab() {
     const [isSaving, setIsSaving] = useState(false);
 
     // If not null, form is in "edit" mode for this player id
-    const [editingPlayerId, setEditingPlayerId] = useState<string | null>(null);
+    const [editingPlayerId, setEditingPlayerId] =
+        useState<string | null>(null);
 
     // Reset form to default "create new player" state
     const resetForm = () => {
@@ -35,12 +51,22 @@ export default function PlayersTab() {
     };
 
     // Load players and their balances from the server
-    const loadData = async () => {
+    const loadData = useCallback(async () => {
         try {
             setIsLoading(true);
 
-            // Get all players (null → no filter by isActive)
-            const list = await playersApi.getPlayers(null);
+            // Map statusFilter → isActive parameter for API
+            const isActiveParam =
+                statusFilter === "all"
+                    ? null
+                    : statusFilter === "active";
+
+            // Ask backend: give me players with filter + sorting
+            const list = await playersApi.getPlayers(
+                isActiveParam,
+                sortBy,
+                sortDirection
+            );
             setPlayers(list);
 
             // For each player, load their balance (DTO with "balance" number)
@@ -48,7 +74,9 @@ export default function PlayersTab() {
                 list.map(async (p) => {
                     try {
                         const balanceDto =
-                            await transactionsApi.getPlayerBalance(p.id);
+                            await transactionsApi.getPlayerBalance(
+                                p.id
+                            );
                         return [p.id, balanceDto.balance] as const;
                     } catch {
                         // If balance fails to load, default to 0
@@ -64,12 +92,12 @@ export default function PlayersTab() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [statusFilter, sortBy, sortDirection]);
 
-    // Initial load on component mount
+    // Initial load + reload when filters / sorting change
     useEffect(() => {
         void loadData();
-    }, []);
+    }, [loadData]);
 
     // Toggle active/inactive status for a player
     const toggleActive = async (player: PlayerDto) => {
@@ -99,7 +127,9 @@ export default function PlayersTab() {
     };
 
     // Create a new player OR update an existing one
-    const handleSavePlayer = async (e: FormEvent<HTMLFormElement>) => {
+    const handleSavePlayer = async (
+        e: FormEvent<HTMLFormElement>
+    ) => {
         // If any HTML validation fails (required / pattern / type),
         // this handler will not be called at all.
         e.preventDefault();
@@ -137,7 +167,9 @@ export default function PlayersTab() {
                         await playersApi.activatePlayer(player.id);
                     } catch (err: unknown) {
                         console.error(err);
-                        toast.error("Player created, but activating failed");
+                        toast.error(
+                            "Player created, but activating failed"
+                        );
                     }
                 }
 
@@ -171,9 +203,45 @@ export default function PlayersTab() {
         setIsFormOpen((prev) => !prev);
     };
 
+    // Change filter: all / active / inactive
+    const handleStatusFilterChange = (value: StatusFilter) => {
+        setStatusFilter(value);
+    };
+
+    // Change sorting: click on column header
+    const handleSort = (column: SortBy) => {
+        if (sortBy === column) {
+            // If we click same column → toggle direction
+            setSortDirection(
+                sortDirection === "asc" ? "desc" : "asc"
+            );
+        } else {
+            // If we click new column → sort by it, ascending
+            setSortBy(column);
+            setSortDirection("asc");
+        }
+    };
+
+    // Helper to style filter buttons
+    const filterButtonClass = (value: StatusFilter) =>
+        "rounded-full px-3 py-1 text-xs font-semibold border " +
+        (statusFilter === value
+            ? "bg-slate-900 text-white border-slate-900"
+            : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100");
+
+    // Helper to show arrow on current sort column
+    const renderSortArrow = (column: SortBy) => {
+        if (sortBy !== column) return null;
+        return (
+            <span className="ml-1">
+                {sortDirection === "asc" ? "↑" : "↓"}
+            </span>
+        );
+    };
+
     return (
         <section className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mb-4">
                 <div>
                     <h2 className="text-lg font-semibold text-slate-900">
                         Player Management
@@ -183,13 +251,50 @@ export default function PlayersTab() {
                     </p>
                 </div>
 
-                <button
-                    type="button"
-                    onClick={handleOpenForm}
-                    className="inline-flex items-center rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
-                >
-                    {isFormOpen ? "Close" : "Add Player"}
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* Status filter buttons */}
+                    <div className="flex items-center gap-1">
+                        <span className="text-xs text-slate-500 mr-1">
+                            Status:
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                handleStatusFilterChange("all")
+                            }
+                            className={filterButtonClass("all")}
+                        >
+                            All
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                handleStatusFilterChange("active")
+                            }
+                            className={filterButtonClass("active")}
+                        >
+                            Active
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() =>
+                                handleStatusFilterChange("inactive")
+                            }
+                            className={filterButtonClass("inactive")}
+                        >
+                            Inactive
+                        </button>
+                    </div>
+
+                    {/* Add player button */}
+                    <button
+                        type="button"
+                        onClick={handleOpenForm}
+                        className="inline-flex items-center rounded-full bg-slate-900 px-4 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                    >
+                        {isFormOpen ? "Close" : "Add Player"}
+                    </button>
+                </div>
             </div>
 
             {/* Create / Edit Player form */}
@@ -210,7 +315,9 @@ export default function PlayersTab() {
                             className="input input-bordered w-full text-sm bg-white"
                             placeholder="John Doe"
                             value={fullName}
-                            onChange={(e) => setFullName(e.target.value)}
+                            onChange={(e) =>
+                                setFullName(e.target.value)
+                            }
                         />
                     </div>
 
@@ -229,7 +336,9 @@ export default function PlayersTab() {
                             className="input input-bordered w-full text-sm bg-white"
                             placeholder="+45 12 34 56 78"
                             value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
+                            onChange={(e) =>
+                                setPhone(e.target.value)
+                            }
                         />
                     </div>
 
@@ -244,7 +353,9 @@ export default function PlayersTab() {
                             className="input input-bordered w-full text-sm bg-white"
                             placeholder="john@example.com"
                             value={email}
-                            onChange={(e) => setEmail(e.target.value)}
+                            onChange={(e) =>
+                                setEmail(e.target.value)
+                            }
                         />
                     </div>
 
@@ -253,7 +364,9 @@ export default function PlayersTab() {
                             type="checkbox"
                             className="toggle toggle-sm"
                             checked={active}
-                            onChange={(e) => setActive(e.target.checked)}
+                            onChange={(e) =>
+                                setActive(e.target.checked)
+                            }
                         />
                         <span className="text-xs text-slate-700">
                             Active (can participate in games)
@@ -288,22 +401,47 @@ export default function PlayersTab() {
 
             {/* Players table */}
             {isLoading ? (
-                <p className="text-sm text-slate-500">Loading players...</p>
+                <p className="text-sm text-slate-500">
+                    Loading players...
+                </p>
             ) : players.length === 0 ? (
                 <p className="text-sm text-slate-500">
-                    No players yet. Add your first player to get started.
+                    No players yet. Add your first player to get
+                    started.
                 </p>
             ) : (
                 <div className="overflow-x-auto">
                     <table className="min-w-full text-sm">
                         <thead>
                         <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
-                            <th className="py-2 pr-4">Name</th>
+                            <th className="py-2 pr-4">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        handleSort("fullName")
+                                    }
+                                    className="inline-flex items-center gap-1"
+                                >
+                                    Name
+                                    {renderSortArrow("fullName")}
+                                </button>
+                            </th>
                             <th className="py-2 pr-4">Phone</th>
                             <th className="py-2 pr-4">Email</th>
                             <th className="py-2 pr-4">Balance</th>
                             <th className="py-2 pr-4">Status</th>
-                            <th className="py-2 pr-4">Joined</th>
+                            <th className="py-2 pr-4">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        handleSort("createdAt")
+                                    }
+                                    className="inline-flex items-center gap-1"
+                                >
+                                    Joined
+                                    {renderSortArrow("createdAt")}
+                                </button>
+                            </th>
                             <th className="py-2 pr-4 text-right">
                                 Actions
                             </th>
@@ -311,10 +449,13 @@ export default function PlayersTab() {
                         </thead>
                         <tbody>
                         {players.map((p) => {
-                            const balance = balances[p.id] ?? 0;
+                            const balance =
+                                balances[p.id] ?? 0;
                             const created =
                                 p.createdAt &&
-                                new Date(p.createdAt).toLocaleDateString();
+                                new Date(
+                                    p.createdAt
+                                ).toLocaleDateString();
 
                             return (
                                 <tr

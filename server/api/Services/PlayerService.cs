@@ -47,23 +47,52 @@ public class PlayerService(
         return player;
     }
 
-    public async Task<List<Player>> GetPlayers(bool? isActive = null)
+    public async Task<List<Player>> GetPlayers(
+        bool? isActive = null,
+        string? sortBy = null,
+        string? direction = null)
     {
-        // Start from non-deleted players only
         var query = ctx.Players
             .Where(p => p.Deletedat == null);
-
-        // Optional filter by active flag
+        
         if (isActive.HasValue)
         {
             query = query.Where(p => p.Isactive == isActive.Value);
         }
+        
+        var desc = string.Equals(direction, "desc", StringComparison.OrdinalIgnoreCase);
+        
+        var sort = (sortBy ?? "").ToLowerInvariant();
+        
+        query = sort switch
+        {
+            "fullname" => desc
+                ? query.OrderByDescending(p => p.Fullname)
+                : query.OrderBy(p => p.Fullname),
 
-        // Stable ordering by name
-        return await query
-            .OrderBy(p => p.Fullname)
-            .ToListAsync();
+            "email" => desc
+                ? query.OrderByDescending(p => p.Email)
+                : query.OrderBy(p => p.Email),
+
+            "isactive" => desc
+                ? query.OrderByDescending(p => p.Isactive)
+                : query.OrderBy(p => p.Isactive),
+
+            "activatedat" => desc
+                ? query.OrderByDescending(p => p.Activatedat ?? DateTime.MinValue)
+                : query.OrderBy(p => p.Activatedat ?? DateTime.MaxValue),
+
+            "createdat" => desc
+                ? query.OrderByDescending(p => p.Createdat ?? DateTime.MinValue)
+                : query.OrderBy(p => p.Createdat ?? DateTime.MaxValue),
+            
+            _ => query.OrderBy(p => p.Fullname)
+        };
+
+        return await query.ToListAsync();
     }
+
+
 
     public async Task<Player> ActivatePlayer(string playerId)
     {

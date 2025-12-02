@@ -24,12 +24,20 @@ public class PlayersController(IPlayerService playerService) : ControllerBase
         return MapToDto(player);
     }
 
-    // Admin: list players, optionally filtered by active flag
-    // GET /GetPlayers?isActive=true/false
+    // Admin: list players, optionally filtered by active flag and sorted
+    // Examples:
+    //   GET /GetPlayers
+    //   GET /GetPlayers?isActive=true
+    //   GET /GetPlayers?sortBy=fullName&direction=asc
+    //   GET /GetPlayers?isActive=true&sortBy=activatedAt&direction=desc
     [HttpGet(nameof(GetPlayers))]
-    public async Task<List<PlayerResponseDto>> GetPlayers([FromQuery] bool? isActive = null)
+    public async Task<List<PlayerResponseDto>> GetPlayers(
+        [FromQuery] bool? isActive = null,
+        [FromQuery] string? sortBy = null,
+        [FromQuery] string? direction = null)
     {
-        var players = await playerService.GetPlayers(isActive);
+        var players = await playerService.GetPlayers(isActive, sortBy, direction);
+
         return players
             .Select(MapToDto)
             .ToList();
