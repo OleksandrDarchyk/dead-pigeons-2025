@@ -14,83 +14,117 @@ import toast from "react-hot-toast";
 type BoardWithPlayer = BoardResponseDto;
 
 export default function BoardsStatsTab() {
-    // Active game is a safe DTO (no EF entities on the client)
-    const [activeGame, setActiveGame] = useState<GameResponseDto | null>(null);
+    // All games history (active + finished + scheduled)
+    const [games, setGames] = useState<GameResponseDto[]>([]);
 
-    // Boards for the current active game
+    // Id of the game selected in the dropdown
+    const [selectedGameId, setSelectedGameId] = useState<string | "">("");
+
+    // Currently selected game (derived from games + selectedGameId)
+    const selectedGame: GameResponseDto | null =
+        games.find((g) => g.id === selectedGameId) ?? null;
+
+    // Boards for the selected game
     const [boards, setBoards] = useState<BoardWithPlayer[]>([]);
 
-    // Active players as DTOs
+    // Active players as DTOs (for resolving names)
     const [players, setPlayers] = useState<PlayerResponseDto[]>([]);
 
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoadingGames, setIsLoadingGames] = useState(true);
+    const [isLoadingBoards, setIsLoadingBoards] = useState(false);
 
-    // Load active game, boards for that game, and active players
-    const loadData = async () => {
-        try {
-            setIsLoading(true);
-
-            // 1) Ask backend for the current active game
-            const game = await gamesApi.getActiveGame();
-            console.log("Active game:", game);
-
-            if (!game || !game.id) {
-                // No active game → clear everything
-                setActiveGame(null);
-                setBoards([]);
-                setPlayers([]);
-                return;
-            }
-
-            setActiveGame(game);
-
-            // 2) Load boards for this game and all active players in parallel
-            const [boardsForGame, allPlayers] = await Promise.all([
-                boardsApi.getBoardsForGame(game.id),
-                // true = only active players
-                playersApi.getPlayers(true),
-            ]);
-
-            console.log("BoardsForGame:", boardsForGame);
-            console.log("AllPlayers:", allPlayers);
-
-            // Defensive checks in case backend returns something unexpected
-            setBoards(Array.isArray(boardsForGame) ? boardsForGame : []);
-            setPlayers(Array.isArray(allPlayers) ? allPlayers : []);
-        } catch (err) {
-            console.error(err);
-            toast.error("Failed to load boards and stats");
-
-            setBoards([]);
-            setPlayers([]);
-            setActiveGame(null);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
+    // 1) Load games history and active players once
     useEffect(() => {
-        void loadData();
+        const loadGamesAndPlayers = async () => {
+            try {
+                setIsLoadingGames(true);
+
+                // Load all games (history)
+                const allGames = await gamesApi.getGamesHistory();
+                setGames(Array.isArray(allGames) ? allGames : []);
+
+                // Pick initial game:
+                // Prefer the active game, otherwise the newest one
+                if (allGames.length > 0) {
+                    const active = allGames.find((g) => g.isActive);
+                    const initial = active ?? allGames[0];
+                    setSelectedGameId(initial.id);
+                }
+
+                // Load active players for name resolution
+                const allPlayers = await playersApi.getPlayers(true);
+                setPlayers(Array.isArray(allPlayers) ? allPlayers : []);
+            } catch (err) {
+                console.error(err);
+                toast.error("Failed to load games and players");
+            } finally {
+                setIsLoadingGames(false);
+            }
+        };
+
+        void loadGamesAndPlayers();
     }, []);
 
-    // High-level statistics for the current active game
+    // 2) Load boards when selected game changes
+    useEffect(() => {
+        if (!selectedGameId) {
+            setBoards([]);
+            return;
+        }
+
+        const loadBoardsForGame = async () => {
+            try {
+                setIsLoadingBoards(true);
+                const boardsForGame = await boardsApi.getBoardsForGame(
+                    selectedGameId
+                );
+                setBoards(Array.isArray(boardsForGame) ? boardsForGame : []);
+            } catch (err) {
+                console.error(err);
+                toast.error("Failed to load boards for selected game");
+                setBoards([]);
+            } finally {
+                setIsLoadingBoards(false);
+            }
+        };
+
+        void loadBoardsForGame();
+    }, [selectedGameId]);
+
+    // High-level statistics for the selected game
     const stats = useMemo(() => {
+        if (!selectedGame) {
+            return {
+                totalPlayersInGame: 0,
+                activeBoards: 0,
+                repeatingBoards: 0,
+                winningBoards: 0,
+                digitalRevenue: 0,
+            };
+        }
+
         // Unique players who actually bought at least one board in this game
         const playersInGame = new Set(boards.map((b) => b.playerId));
         const totalPlayersInGame = playersInGame.size;
 
-        // Backend already returns only non-deleted boards in DTO
         const activeBoards = boards.length;
         const repeatingBoards = boards.filter((b) => b.repeatActive).length;
         const winningBoards = boards.filter((b) => b.isWinning).length;
+
+        // Sum of board prices for this game
+        const digitalRevenue = boards.reduce(
+            (sum, b) => sum + (b.price ?? 0),
+            0
+        );
 
         return {
             totalPlayersInGame,
             activeBoards,
             repeatingBoards,
             winningBoards,
+            digitalRevenue,
         };
-    }, [boards]);
+    }, [boards, selectedGame]);
 
     // Resolve player name for a board using playerId from DTO and PlayerResponseDto list
     const getPlayerName = (board: BoardWithPlayer): string => {
@@ -98,83 +132,146 @@ export default function BoardsStatsTab() {
         return player?.fullName ?? "Unknown player";
     };
 
-    // Human-friendly label for current active game
+    // Human-friendly label for selected game
     const weekLabel =
-        activeGame &&
-        `Week ${activeGame.weekNumber}, ${activeGame.year?.toString()}`;
+        selectedGame &&
+        `Week ${selectedGame.weekNumber}, ${selectedGame.year?.toString()}`;
+
+    const gameStatus =
+        selectedGame &&
+        (selectedGame.isActive
+            ? "Active"
+            : selectedGame.closedAt
+                ? "Finished"
+                : "Scheduled");
+
+    const isLoading = isLoadingGames || isLoadingBoards;
 
     return (
         <section className="space-y-6">
-            {/* Top statistics card for the current active game */}
+            {/* Top statistics card for the selected game */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                <h2 className="text-lg font-semibold text-slate-900 mb-1">
-                    Statistics Overview
-                </h2>
-                <p className="text-xs text-slate-500 mb-4">
-                    {weekLabel ?? "Current active game"}
-                </p>
-
-                {isLoading ? (
-                    <p className="text-sm text-slate-500">Loading stats...</p>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                        {/* How many unique players actually play in this game */}
-                        <div className="rounded-xl bg-slate-50 px-4 py-3">
-                            <p className="text-xs text-slate-500 mb-1">
-                                Players in this game
-                            </p>
-                            <p className="text-2xl font-bold text-slate-900">
-                                {stats.totalPlayersInGame}
-                            </p>
-                        </div>
-
-                        {/* Total number of boards in this game */}
-                        <div className="rounded-xl bg-green-50 px-4 py-3">
-                            <p className="text-xs text-slate-500 mb-1">
-                                Active Boards
-                            </p>
-                            <p className="text-2xl font-bold text-green-800">
-                                {stats.activeBoards}
-                            </p>
-                        </div>
-
-                        {/* Boards marked as repeating */}
-                        <div className="rounded-xl bg-violet-50 px-4 py-3">
-                            <p className="text-xs text-slate-500 mb-1">
-                                Repeating Boards
-                            </p>
-                            <p className="text-2xl font-bold text-violet-800">
-                                {stats.repeatingBoards}
-                            </p>
-                        </div>
-
-                        {/* Boards marked as winning by the backend */}
-                        <div className="rounded-xl bg-amber-50 px-4 py-3">
-                            <p className="text-xs text-slate-500 mb-1">
-                                Winning Boards
-                            </p>
-                            <p className="text-2xl font-bold text-amber-800">
-                                {stats.winningBoards}
-                            </p>
-                        </div>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 className="text-lg font-semibold text-slate-900 mb-1">
+                            Statistics Overview
+                        </h2>
+                        <p className="text-xs text-slate-500">
+                            Select a week to see all boards and results.
+                        </p>
                     </div>
-                )}
+
+                    {/* Game selector */}
+                    <div className="flex flex-col items-start gap-1 text-xs">
+                        <span className="font-semibold text-slate-700">
+                            Game:
+                        </span>
+                        <select
+                            className="select select-bordered w-full md:w-64 text-sm bg-slate-50"
+                            value={selectedGameId}
+                            onChange={(e) => setSelectedGameId(e.target.value)}
+                            disabled={isLoadingGames || games.length === 0}
+                        >
+                            {games.length === 0 && (
+                                <option value="">No games found</option>
+                            )}
+
+                            {games.map((g) => (
+                                <option key={g.id} value={g.id}>
+                                    Week {g.weekNumber}, {g.year}{" "}
+                                    {g.isActive
+                                        ? "(Active)"
+                                        : g.closedAt
+                                            ? "(Finished)"
+                                            : "(Scheduled)"}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                <div className="mt-4">
+                    {isLoading && !selectedGame ? (
+                        <p className="text-sm text-slate-500">
+                            Loading stats...
+                        </p>
+                    ) : !selectedGame ? (
+                        <p className="text-sm text-slate-500">
+                            No game selected.
+                        </p>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            {/* Selected game info */}
+                            <div className="rounded-xl bg-slate-50 px-4 py-3">
+                                <p className="text-xs text-slate-500 mb-1">
+                                    Selected game
+                                </p>
+                                <p className="text-sm font-bold text-slate-900">
+                                    {weekLabel}
+                                </p>
+                                <p className="text-[11px] text-slate-500 mt-1">
+                                    Status: {gameStatus}
+                                </p>
+                            </div>
+
+                            {/* Total unique players in this game */}
+                            <div className="rounded-xl bg-slate-50 px-4 py-3">
+                                <p className="text-xs text-slate-500 mb-1">
+                                    Players in this game
+                                </p>
+                                <p className="text-2xl font-bold text-slate-900">
+                                    {stats.totalPlayersInGame}
+                                </p>
+                            </div>
+
+                            {/* Total number of boards */}
+                            <div className="rounded-xl bg-green-50 px-4 py-3">
+                                <p className="text-xs text-slate-500 mb-1">
+                                    Total Boards
+                                </p>
+                                <p className="text-2xl font-bold text-green-800">
+                                    {stats.activeBoards}
+                                </p>
+                            </div>
+
+                            {/* Digital revenue */}
+                            <div className="rounded-xl bg-amber-50 px-4 py-3">
+                                <p className="text-xs text-slate-500 mb-1">
+                                    Digital revenue
+                                </p>
+                                <p className="text-2xl font-bold text-amber-800">
+                                    {stats.digitalRevenue}{" "}
+                                    <span className="text-sm font-semibold">
+                                        DKK
+                                    </span>
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-slate-500">
+                                    Before 70/30 split
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* List of boards for the current active game */}
+            {/* List of boards for the selected game */}
             <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
                 <h3 className="text-base font-semibold text-slate-900 mb-1">
-                    All Active Boards
+                    Boards for selected game
                 </h3>
                 <p className="text-xs text-slate-500 mb-4">
-                    View all purchased boards for the current game.
+                    View all purchased boards, including winners.
                 </p>
 
                 {isLoading ? (
                     <p className="text-sm text-slate-500">Loading boards...</p>
+                ) : !selectedGame ? (
+                    <p className="text-sm text-slate-500">
+                        Select a game to see its boards.
+                    </p>
                 ) : boards.length === 0 ? (
                     <p className="text-sm text-slate-500">
-                        No boards for the current game.
+                        No boards for this game.
                     </p>
                 ) : (
                     <div className="space-y-3">
@@ -235,7 +332,7 @@ export default function BoardsStatsTab() {
 
                                             {isWinning && (
                                                 <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
-                                                    Winning
+                                                    Winner
                                                 </span>
                                             )}
                                         </div>
