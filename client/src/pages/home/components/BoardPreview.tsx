@@ -1,19 +1,17 @@
-//we create board preview component
+// src/pages/home/components/BoardPreview.tsx
 
 export default function BoardPreview() {
     return (
         <div className="relative w-full max-w-xl mx-auto">
-
-            {/* BACKGROUND (stadium / lights) */}
+            {/* BACKGROUND (stadium / lights effect) */}
             <div
                 className="absolute inset-0 rounded-3xl
-        bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900
-        opacity-60 blur-sm"
+                bg-gradient-to-br from-slate-900 via-indigo-900 to-slate-900
+                opacity-60 blur-sm"
             />
 
             {/* BOARD CONTAINER */}
             <div className="relative rounded-3xl bg-white shadow-2xl overflow-hidden">
-
                 {/* TOP TITLE BAR */}
                 <div className="bg-slate-900 text-slate-50 text-center py-3 font-bold tracking-wide">
                     DEAD PIGEONS LOTTERY
