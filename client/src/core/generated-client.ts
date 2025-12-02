@@ -474,10 +474,14 @@ export class PlayersClient {
         return Promise.resolve<PlayerResponseDto>(null as any);
     }
 
-    getPlayers(isActive: boolean | null | undefined): Promise<PlayerResponseDto[]> {
+    getPlayers(isActive: boolean | null | undefined, sortBy: string | null | undefined, direction: string | null | undefined): Promise<PlayerResponseDto[]> {
         let url_ = this.baseUrl + "/GetPlayers?";
         if (isActive !== undefined && isActive !== null)
             url_ += "isActive=" + encodeURIComponent("" + isActive) + "&";
+        if (sortBy !== undefined && sortBy !== null)
+            url_ += "sortBy=" + encodeURIComponent("" + sortBy) + "&";
+        if (direction !== undefined && direction !== null)
+            url_ += "direction=" + encodeURIComponent("" + direction) + "&";
         url_ = url_.replace(/[?&]$/, "");
 
         let options_: RequestInit = {
