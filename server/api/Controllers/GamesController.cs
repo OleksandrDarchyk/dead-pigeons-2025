@@ -53,13 +53,21 @@ public class GamesController(IGameService gameService) : ControllerBase
     }
 
     // POST /SetWinningNumbers
-    // Only admin is allowed to close a game and set winners
+    // Only admin is allowed to close a game, calculate winners and activate the next game
     [HttpPost(nameof(SetWinningNumbers))]
     [Authorize(Roles = Roles.Admin)]
-    public async Task<GameResponseDto> SetWinningNumbers([FromBody] SetWinningNumbersRequestDto dto)
+    public async Task<GameResultSummaryDto> SetWinningNumbers([FromBody] SetWinningNumbersRequestDto dto)
     {
-        var game = await gameService.SetWinningNumbers(dto);
-        return MapToDto(game);
+        // Service will:
+        // - validate DTO
+        // - close the game and set winning numbers
+        // - mark winning boards
+        // - activate next game
+        // - calculate total boards, winners and revenue
+        var summary = await gameService.SetWinningNumbers(dto);
+
+        // We return the summary directly to the frontend
+        return summary;
     }
 
     // Maps EF entity to a safe API response DTO

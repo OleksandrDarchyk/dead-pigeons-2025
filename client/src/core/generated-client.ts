@@ -389,7 +389,7 @@ export class GamesClient {
         return Promise.resolve<PlayerGameHistoryItemDto[]>(null as any);
     }
 
-    setWinningNumbers(dto: SetWinningNumbersRequestDto): Promise<GameResponseDto> {
+    setWinningNumbers(dto: SetWinningNumbersRequestDto): Promise<GameResultSummaryDto> {
         let url_ = this.baseUrl + "/SetWinningNumbers";
         url_ = url_.replace(/[?&]$/, "");
 
@@ -409,13 +409,13 @@ export class GamesClient {
         });
     }
 
-    protected processSetWinningNumbers(response: Response): Promise<GameResponseDto> {
+    protected processSetWinningNumbers(response: Response): Promise<GameResultSummaryDto> {
         const status = response.status;
         let _headers: any = {}; if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => _headers[k] = v); };
         if (status === 200) {
             return response.text().then((_responseText) => {
             let result200: any = null;
-            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as GameResponseDto;
+            result200 = _responseText === "" ? null : JSON.parse(_responseText, this.jsonParseReviver) as GameResultSummaryDto;
             return result200;
             });
         } else if (status !== 200 && status !== 204) {
@@ -423,7 +423,7 @@ export class GamesClient {
             return throwException("An unexpected server error occurred.", status, _responseText, _headers);
             });
         }
-        return Promise.resolve<GameResponseDto>(null as any);
+        return Promise.resolve<GameResultSummaryDto>(null as any);
     }
 }
 
@@ -1095,6 +1095,16 @@ export interface PlayerGameHistoryItemDto {
     boardCreatedAt: string | undefined;
     winningNumbers: number[] | undefined;
     isWinning: boolean;
+}
+
+export interface GameResultSummaryDto {
+    gameId: string;
+    weekNumber: number;
+    year: number;
+    winningNumbers: number[];
+    totalBoards: number;
+    winningBoards: number;
+    digitalRevenue: number;
 }
 
 export interface SetWinningNumbersRequestDto {

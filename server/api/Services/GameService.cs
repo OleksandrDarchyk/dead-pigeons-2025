@@ -41,7 +41,7 @@ public class GameService(
             .ToListAsync();
     }
 
-    public async Task<Game> SetWinningNumbers(SetWinningNumbersRequestDto dto)
+    public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersRequestDto dto)
     {
         // Validate DTO via DataAnnotations attributes
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
@@ -73,13 +73,13 @@ public class GameService(
             throw new ValidationException("Game not found.");
         }
 
-        // Business rule: only the currently active game can be closed
+        // Protect from double-submit: if the game is not active, then it is already finished
         if (!game.Isactive)
         {
-            throw new ValidationException("Only the active game can be closed and assigned winning numbers.");
+            throw new ValidationException("Game already finished.");
         }
 
-        // Do not allow closing the same game twice
+        // Extra guard: if for some reason game is still active, but winning numbers already exist
         if (game.Winningnumbers != null)
         {
             throw new ValidationException("Winning numbers already set for this game.");
@@ -117,10 +117,31 @@ public class GameService(
             nextGame.Isactive = true;
         }
 
+        // Calculate summary for the just-closed game
+        var totalBoards = game.Boards
+            .Count(b => b.Deletedat == null);
+
+        var winningBoards = game.Boards
+            .Count(b => b.Deletedat == null && b.Iswinning);
+
+        var digitalRevenue = game.Boards
+            .Where(b => b.Deletedat == null)
+            .Sum(b => b.Price);
+
         // Save all changes in one go
         await ctx.SaveChangesAsync();
 
-        return game;
+        // Return a summary DTO for the UI
+        return new GameResultSummaryDto
+        {
+            GameId = game.Id,
+            WeekNumber = game.Weeknumber,
+            Year = game.Year,
+            WinningNumbers = sortedNumbers,
+            TotalBoards = totalBoards,
+            WinningBoards = winningBoards,
+            DigitalRevenue = digitalRevenue
+        };
     }
 
     public async Task<List<PlayerGameHistoryItemDto>> GetPlayerHistory(string playerEmail)
@@ -175,5 +196,4 @@ public class GameService(
 
         return history;
     }
-
 }

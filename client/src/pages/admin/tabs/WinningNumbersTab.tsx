@@ -1,14 +1,20 @@
 // src/components/admin/WinningNumbersTab.tsx
 import { useEffect, useState, type FormEvent } from "react";
 import { gamesApi } from "../../../utilities/gamesApi";
-import type { GameResponseDto } from "../../../core/generated-client";
+import type {
+    GameResponseDto,
+    GameResultSummaryDto,
+} from "../../../core/generated-client";
 import toast from "react-hot-toast";
 
 export default function WinningNumbersTab() {
-    // Active game is loaded from the API as GameResponseDto
+    // Active game loaded from API
     const [activeGame, setActiveGame] = useState<GameResponseDto | null>(null);
 
-    // Local state for 3 winning numbers (can be number or empty string when not selected)
+    // Last closed game summary (after successful submit)
+    const [summary, setSummary] = useState<GameResultSummaryDto | null>(null);
+
+    // Local state for 3 winning numbers (number or empty string)
     const [n1, setN1] = useState<number | "">("");
     const [n2, setN2] = useState<number | "">("");
     const [n3, setN3] = useState<number | "">("");
@@ -59,18 +65,32 @@ export default function WinningNumbersTab() {
         try {
             setIsSaving(true);
 
-            // Call API to set winning numbers for the active game
-            await gamesApi.setWinningNumbers({
+            // Call API to set winning numbers for the active game.
+            // Backend returns a GameResultSummaryDto.
+            const result = await gamesApi.setWinningNumbers({
                 gameId: activeGame.id,
                 winningNumbers: chosen,
             });
 
-            toast.success("Winning numbers saved. Game closed.");
+            setSummary(result);
 
-            // Reload active game (will move to the next game if available)
+            toast.success(
+                `Winning numbers ${result.winningNumbers.join(
+                    ", "
+                )} saved. Game ${result.weekNumber} is now finished.`
+            );
+
+            // Optionally reset local selects
+            setN1("");
+            setN2("");
+            setN3("");
+
+            // Reload active game (should now be the next week)
             await loadActiveGame();
         } catch (err) {
             console.error(err);
+            // Global fetch wrapper should show server message,
+            // but we add a generic one for safety
             toast.error("Failed to save winning numbers");
         } finally {
             setIsSaving(false);
@@ -179,6 +199,50 @@ export default function WinningNumbersTab() {
                     closed and the next game will start automatically.
                 </p>
             </form>
+
+            {/* Summary of the last closed game */}
+            {summary && (
+                <div className="mt-6 rounded-2xl border border-green-100 bg-green-50 p-4 text-xs text-slate-800">
+                    <p className="font-semibold text-green-700 mb-1">
+                        Week {summary.weekNumber}, {summary.year} is now closed.
+                    </p>
+                    <p className="mb-1">
+                        Winning numbers:{" "}
+                        <span className="font-semibold">
+                            {summary.winningNumbers.join(", ")}
+                        </span>
+                    </p>
+                    <p className="mb-1">
+                        Total digital boards:{" "}
+                        <span className="font-semibold">
+                            {summary.totalBoards}
+                        </span>
+                    </p>
+                    <p className="mb-1">
+                        Winning boards:{" "}
+                        <span className="font-semibold">
+                            {summary.winningBoards}
+                        </span>
+                    </p>
+                    <p className="mb-1">
+                        Digital revenue:{" "}
+                        <span className="font-semibold">
+                            {summary.digitalRevenue} DKK
+                        </span>{" "}
+                        <span className="text-[10px] text-slate-500">
+                            (before 70/30 split)
+                        </span>
+                    </p>
+
+                    <p className="mt-2 text-[11px] text-slate-600">
+                        You can view detailed winning boards in the{" "}
+                        <span className="font-semibold">
+                            Boards &amp; Stats
+                        </span>{" "}
+                        tab.
+                    </p>
+                </div>
+            )}
         </section>
     );
 }
