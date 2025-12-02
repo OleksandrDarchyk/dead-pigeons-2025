@@ -38,6 +38,17 @@ public class BoardService(
             throw new ValidationException("Board numbers must be between 1 and 16.");
         }
 
+        // Defensive validation for repeat weeks (even if DTO is already checked)
+        if (dto.RepeatWeeks < 0)
+        {
+            throw new ValidationException("Repeat weeks cannot be negative.");
+        }
+
+        if (dto.RepeatWeeks > 52)
+        {
+            throw new ValidationException("Repeat weeks cannot be more than 52.");
+        }
+
         var sortedNumbers = numbers.OrderBy(n => n).ToArray();
 
         // Ensure player exists and is not soft-deleted
@@ -76,7 +87,7 @@ public class BoardService(
 
         // Price is calculated on the server based on number of fields
         var count = sortedNumbers.Length;
-        var price = count switch
+        var weeklyPrice = count switch
         {
             5 => 20,
             6 => 40,
@@ -85,12 +96,18 @@ public class BoardService(
             _ => throw new ValidationException("Board must have between 5 and 8 numbers.")
         };
 
+        // How many weeks we must be able to cover with current balance:
+        // 0 -> no repeat -> at least 1 week
+        var weeksToCover = dto.RepeatWeeks <= 0 ? 1 : dto.RepeatWeeks;
+        var totalCost = weeklyPrice * weeksToCover;
+
         // Balance = sum(approved transactions) - sum(board prices)
         var currentBalance = await GetCurrentBalance(playerId);
 
-        if (currentBalance < price)
+        if (currentBalance < totalCost)
         {
-            throw new ValidationException("Not enough balance to buy this board.");
+            throw new ValidationException(
+                "Not enough balance to buy this board for the selected number of weeks.");
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -101,7 +118,8 @@ public class BoardService(
             Playerid = playerId,
             Gameid = dto.GameId,
             Numbers = sortedNumbers.ToList(),
-            Price = price,
+            // We still store price for a single week; repeated rounds will be handled later
+            Price = weeklyPrice,
             Iswinning = false,
             Repeatweeks = dto.RepeatWeeks,
             Repeatactive = dto.RepeatWeeks > 0,
