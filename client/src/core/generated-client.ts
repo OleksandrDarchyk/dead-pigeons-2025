@@ -1066,6 +1066,8 @@ export interface BoardResponseDto {
     createdAt: string | undefined;
     gameWeek: number;
     gameYear: number;
+    gameIsActive: boolean;
+    gameClosedAt: string | undefined;
 }
 
 export interface CreateBoardRequestDto {

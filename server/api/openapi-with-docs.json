@@ -1082,6 +1082,14 @@
           "gameYear": {
             "type": "integer",
             "format": "int32"
+          },
+          "gameIsActive": {
+            "type": "boolean"
+          },
+          "gameClosedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
           }
         }
       },
