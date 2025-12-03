@@ -1,5 +1,5 @@
 // client/src/hooks/usePlayerBalance.ts
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { transactionsApi } from "../utilities/transactionsApi";
 import type { PlayerBalanceResponseDto } from "../core/generated-client";
 import toast from "react-hot-toast";
@@ -10,7 +10,7 @@ export function usePlayerBalance(enabled: boolean = true) {
     const [isLoading, setIsLoading] = useState<boolean>(enabled);
 
     // Single function that loads the balance from the API
-    const loadBalance = async () => {
+    const loadBalance = useCallback(async () => {
         // Do nothing if the hook is disabled
         if (!enabled) return;
 
@@ -27,7 +27,7 @@ export function usePlayerBalance(enabled: boolean = true) {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [enabled]);
 
     // Auto-load balance when "enabled" becomes true (for example when user is a player)
     useEffect(() => {
@@ -37,7 +37,7 @@ export function usePlayerBalance(enabled: boolean = true) {
         }
 
         void loadBalance();
-    }, [enabled]);
+    }, [enabled, loadBalance]);
 
     return {
         balance,

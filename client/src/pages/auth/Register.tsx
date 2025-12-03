@@ -51,8 +51,53 @@ export default function Register() {
 
             // On success, the hook will log the user in and redirect
         } catch (err) {
-            console.error(err);
-            toast.error("Registration failed");
+            console.error("Registration failed", err);
+
+            let message = "Registration failed";
+
+            try {
+                const apiErr = err as { response?: string };
+
+                if (apiErr.response) {
+                    const body = JSON.parse(apiErr.response) as {
+                        detail?: string;
+                        title?: string;
+                    };
+
+                    const detail =
+                        typeof body.detail === "string" &&
+                        body.detail.trim()
+                            ? body.detail.trim()
+                            : null;
+
+                    const title =
+                        typeof body.title === "string" &&
+                        body.title.trim()
+                            ? body.title.trim()
+                            : null;
+
+                    if (detail) {
+                        message = detail;
+                    } else if (title) {
+                        message = title;
+                    }
+                }
+            } catch (parseError) {
+                console.error(
+                    "Failed to parse registration error response",
+                    parseError,
+                );
+            }
+
+            const emailInput = document.querySelector<HTMLInputElement>(
+                'input[type="email"]',
+            );
+            if (emailInput) {
+                emailInput.setCustomValidity(message);
+                emailInput.reportValidity();
+            }
+
+            toast.error(message);
         } finally {
             setIsLoading(false);
         }
@@ -80,9 +125,13 @@ export default function Register() {
                             className="input input-bordered w-full bg-slate-50 text-sm"
                             placeholder="you@example.com"
                             value={form.email}
-                            onChange={(e) =>
-                                setForm({ ...form, email: e.target.value })
-                            }
+                            onChange={(e) => {
+                                e.target.setCustomValidity("");
+                                setForm({
+                                    ...form,
+                                    email: e.target.value,
+                                });
+                            }}
                         />
                     </div>
 
@@ -98,7 +147,10 @@ export default function Register() {
                             placeholder="********"
                             value={form.password}
                             onChange={(e) =>
-                                setForm({ ...form, password: e.target.value })
+                                setForm({
+                                    ...form,
+                                    password: e.target.value,
+                                })
                             }
                         />
                     </div>
