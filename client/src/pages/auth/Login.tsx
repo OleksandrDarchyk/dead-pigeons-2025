@@ -30,25 +30,31 @@ export default function Login() {
             await login(form);
             // On success, the hook will navigate to /admin or /player
         } catch (err) {
-            console.error(err);
+            console.error("Login failed", err);
 
             let message = "Login failed";
 
             try {
+                // NSwag ApiException usually має поле `response` з JSON-строкою
                 const apiErr = err as { response?: string };
 
                 if (apiErr.response) {
-                    const body = JSON.parse(apiErr.response) as any;
+                    const body = JSON.parse(apiErr.response) as {
+                        detail?: string;
+                        title?: string;
+                    };
 
                     const detail =
-                        body &&
                         typeof body.detail === "string" &&
-                        body.detail.trim();
+                        body.detail.trim()
+                            ? body.detail.trim()
+                            : null;
 
                     const title =
-                        body &&
                         typeof body.title === "string" &&
-                        body.title.trim();
+                        body.title.trim()
+                            ? body.title.trim()
+                            : null;
 
                     if (detail) {
                         message = detail;
@@ -56,17 +62,24 @@ export default function Login() {
                         message = title;
                     }
                 }
-            } catch {
+            } catch (parseError) {
+                // Якщо не вийшло прочитати JSON – залишаємо дефолтне повідомлення
+                console.error(
+                    "Failed to parse login error response",
+                    parseError,
+                );
             }
 
+            // Показуємо помилку як native bubble біля email
             const emailInput = document.querySelector<HTMLInputElement>(
-                'input[type="email"]'
+                'input[type="email"]',
             );
             if (emailInput) {
                 emailInput.setCustomValidity(message);
                 emailInput.reportValidity();
             }
 
+            // І плюс toast (як раніше)
             toast.error(message);
         } finally {
             setIsLoading(false);
@@ -96,8 +109,12 @@ export default function Login() {
                             placeholder="you@example.com"
                             value={form.email}
                             onChange={(e) => {
+                                // При зміні email забираємо старе повідомлення помилки
                                 e.target.setCustomValidity("");
-                                setForm({ ...form, email: e.target.value });
+                                setForm({
+                                    ...form,
+                                    email: e.target.value,
+                                });
                             }}
                         />
                     </div>
@@ -114,7 +131,10 @@ export default function Login() {
                             placeholder="********"
                             value={form.password}
                             onChange={(e) =>
-                                setForm({ ...form, password: e.target.value })
+                                setForm({
+                                    ...form,
+                                    password: e.target.value,
+                                })
                             }
                         />
                     </div>
