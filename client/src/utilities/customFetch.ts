@@ -57,11 +57,27 @@ export async function customFetch(
             const clone = response.clone();
             const problem = (await clone.json()) as ProblemDetails | null;
 
-            const message =
-                (problem &&
-                    typeof problem.title === "string" &&
-                    problem.title.trim()) ||
-                "Unexpected error";
+            let message = "Unexpected error";
+
+            if (problem) {
+                // Try to read first validation error from "errors"
+                const firstErrorFromErrors =
+                    problem.errors &&
+                    Object.values(problem.errors)
+                        .flat()
+                        .find(
+                            (e) =>
+                                typeof e === "string" &&
+                                e.trim().length > 0,
+                        );
+
+                // Fallback chain: errors -> detail -> title -> default
+                message =
+                    firstErrorFromErrors ||
+                    (problem.detail && problem.detail.trim()) ||
+                    (problem.title && problem.title.trim()) ||
+                    message;
+            }
 
             toast.error(message);
         } catch {
