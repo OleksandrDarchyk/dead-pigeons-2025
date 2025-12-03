@@ -33,7 +33,7 @@ export default function BoardsStatsTab() {
     const [isLoadingGames, setIsLoadingGames] = useState(true);
     const [isLoadingBoards, setIsLoadingBoards] = useState(false);
 
-    // 1) Load games history and active players once
+    // Load games history and active players once
     useEffect(() => {
         const loadGamesAndPlayers = async () => {
             try {
@@ -65,7 +65,7 @@ export default function BoardsStatsTab() {
         void loadGamesAndPlayers();
     }, []);
 
-    // 2) Load boards when selected game changes
+    // Load boards when selected game changes
     useEffect(() => {
         if (!selectedGameId) {
             setBoards([]);
@@ -76,7 +76,7 @@ export default function BoardsStatsTab() {
             try {
                 setIsLoadingBoards(true);
                 const boardsForGame = await boardsApi.getBoardsForGame(
-                    selectedGameId
+                    selectedGameId,
                 );
                 setBoards(Array.isArray(boardsForGame) ? boardsForGame : []);
             } catch (err) {
@@ -114,7 +114,7 @@ export default function BoardsStatsTab() {
         // Sum of board prices for this game
         const digitalRevenue = boards.reduce(
             (sum, b) => sum + (b.price ?? 0),
-            0
+            0,
         );
 
         return {
@@ -200,7 +200,7 @@ export default function BoardsStatsTab() {
                             No game selected.
                         </p>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                             {/* Selected game info */}
                             <div className="rounded-xl bg-slate-50 px-4 py-3">
                                 <p className="text-xs text-slate-500 mb-1">
@@ -227,10 +227,23 @@ export default function BoardsStatsTab() {
                             {/* Total number of boards */}
                             <div className="rounded-xl bg-green-50 px-4 py-3">
                                 <p className="text-xs text-slate-500 mb-1">
-                                    Total Boards
+                                    Total boards
                                 </p>
                                 <p className="text-2xl font-bold text-green-800">
                                     {stats.activeBoards}
+                                </p>
+                            </div>
+
+                            {/* Winning boards */}
+                            <div className="rounded-xl bg-emerald-50 px-4 py-3">
+                                <p className="text-xs text-emerald-700 mb-1">
+                                    Winning boards
+                                </p>
+                                <p className="text-2xl font-bold text-emerald-900">
+                                    {stats.winningBoards}
+                                </p>
+                                <p className="mt-0.5 text-[11px] text-emerald-700">
+                                    Boards that matched all 3 winning numbers.
                                 </p>
                             </div>
 
