@@ -52,7 +52,43 @@ export default function Register() {
             // On success, the hook will log the user in and redirect
         } catch (err) {
             console.error(err);
-            toast.error("Registration failed");
+
+            let message = "Registration failed";
+
+            try {
+                const apiErr = err as { response?: string };
+
+                if (apiErr.response) {
+                    const body = JSON.parse(apiErr.response) as any;
+
+                    const detail =
+                        body &&
+                        typeof body.detail === "string" &&
+                        body.detail.trim();
+
+                    const title =
+                        body &&
+                        typeof body.title === "string" &&
+                        body.title.trim();
+
+                    if (detail) {
+                        message = detail;
+                    } else if (title) {
+                        message = title;
+                    }
+                }
+            } catch {
+            }
+
+            const emailInput = document.querySelector<HTMLInputElement>(
+                'input[type="email"]'
+            );
+            if (emailInput) {
+                emailInput.setCustomValidity(message);
+                emailInput.reportValidity();
+            }
+
+            toast.error(message);
         } finally {
             setIsLoading(false);
         }
@@ -80,9 +116,10 @@ export default function Register() {
                             className="input input-bordered w-full bg-slate-50 text-sm"
                             placeholder="you@example.com"
                             value={form.email}
-                            onChange={(e) =>
-                                setForm({ ...form, email: e.target.value })
-                            }
+                            onChange={(e) => {
+                                e.target.setCustomValidity("");
+                                setForm({ ...form, email: e.target.value });
+                            }}
                         />
                     </div>
 

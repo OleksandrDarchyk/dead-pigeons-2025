@@ -31,7 +31,43 @@ export default function Login() {
             // On success, the hook will navigate to /admin or /player
         } catch (err) {
             console.error(err);
-            toast.error("Login failed");
+
+            let message = "Login failed";
+
+            try {
+                const apiErr = err as { response?: string };
+
+                if (apiErr.response) {
+                    const body = JSON.parse(apiErr.response) as any;
+
+                    const detail =
+                        body &&
+                        typeof body.detail === "string" &&
+                        body.detail.trim();
+
+                    const title =
+                        body &&
+                        typeof body.title === "string" &&
+                        body.title.trim();
+
+                    if (detail) {
+                        message = detail;
+                    } else if (title) {
+                        message = title;
+                    }
+                }
+            } catch {
+            }
+
+            const emailInput = document.querySelector<HTMLInputElement>(
+                'input[type="email"]'
+            );
+            if (emailInput) {
+                emailInput.setCustomValidity(message);
+                emailInput.reportValidity();
+            }
+
+            toast.error(message);
         } finally {
             setIsLoading(false);
         }
@@ -59,9 +95,10 @@ export default function Login() {
                             className="input input-bordered w-full bg-slate-50 text-sm"
                             placeholder="you@example.com"
                             value={form.email}
-                            onChange={(e) =>
-                                setForm({ ...form, email: e.target.value })
-                            }
+                            onChange={(e) => {
+                                e.target.setCustomValidity("");
+                                setForm({ ...form, email: e.target.value });
+                            }}
                         />
                     </div>
 

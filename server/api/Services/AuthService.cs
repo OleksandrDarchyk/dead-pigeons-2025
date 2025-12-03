@@ -47,9 +47,10 @@ public class AuthService(
 
         if (user == null)
         {
-            // Still return a 400, but we do not reveal more details than needed
+            // Still return a 400, but with a clear message for the player
             logger.LogWarning("Login failed: user with email {Email} not found", dto.Email);
-            throw new ValidationException("User is not found!");
+            throw new ValidationException(
+                "No account found for this email. Please register first.");
         }
 
         // Verify password against Argon2id hash
@@ -120,6 +121,4 @@ public class AuthService(
         var token = tokenService.CreateToken(user);
         return new JwtResponse(token);
     }
-
-
 }
