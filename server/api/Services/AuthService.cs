@@ -121,4 +121,10 @@ public class AuthService(
         var token = tokenService.CreateToken(user);
         return new JwtResponse(token);
     }
+    
+    public Task<JwtClaims> VerifyAndDecodeToken(string token)
+    {
+        var claims = tokenService.ValidateAndDecode(token);
+        return Task.FromResult(claims);
+    }
 }
