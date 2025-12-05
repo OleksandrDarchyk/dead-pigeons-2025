@@ -1,9 +1,11 @@
 using System.Text.Json;
 using api.Etc;
 using api.Models.Requests;
-using Api.Security;
 using api.Services;
 using dataccess;
+using dataccess.Entities;
+
+namespace tests;
 
 public class SetupTests(
     MyDbContext ctx,
@@ -12,51 +14,52 @@ public class SetupTests(
     IAuthService authService)
 {
     [Fact]
-    public async Task RegisterReturnsJwtWhichCanVerifyAgain()
+    public async Task Seeder_DoesNotThrow()
     {
-        // 1) перевіряємо, що DI дав не null
-        Assert.NotNull(authService);
+        await seeder.Seed();
+    }
 
-        var result = await authService.Register(new RegisterRequestDto
+    [Fact]
+    public async Task Register_DoesNotThrow_AndTokenCanBeVerified()
+    {
+        // 1) Arrange: create a player that does NOT have a User yet
+        var email = "register-tests@dp.dk";
+
+        ctx.Players.Add(new Player
         {
-            Email = "test@example.com",
-            Password = "SuperStrongPassword123!"
+            Id = Guid.NewGuid().ToString(),
+            Fullname = "Register Test Player",
+            Email = email,
+            Phone = "12345678",
+            Isactive = true,
+            Activatedat = DateTime.UtcNow,
+            Createdat = DateTime.UtcNow,
+            Deletedat = null
         });
 
-        // 2) перевіряємо, що сервіс повернув результат з токеном
+        await ctx.SaveChangesAsync();
+
+        // 2) Act: call Register with this email
+        var dto = new RegisterRequestDto
+        {
+            Email = email,
+            Password = "SuperStrongPassword123!",
+            ConfirmPassword = "SuperStrongPassword123!"
+        };
+
+        var result = await authService.Register(dto);
+
+        // 3) Assert: token is not empty and can be decoded
         Assert.NotNull(result);
         Assert.False(string.IsNullOrWhiteSpace(result.Token));
 
-        // 3) лише якщо токен є – пробуємо його розкодувати
         var claims = await authService.VerifyAndDecodeToken(result.Token);
-        Assert.NotNull(claims);
 
         outputHelper.WriteLine(result.Token);
         outputHelper.WriteLine(JsonSerializer.Serialize(claims));
 
-        Assert.Equal("test@example.com", claims.Email);
-        Assert.Equal(Roles.User, claims.Role);
+        Assert.Equal(email, claims.Email);
+        Assert.Equal("User", claims.Role);   // Roles.User if you prefer constant
         Assert.False(string.IsNullOrWhiteSpace(claims.Id));
     }
-
-
-    [Fact]
-    public async Task SeederDoesNotThrowException()
-    {
-        Assert.NotNull(seeder);
-
-        try
-        {
-            await seeder.Seed();
-        }
-        catch (Exception ex)
-        {
-            // це дасть повний текст винятку зі стеком
-            outputHelper.WriteLine(ex.ToString());
-            throw;
-        }
-    }
-
-    
-
 }
