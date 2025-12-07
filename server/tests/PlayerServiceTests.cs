@@ -1,31 +1,59 @@
-// server/tests/PlayerServiceTests.cs
+// tests/PlayerServiceTests.cs
 
 using api.Models.Requests;
 using api.Services;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
-
 using ValidationException = Bogus.ValidationException;
+
 
 namespace tests;
 
+/// <summary>
+/// Service-level tests for <see cref="PlayerService"/>.
+/// Verifies create, read, update, soft delete, filtering and sorting logic.
+/// Each test runs in its own transaction for full isolation.
+/// </summary>
 public class PlayerServiceTests(
     IPlayerService playerService,
     MyDbContext ctx,
     TimeProvider timeProvider,
-    ITestOutputHelper outputHelper)
+    ITestOutputHelper outputHelper,
+    TestTransactionScope transaction) : IAsyncLifetime
 {
-    // Helpers ----------------------------------------------------
+    /// <summary>
+    /// Start a new database transaction before each test.
+    /// All changes will be rolled back by <see cref="TestTransactionScope"/>.
+    /// </summary>
+    public async ValueTask InitializeAsync()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await transaction.BeginTransactionAsync(ct);
+    }
 
-    private static Player CreatePlayer(
+    /// <summary>
+    /// No extra async cleanup needed here.
+    /// Transaction rollback happens inside <see cref="TestTransactionScope.Dispose"/>.
+    /// </summary>
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    // ---------------------------------------------------------------------
+    // Helper methods
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// Helper to create a Player entity with reasonable defaults.
+    /// Uses TimeProvider so tests remain deterministic and do not depend on DateTime.UtcNow.
+    /// </summary>
+    private Player CreatePlayer(
         string fullName,
         string email,
         string phone,
         bool isActive,
         bool isDeleted = false)
     {
-        var now = DateTime.UtcNow;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
         return new Player
         {
@@ -68,7 +96,7 @@ public class PlayerServiceTests(
         Assert.Equal(dto.Email, created.Email);
         Assert.Equal(dto.Phone, created.Phone);
 
-        // New players must start inactive
+        // New players must start inactive by business rule
         Assert.False(created.Isactive);
         Assert.Null(created.Activatedat);
         Assert.Null(created.Deletedat);
@@ -78,7 +106,7 @@ public class PlayerServiceTests(
         var fromDb = await ctx.Players.SingleAsync(p => p.Id == created.Id, ct);
         Assert.Equal(created.Email, fromDb.Email);
 
-        outputHelper.WriteLine($"Created player: {created.Id} ({created.Email})");
+        outputHelper.WriteLine($"[Player] Created player: {created.Id} ({created.Email})");
     }
 
     [Fact]
@@ -102,8 +130,7 @@ public class PlayerServiceTests(
 
         // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await playerService.CreatePlayer(dto)
-        );
+            async () => await playerService.CreatePlayer(dto));
     }
 
     // ============================================================
@@ -116,15 +143,15 @@ public class PlayerServiceTests(
         var ct = TestContext.Current.CancellationToken;
 
         // Arrange: active + inactive + soft-deleted
-        var active1   = CreatePlayer("Alice", "alice@test.local", "11111111", isActive: true);
-        var active2   = CreatePlayer("Charlie", "charlie@test.local", "22222222", isActive: true);
-        var inactive  = CreatePlayer("Bob", "bob@test.local", "33333333", isActive: false);
-        var deleted   = CreatePlayer("Deleted", "deleted@test.local", "44444444", isActive: true, isDeleted: true);
+        var active1  = CreatePlayer("Alice",   "alice@test.local",   "11111111", isActive: true);
+        var active2  = CreatePlayer("Charlie", "charlie@test.local", "22222222", isActive: true);
+        var inactive = CreatePlayer("Bob",     "bob@test.local",     "33333333", isActive: false);
+        var deleted  = CreatePlayer("Deleted", "deleted@test.local", "44444444", isActive: true, isDeleted: true);
 
         ctx.Players.AddRange(active1, active2, inactive, deleted);
         await ctx.SaveChangesAsync(ct);
 
-        // Act: only active players, default sorting
+        // Act: only active players, default sorting (Fullname ascending)
         var result = await playerService.GetPlayers(isActive: true);
 
         // Assert: soft-deleted player is excluded
@@ -135,8 +162,7 @@ public class PlayerServiceTests(
         // Default ordering is by Fullname ascending
         Assert.Equal(
             new[] { "Alice", "Charlie" },
-            result.Select(p => p.Fullname).ToArray()
-        );
+            result.Select(p => p.Fullname).ToArray());
     }
 
     [Fact]
@@ -145,8 +171,8 @@ public class PlayerServiceTests(
         var ct = TestContext.Current.CancellationToken;
 
         // Arrange
-        var p1 = CreatePlayer("One", "a@test.local", "11111111", isActive: true);
-        var p2 = CreatePlayer("Two", "c@test.local", "22222222", isActive: true);
+        var p1 = CreatePlayer("One",   "a@test.local", "11111111", isActive: true);
+        var p2 = CreatePlayer("Two",   "c@test.local", "22222222", isActive: true);
         var p3 = CreatePlayer("Three", "b@test.local", "33333333", isActive: true);
 
         ctx.Players.AddRange(p1, p2, p3);
@@ -161,8 +187,7 @@ public class PlayerServiceTests(
         // Assert: ordered by email (c, b, a)
         Assert.Equal(
             new[] { "c@test.local", "b@test.local", "a@test.local" },
-            result.Select(p => p.Email).ToArray()
-        );
+            result.Select(p => p.Email).ToArray());
     }
 
     // ============================================================
@@ -174,21 +199,22 @@ public class PlayerServiceTests(
     {
         var ct = TestContext.Current.CancellationToken;
 
-        // Arrange
+        // Arrange: inactive player with null Activatedat
         var player = CreatePlayer("Inactive", "inactive@test.local", "11111111", isActive: false);
-        player.Activatedat = null; // make sure
+        player.Activatedat = null;
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
-        // Act
+        // Act: first activation
         var activated = await playerService.ActivatePlayer(player.Id);
 
-        // Assert
+        // Assert: player becomes active and gets an activation timestamp
         Assert.True(activated.Isactive);
         Assert.NotNull(activated.Activatedat);
 
-        // Calling again should not change Activatedat
         var firstActivatedAt = activated.Activatedat;
+
+        // Act again: calling ActivatePlayer twice should not move Activatedat
         var activatedAgain = await playerService.ActivatePlayer(player.Id);
 
         Assert.True(activatedAgain.Isactive);
@@ -201,8 +227,7 @@ public class PlayerServiceTests(
         var unknownId = Guid.NewGuid().ToString();
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await playerService.ActivatePlayer(unknownId)
-        );
+            async () => await playerService.ActivatePlayer(unknownId));
     }
 
     // ============================================================
@@ -224,9 +249,8 @@ public class PlayerServiceTests(
         // Act
         var deactivated = await playerService.DeactivatePlayer(player.Id);
 
-        // Assert
+        // Assert: Isactive is false but Activatedat is preserved
         Assert.False(deactivated.Isactive);
-        // ActivatedAt should not be changed or cleared
         Assert.Equal(originalActivatedAt, deactivated.Activatedat);
     }
 
@@ -236,8 +260,7 @@ public class PlayerServiceTests(
         var unknownId = Guid.NewGuid().ToString();
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await playerService.DeactivatePlayer(unknownId)
-        );
+            async () => await playerService.DeactivatePlayer(unknownId));
     }
 
     // ============================================================
@@ -262,8 +285,7 @@ public class PlayerServiceTests(
 
         // Soft-deleted player should not be returned by GetPlayerById
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await playerService.GetPlayerById(player.Id)
-        );
+            async () => await playerService.GetPlayerById(player.Id));
 
         // Soft-deleted player should not be returned by GetPlayers
         var allPlayers = await playerService.GetPlayers();
@@ -276,14 +298,19 @@ public class PlayerServiceTests(
         var ct = TestContext.Current.CancellationToken;
 
         // Arrange: already deleted player
-        var player = CreatePlayer("Deleted", "already-deleted@test.local", "11111111", isActive: true, isDeleted: true);
+        var player = CreatePlayer(
+            "Deleted",
+            "already-deleted@test.local",
+            "11111111",
+            isActive: true,
+            isDeleted: true);
+
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
         // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await playerService.SoftDeletePlayer(player.Id)
-        );
+            async () => await playerService.SoftDeletePlayer(player.Id));
     }
 
     // ============================================================
@@ -313,20 +340,25 @@ public class PlayerServiceTests(
     {
         var ct = TestContext.Current.CancellationToken;
 
-        var deleted = CreatePlayer("Deleted", "deleted-lookup@test.local", "11111111", isActive: true, isDeleted: true);
+        // Arrange: soft-deleted player
+        var deleted = CreatePlayer(
+            "Deleted",
+            "deleted-lookup@test.local",
+            "11111111",
+            isActive: true,
+            isDeleted: true);
+
         ctx.Players.Add(deleted);
         await ctx.SaveChangesAsync(ct);
 
         // Deleted
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await playerService.GetPlayerById(deleted.Id)
-        );
+            async () => await playerService.GetPlayerById(deleted.Id));
 
         // Not found
         var unknownId = Guid.NewGuid().ToString();
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await playerService.GetPlayerById(unknownId)
-        );
+            async () => await playerService.GetPlayerById(unknownId));
     }
 
     // ============================================================
@@ -366,8 +398,8 @@ public class PlayerServiceTests(
         var ct = TestContext.Current.CancellationToken;
 
         // Arrange
-        var player       = CreatePlayer("Target", "old@test.local", "11111111", isActive: true);
-        var otherPlayer  = CreatePlayer("Other", "other@test.local", "22222222", isActive: true);
+        var player      = CreatePlayer("Target", "old@test.local",   "11111111", isActive: true);
+        var otherPlayer = CreatePlayer("Other",  "other@test.local", "22222222", isActive: true);
 
         ctx.Players.AddRange(player, otherPlayer);
         await ctx.SaveChangesAsync(ct);
@@ -394,7 +426,7 @@ public class PlayerServiceTests(
 
         // Arrange
         var player      = CreatePlayer("Target", "target@test.local", "11111111", isActive: true);
-        var otherPlayer = CreatePlayer("Other", "taken@test.local", "22222222", isActive: true);
+        var otherPlayer = CreatePlayer("Other",  "taken@test.local",  "22222222", isActive: true);
 
         ctx.Players.AddRange(player, otherPlayer);
         await ctx.SaveChangesAsync(ct);
@@ -409,8 +441,7 @@ public class PlayerServiceTests(
 
         // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await playerService.UpdatePlayer(dto)
-        );
+            async () => await playerService.UpdatePlayer(dto));
     }
 
     [Fact]
@@ -432,15 +463,14 @@ public class PlayerServiceTests(
         var validDtoForDeleted = new UpdatePlayerRequestDto
         {
             Id       = deleted.Id,
-            FullName = "Valid Name",              // passes MinLength(3)
+            FullName = "Valid Name", // passes MinLength(3)
             Email    = deleted.Email,
             Phone    = deleted.Phone
         };
 
-        // Act + Assert: deleted player -> Bogus.ValidationException("Player not found.")
+        // Act + Assert: deleted player -> domain ValidationException("Player not found.")
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await playerService.UpdatePlayer(validDtoForDeleted)
-        );
+            async () => await playerService.UpdatePlayer(validDtoForDeleted));
 
         // Also test completely unknown player id with a valid DTO
         var validDtoForUnknown = new UpdatePlayerRequestDto
@@ -452,8 +482,6 @@ public class PlayerServiceTests(
         };
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await playerService.UpdatePlayer(validDtoForUnknown)
-        );
+            async () => await playerService.UpdatePlayer(validDtoForUnknown));
     }
-
 }
