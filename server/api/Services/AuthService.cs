@@ -7,10 +7,15 @@ using dataccess.Entities;
 using Api.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
+using Microsoft.IdentityModel.Tokens;
 using ValidationException = Bogus.ValidationException;
 
 namespace api.Services;
 
+/// <summary>
+/// Authentication service for login, registration and token verification.
+/// </summary>
 public class AuthService(
     MyDbContext ctx,
     ILogger<AuthService> logger,
@@ -19,7 +24,15 @@ public class AuthService(
     ITokenService tokenService
 ) : IAuthService
 {
-    // Build a simple DTO from claims on the current principal
+    /// <summary>
+    /// Normalizes email so we can do case-insensitive comparisons.
+    /// </summary>
+    private static string NormalizeEmail(string email)
+        => email.Trim().ToLowerInvariant();
+
+    /// <summary>
+    /// Reads user claims (id, email, role) from the current principal and returns them as a DTO.
+    /// </summary>
     public JwtClaims GetCurrentUserClaims(ClaimsPrincipal principal)
     {
         var userId = principal.GetUserId();
@@ -34,23 +47,25 @@ public class AuthService(
         };
     }
 
+    /// <summary>
+    /// Logs a user in with email and password.
+    /// </summary>
     public async Task<JwtResponse> Login(LoginRequestDto dto)
     {
-        // Let DataAnnotations guard basic shape (required fields etc.)
+        // Validate basic DTO shape (required fields, etc.)
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
-        // Only allow non-deleted accounts to log in
-        var user = await ctx.Users
-            .FirstOrDefaultAsync(u =>
-                u.Email == dto.Email &&
-                u.Deletedat == null);
+        var normalizedEmail = NormalizeEmail(dto.Email);
 
-        if (user == null)
+        // Find non-deleted user by email, case-insensitive
+        var user = await ctx.Users
+            .Where(u => u.Deletedat == null)
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == normalizedEmail);
+
+        if (user is null)
         {
-            // Still return a 400, but with a clear message for the player
             logger.LogWarning("Login failed: user with email {Email} not found", dto.Email);
-            throw new ValidationException(
-                "No account found for this email. Please register first.");
+            throw new ValidationException("No account found for this email. Please register first.");
         }
 
         // Verify password against Argon2id hash
@@ -62,36 +77,45 @@ public class AuthService(
             throw new ValidationException("Password is incorrect!");
         }
 
-        // Optionally handle SuccessRehashNeeded the same as Success
-        logger.LogInformation("User {Email} logged in successfully", dto.Email);
+        logger.LogInformation("User {Email} logged in successfully", user.Email);
 
         var token = tokenService.CreateToken(user);
         return new JwtResponse(token);
     }
 
+    /// <summary>
+    /// Registers a new user account for an existing active player.
+    /// </summary>
     public async Task<JwtResponse> Register(RegisterRequestDto dto)
     {
-        // Validate basic shape (email format, password length etc.)
+        // Validate basic DTO rules (email format, password length, etc.)
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
-        // Player must already exist in the system with this email
-        var playerExists = await ctx.Players
-            .AnyAsync(p =>
-                p.Email == dto.Email &&
-                p.Deletedat == null);
+        var normalizedEmail = NormalizeEmail(dto.Email);
 
-        if (!playerExists)
+        // Player must exist with this email (case-insensitive), not soft-deleted
+        var player = await ctx.Players
+            .Where(p => p.Deletedat == null)
+            .FirstOrDefaultAsync(p => p.Email.ToLower() == normalizedEmail);
+
+        if (player is null)
         {
             // Do not allow random people to create accounts
             throw new ValidationException(
                 "You must be registered as a player by the club before creating an account.");
         }
 
-        // A non-deleted user with this email must not already exist
+        // Player must be active
+        if (!player.Isactive)
+        {
+            throw new ValidationException(
+                "Your membership is not active yet. Please contact the club.");
+        }
+
+        // Email must not already be taken by a non-deleted user (case-insensitive)
         var emailTaken = await ctx.Users
-            .AnyAsync(u =>
-                u.Email == dto.Email &&
-                u.Deletedat == null);
+            .Where(u => u.Deletedat == null)
+            .AnyAsync(u => u.Email.ToLower() == normalizedEmail);
 
         if (emailTaken)
         {
@@ -103,10 +127,10 @@ public class AuthService(
         var user = new User
         {
             Id = Guid.NewGuid().ToString(),
-            Email = dto.Email,
+            Email = normalizedEmail,      // store normalized email
             Createdat = now,
             Role = Roles.User,
-            Salt = string.Empty // Argon2id hash contains its own salt
+            Salt = string.Empty           // Argon2id hash contains its own salt
         };
 
         // Hash the raw password using Argon2id
@@ -115,16 +139,29 @@ public class AuthService(
         ctx.Users.Add(user);
         await ctx.SaveChangesAsync();
 
-        logger.LogInformation("User {Email} registered successfully", dto.Email);
+        logger.LogInformation("User {Email} registered successfully", user.Email);
 
-        // New users receive a JWT right after registration
+        // New users get a JWT right after registration
         var token = tokenService.CreateToken(user);
         return new JwtResponse(token);
     }
-    
+
+    /// <summary>
+    /// Verifies a JWT token and returns decoded claims,
+    /// or throws a validation error if the token is invalid/expired.
+    /// </summary>
     public Task<JwtClaims> VerifyAndDecodeToken(string token)
     {
-        var claims = tokenService.ValidateAndDecode(token);
-        return Task.FromResult(claims);
+        try
+        {
+            var claims = tokenService.ValidateAndDecode(token);
+            return Task.FromResult(claims);
+        }
+        catch (SecurityTokenException)
+        {
+            // Map low-level token error to a domain validation exception
+            throw new ValidationException("Invalid or expired token.");
+        }
     }
+
 }

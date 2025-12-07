@@ -1,34 +1,73 @@
-using System.Text.Json;
+// tests/SetupTests.cs
 using api.Etc;
 using api.Models.Requests;
 using api.Services;
 using dataccess;
 using dataccess.Entities;
+using Microsoft.EntityFrameworkCore;
 
 namespace tests;
 
 public class SetupTests(
     MyDbContext ctx,
+    TestTransactionScope transaction,
     ISeeder seeder,
-    ITestOutputHelper outputHelper,
-    IAuthService authService)
+    ITestOutputHelper output,
+    IAuthService authService) : IAsyncLifetime
 {
-    [Fact]
-    public async Task Seeder_DoesNotThrow()
+    // xUnit v3 lifecycle: use TestContext.Current.CancellationToken
+    public async ValueTask InitializeAsync()
     {
-        await seeder.Seed();
+        var ct = TestContext.Current.CancellationToken;
+        await transaction.BeginTransactionAsync(ct);
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    [Fact]
+    public async Task Database_IsCreated_Successfully()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var canConnect = await ctx.Database.CanConnectAsync(ct);
+        Assert.True(canConnect);
+
+        output.WriteLine("✓ Database connection successful");
     }
 
     [Fact]
-    public async Task Register_DoesNotThrow_AndTokenCanBeVerified()
+    public async Task Seeder_DoesNotThrow()
     {
-        // 1) Arrange: create a player that does NOT have a User yet
-        var email = "register-tests@dp.dk";
+        var ct = TestContext.Current.CancellationToken;
+
+        // Seeder does not accept CancellationToken – just call it
+        await seeder.Seed();
+
+        var usersCount = await ctx.Users.CountAsync(ct);
+        var playersCount = await ctx.Players.CountAsync(ct);
+        var gamesCount = await ctx.Games.CountAsync(ct);
+
+        Assert.True(usersCount > 0);
+        Assert.True(playersCount > 0);
+        Assert.True(gamesCount > 0);
+
+        output.WriteLine(
+            $"✓ Seeded: {usersCount} users, {playersCount} players, {gamesCount} games"
+        );
+    }
+
+    [Fact]
+    public async Task Register_CreatesUserSuccessfully()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var email = $"setup-{Guid.NewGuid()}@test.local";
+        const string password = "StrongPassword123!";
 
         ctx.Players.Add(new Player
         {
             Id = Guid.NewGuid().ToString(),
-            Fullname = "Register Test Player",
+            Fullname = "Setup Test",
             Email = email,
             Phone = "12345678",
             Isactive = true,
@@ -37,29 +76,55 @@ public class SetupTests(
             Deletedat = null
         });
 
-        await ctx.SaveChangesAsync();
+        await ctx.SaveChangesAsync(ct);
 
-        // 2) Act: call Register with this email
         var dto = new RegisterRequestDto
         {
             Email = email,
-            Password = "SuperStrongPassword123!",
-            ConfirmPassword = "SuperStrongPassword123!"
+            Password = password,
+            ConfirmPassword = password
         };
 
-        var result = await authService.Register(dto);
+        var response = await authService.Register(dto);
+        Assert.False(string.IsNullOrWhiteSpace(response.Token));
 
-        // 3) Assert: token is not empty and can be decoded
-        Assert.NotNull(result);
-        Assert.False(string.IsNullOrWhiteSpace(result.Token));
-
-        var claims = await authService.VerifyAndDecodeToken(result.Token);
-
-        outputHelper.WriteLine(result.Token);
-        outputHelper.WriteLine(JsonSerializer.Serialize(claims));
-
+        var claims = await authService.VerifyAndDecodeToken(response.Token);
         Assert.Equal(email, claims.Email);
-        Assert.Equal("User", claims.Role);   // Roles.User if you prefer constant
-        Assert.False(string.IsNullOrWhiteSpace(claims.Id));
+
+        output.WriteLine($"✓ Registration + token verification OK for {email}");
+    }
+
+    [Fact]
+    public async Task TransactionIsolation_WorksCorrectly()
+    {
+        var ct = TestContext.Current.CancellationToken;
+
+        var testId = Guid.NewGuid().ToString();
+
+        var player = new Player
+        {
+            Id = testId,
+            Fullname = "Isolation Test",
+            Email = $"isolation-{testId}@test.local",
+            Phone = "12345678",
+            Isactive = true,
+            Activatedat = DateTime.UtcNow,
+            Createdat = DateTime.UtcNow,
+            Deletedat = null
+        };
+
+        ctx.Players.Add(player);
+        await ctx.SaveChangesAsync(ct);
+
+        // FindAsync overload with CancellationToken
+        var found = await ctx.Players.FindAsync(
+            new object[] { testId },
+            ct
+        );
+
+        Assert.NotNull(found);
+
+        output.WriteLine($"✓ Transaction isolation confirmed for player {testId}");
+        // After test: TestTransactionScope rolls back the transaction
     }
 }

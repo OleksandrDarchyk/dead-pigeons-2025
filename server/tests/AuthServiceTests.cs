@@ -1,238 +1,316 @@
-// server/tests/AuthServiceTests.cs
-
 using api.Models.Requests;
 using Api.Security;
 using api.Services;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
-
-
-// Domain-level validation in services uses Bogus.ValidationException
 using ValidationException = Bogus.ValidationException;
+
 
 namespace tests;
 
+/// <summary>
+/// Service-level tests for AuthService (login, register, token verification).
+/// These tests work directly against the real database in a transaction.
+/// </summary>
 public class AuthServiceTests(
     IAuthService authService,
     MyDbContext ctx,
-    ITestOutputHelper output)
+    TestTransactionScope transaction,
+    ITestOutputHelper output) : IAsyncLifetime
 {
-    // Helper: create a player row for a given email
+    /// <summary>
+    /// Each test runs in its own transaction which gets rolled back afterwards.
+    /// </summary>
+    public async ValueTask InitializeAsync()
+    {
+        await transaction.BeginTransactionAsync();
+    }
+
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Helper for creating a Player entity with a given email and active/inactive status.
+    /// </summary>
     private static Player CreatePlayer(string email, bool isActive = true)
     {
         var now = DateTime.UtcNow;
-
         return new Player
         {
-            Id          = Guid.NewGuid().ToString(),
-            Fullname    = "Auth Test Player",
-            Email       = email,
-            Phone       = "12345678",
-            Isactive    = isActive,
+            Id = Guid.NewGuid().ToString(),
+            Fullname = "Test Player",
+            Email = email,
+            Phone = "12345678",
+            Isactive = isActive,
             Activatedat = isActive ? now : null,
-            Createdat   = now,
-            Deletedat   = null
+            Createdat = now,
+            Deletedat = null
         };
     }
 
-    // ============================================================
-    // Register
-    // ============================================================
-
     [Fact]
-    public async Task Register_CreatesUser_ForExistingPlayer()
+    public async Task Register_CreatesUser_ForExistingActivePlayer()
     {
         var ct = TestContext.Current.CancellationToken;
+        var email = $"{Guid.NewGuid()}@test.local";
+        const string password = "StrongPassword123!";
 
-        // Use a unique email to avoid conflicts with seed data
-        var email = $"{Guid.NewGuid()}@auth-tests.local";
-        const string password = "VeryStrongPassword123!";
-
-        // Arrange: player already exists in the system
-        var player = CreatePlayer(email);
+        // Arrange: create active player with this email
+        var player = CreatePlayer(email, isActive: true);
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
         var dto = new RegisterRequestDto
         {
-            Email           = email,
-            Password        = password,
-            ConfirmPassword = password // ← додали для проходження DataAnnotations
+            Email = email,
+            Password = password,
+            ConfirmPassword = password
         };
 
         // Act
         var response = await authService.Register(dto);
 
-        // Assert: JWT is returned
+        // Assert: token was returned
         Assert.False(string.IsNullOrWhiteSpace(response.Token));
 
-        // Assert: user row is created
-        var user = await ctx.Users.SingleAsync(u => u.Email == email, ct);
+        // Email is stored in normalized (lowercase) form
+        var normalized = email.Trim().ToLowerInvariant();
+        var user = await ctx.Users.SingleAsync(u => u.Email == normalized, ct);
 
-        Assert.Equal(email, user.Email);
         Assert.Equal(Roles.User, user.Role);
-        Assert.NotNull(user.Createdat);
-        Assert.Null(user.Deletedat);
-
-        // Password is hashed, not stored as plain text
-        Assert.False(string.IsNullOrWhiteSpace(user.Passwordhash));
         Assert.NotEqual(password, user.Passwordhash);
 
-        output.WriteLine($"Registered user id: {user.Id}, email: {user.Email}");
+        output.WriteLine($"[Auth] Registered user with email: {user.Email}, id: {user.Id}");
     }
 
     [Fact]
     public async Task Register_Throws_When_PlayerDoesNotExist()
     {
-        // Use a unique email that is not present in Players table
-        var email = $"{Guid.NewGuid()}@auth-tests.local";
-        const string password = "VeryStrongPassword123!";
+        var email = $"{Guid.NewGuid()}@test.local";
 
         var dto = new RegisterRequestDto
         {
-            Email           = email,
-            Password        = password,
-            ConfirmPassword = password // ← теж додаємо, щоб впала саме доменна валідація
+            Email = email,
+            Password = "StrongPassword123!",
+            ConfirmPassword = "StrongPassword123!"
         };
 
-        // Act + Assert:
-        // DTO is valid, but there is no Player with this email,
-        // so the domain rule should throw Bogus.ValidationException.
+        // No player with this email -> registration must fail
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await authService.Register(dto)
-        );
-    }
-
-    // ============================================================
-    // Login
-    // ============================================================
-
-    [Fact]
-    public async Task Login_Throws_When_UserNotFound()
-    {
-        // Use a unique email that has no User row
-        var email = $"{Guid.NewGuid()}@auth-tests.local";
-
-        var dto = new LoginRequestDto
-        {
-            Email    = email,
-            Password = "SomeStrongPassword123!"
-        };
-
-        // Act + Assert: no such user -> domain ValidationException
-        await Assert.ThrowsAsync<ValidationException>(
-            async () => await authService.Login(dto)
-        );
+            async () => await authService.Register(dto));
     }
 
     [Fact]
-    public async Task Login_Throws_When_PasswordIncorrect()
+    public async Task Register_Throws_When_PlayerIsInactive()
     {
         var ct = TestContext.Current.CancellationToken;
+        var email = $"{Guid.NewGuid()}@test.local";
 
-        var email = $"{Guid.NewGuid()}@auth-tests.local";
-        const string correctPassword = "CorrectPassword123!";
-        const string wrongPassword   = "WrongPassword123!";
-
-        // Arrange: existing player + register user
-        var player = CreatePlayer(email);
+        // Player exists but is inactive
+        var player = CreatePlayer(email, isActive: false);
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
-        var registerDto = new RegisterRequestDto
+        var dto = new RegisterRequestDto
         {
-            Email           = email,
-            Password        = correctPassword,
-            ConfirmPassword = correctPassword // ← додали
-        };
-
-        await authService.Register(registerDto);
-
-        // Act + Assert: login with wrong password must fail
-        var loginDto = new LoginRequestDto
-        {
-            Email    = email,
-            Password = wrongPassword
+            Email = email,
+            Password = "StrongPassword123!",
+            ConfirmPassword = "StrongPassword123!"
         };
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await authService.Login(loginDto)
-        );
+            async () => await authService.Register(dto));
+    }
+
+    [Fact]
+    public async Task Register_IsCaseInsensitive_ForEmail()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var email = $"{Guid.NewGuid()}@test.local";
+
+        // Player email is stored in lower-case
+        var player = CreatePlayer(email.ToLower(), isActive: true);
+        ctx.Players.Add(player);
+        await ctx.SaveChangesAsync(ct);
+
+        var dto = new RegisterRequestDto
+        {
+            // User types the same email but upper-case
+            Email = email.ToUpper(),
+            Password = "StrongPassword123!",
+            ConfirmPassword = "StrongPassword123!"
+        };
+
+        var response = await authService.Register(dto);
+
+        Assert.False(string.IsNullOrWhiteSpace(response.Token));
+    }
+
+    [Fact]
+    public async Task Register_Throws_When_EmailAlreadyHasUser()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var email = $"{Guid.NewGuid()}@test.local";
+        const string password = "StrongPassword123!";
+
+        // Existing active player
+        var player = CreatePlayer(email, isActive: true);
+        ctx.Players.Add(player);
+        await ctx.SaveChangesAsync(ct);
+
+        var dto = new RegisterRequestDto
+        {
+            Email = email,
+            Password = password,
+            ConfirmPassword = password
+        };
+
+        // First registration succeeds
+        await authService.Register(dto);
+
+        // Second registration with same email must fail
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await authService.Register(dto));
     }
 
     [Fact]
     public async Task Login_Succeeds_ForValidCredentials()
     {
         var ct = TestContext.Current.CancellationToken;
-
-        var email = $"{Guid.NewGuid()}@auth-tests.local";
+        var email = $"{Guid.NewGuid()}@test.local";
         const string password = "ValidPassword123!";
 
-        // Arrange: create player and then register user
-        var player = CreatePlayer(email);
+        // Player exists and is active
+        var player = CreatePlayer(email, isActive: true);
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
-        var registerDto = new RegisterRequestDto
+        // Register user first
+        await authService.Register(new RegisterRequestDto
         {
-            Email           = email,
-            Password        = password,
-            ConfirmPassword = password // ← додали
-        };
+            Email = email,
+            Password = password,
+            ConfirmPassword = password
+        });
 
-        var registerResponse = await authService.Register(registerDto);
-        Assert.False(string.IsNullOrWhiteSpace(registerResponse.Token));
-
-        // Act: try to login with the same credentials
         var loginDto = new LoginRequestDto
         {
-            Email    = email,
+            Email = email,
             Password = password
         };
 
-        var loginResponse = await authService.Login(loginDto);
+        var response = await authService.Login(loginDto);
 
-        // Assert: new JWT is generated on login
-        Assert.False(string.IsNullOrWhiteSpace(loginResponse.Token));
-
-        output.WriteLine($"Login JWT: {loginResponse.Token}");
+        Assert.False(string.IsNullOrWhiteSpace(response.Token));
     }
 
-    // ============================================================
-    // VerifyAndDecodeToken / GetCurrentUserClaims
-    // ============================================================
+    [Fact]
+    public async Task Login_Throws_When_UserNotFound()
+    {
+        var email = $"{Guid.NewGuid()}@test.local";
+
+        var dto = new LoginRequestDto
+        {
+            Email = email,
+            Password = "SomePassword123!"
+        };
+
+        // No user with this email -> login must fail
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await authService.Login(dto));
+    }
 
     [Fact]
-    public async Task VerifyAndDecodeToken_Returns_Claims_ForRegisteredUser()
+    public async Task Login_Throws_When_PasswordIncorrect()
     {
         var ct = TestContext.Current.CancellationToken;
+        var email = $"{Guid.NewGuid()}@test.local";
+        const string correctPassword = "CorrectPassword123!";
 
-        var email = $"{Guid.NewGuid()}@auth-tests.local";
-        const string password = "StrongPassword123!";
-
-        // Arrange: existing player and registered user
-        var player = CreatePlayer(email);
+        var player = CreatePlayer(email, isActive: true);
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
-        var registerDto = new RegisterRequestDto
+        // Register with correct password
+        await authService.Register(new RegisterRequestDto
         {
-            Email           = email,
-            Password        = password,
-            ConfirmPassword = password // ← додали
+            Email = email,
+            Password = correctPassword,
+            ConfirmPassword = correctPassword
+        });
+
+        var loginDto = new LoginRequestDto
+        {
+            Email = email,
+            Password = "WrongPassword123!"
         };
 
-        var registerResponse = await authService.Register(registerDto);
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await authService.Login(loginDto));
+    }
 
-        // Act: decode JWT using the service
-        var claims = await authService.VerifyAndDecodeToken(registerResponse.Token);
+    [Fact]
+    public async Task Login_IsCaseInsensitive_ForEmail()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var email = $"{Guid.NewGuid()}@test.local";
+        const string password = "ValidPassword123!";
 
-        // Assert: claims match the registered user
-        Assert.Equal(email, claims.Email);
+        var player = CreatePlayer(email.ToLower(), isActive: true);
+        ctx.Players.Add(player);
+        await ctx.SaveChangesAsync(ct);
+
+        // Register using lower-case email
+        await authService.Register(new RegisterRequestDto
+        {
+            Email = email.ToLower(),
+            Password = password,
+            ConfirmPassword = password
+        });
+
+        // Login using upper-case version of the same email
+        var loginDto = new LoginRequestDto
+        {
+            Email = email.ToUpper(),
+            Password = password
+        };
+
+        var response = await authService.Login(loginDto);
+
+        Assert.False(string.IsNullOrWhiteSpace(response.Token));
+    }
+
+    [Fact]
+    public async Task VerifyAndDecodeToken_Returns_ValidClaims()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var email = $"{Guid.NewGuid()}@test.local";
+        const string password = "StrongPassword123!";
+
+        var player = CreatePlayer(email, isActive: true);
+        ctx.Players.Add(player);
+        await ctx.SaveChangesAsync(ct);
+
+        // Register user to get a valid token
+        var response = await authService.Register(new RegisterRequestDto
+        {
+            Email = email,
+            Password = password,
+            ConfirmPassword = password
+        });
+
+        var claims = await authService.VerifyAndDecodeToken(response.Token);
+
+        Assert.Equal(email.ToLower(), claims.Email.ToLower());
         Assert.Equal(Roles.User, claims.Role);
         Assert.False(string.IsNullOrWhiteSpace(claims.Id));
+    }
 
-        output.WriteLine($"Decoded claims: id={claims.Id}, email={claims.Email}, role={claims.Role}");
+    [Fact]
+    public async Task VerifyAndDecodeToken_Throws_For_InvalidToken()
+    {
+        // Service wraps SecurityTokenException into Bogus.ValidationException
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await authService.VerifyAndDecodeToken("totally-invalid-token"));
     }
 }

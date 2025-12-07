@@ -7,60 +7,111 @@ using api.Services;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
-
-
 // All validation in TransactionService uses DataAnnotations.ValidationException
 using ValidationException = System.ComponentModel.DataAnnotations.ValidationException;
 
+
 namespace tests;
 
+/// <summary>
+/// Service-level tests for <see cref="TransactionService"/>:
+/// - creating transactions (admin + current user)
+/// - approving / rejecting
+/// - pending + history queries
+/// - balance calculation for players
+/// Uses TestTransactionScope so each test runs in isolation.
+/// </summary>
 public class TransactionServiceTests(
     ITransactionService transactionService,
     MyDbContext ctx,
-    ITestOutputHelper outputHelper)
+    TestTransactionScope transactionScope,
+    TimeProvider timeProvider,
+    ITestOutputHelper outputHelper) : IAsyncLifetime
 {
-    // Helper: create a simple active player
-    private static Player CreateActivePlayer(string email)
-    {
-        var now = DateTime.UtcNow;
+    // ---------------------------------------------------------------------
+    // xUnit v3 lifecycle
+    // ---------------------------------------------------------------------
 
-        return new Player
+    /// <summary>
+    /// Start a new database transaction before each test.
+    /// All changes are rolled back by <see cref="TestTransactionScope"/>.
+    /// </summary>
+    public async ValueTask InitializeAsync()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await transactionScope.BeginTransactionAsync(ct);
+    }
+
+    /// <summary>
+    /// No extra async cleanup needed.
+    /// Transaction rollback happens inside TestTransactionScope.Dispose().
+    /// </summary>
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    // ---------------------------------------------------------------------
+    // Helper methods
+    // ---------------------------------------------------------------------
+
+    /// <summary>
+    /// Helper to create a unique player with defaults.
+    /// Uses TimeProvider for deterministic timestamps.
+    /// </summary>
+    private async Task<Player> CreateUniquePlayer(string emailPrefix)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var uniqueId = Guid.NewGuid().ToString();
+
+        var player = new Player
         {
-            Id          = Guid.NewGuid().ToString(),
+            Id          = uniqueId,
             Fullname    = "Test Player",
-            Email       = email,
+            Email       = $"{emailPrefix}-{uniqueId}@test.local",
             Phone       = "12345678",
             Isactive    = true,
             Activatedat = now,
             Createdat   = now,
             Deletedat   = null
         };
+
+        ctx.Players.Add(player);
+        await ctx.SaveChangesAsync(ct);
+        return player;
     }
 
-    // Helper: create a simple game (used only for boards in balance tests)
-    private static Game CreateGame(int year, int weekNumber, bool isActive = false)
+    /// <summary>
+    /// Helper to create a unique game (used when boards are needed for balance tests).
+    /// </summary>
+    private async Task<Game> CreateUniqueGame()
     {
-        var now = DateTime.UtcNow;
+        var ct = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var random = new Random();
 
-        return new Game
+        var game = new Game
         {
             Id         = Guid.NewGuid().ToString(),
-            Year       = year,
-            Weeknumber = weekNumber,
-            Isactive   = isActive,
+            Year       = now.Year + random.Next(0, 10),
+            Weeknumber = random.Next(1, 52),
+            Isactive   = false,
             Createdat  = now,
             Closedat   = null,
             Deletedat  = null
         };
+
+        ctx.Games.Add(game);
+        await ctx.SaveChangesAsync(ct);
+        return game;
     }
 
-    // Helper: create a stable MobilePay number (digits only, long enough and unique)
+    /// <summary>
+    /// Helper to generate a reasonably unique MobilePay number for tests.
+    /// </summary>
     private static string NewMobilePayNumber()
     {
-        // Use ticks + random digits to avoid collisions
-        var ticks = DateTime.UtcNow.Ticks.ToString();
+        var ticks  = DateTime.UtcNow.Ticks.ToString();
         var random = Random.Shared.Next(1000, 9999).ToString();
-        return ticks + random; // always numeric and length > 6
+        return ticks + random;
     }
 
     // ============================================================
@@ -72,10 +123,8 @@ public class TransactionServiceTests(
     {
         var ct = TestContext.Current.CancellationToken;
 
-        // Arrange: create one player
-        var player = CreateActivePlayer("tx-admin-happy@test.local");
-        ctx.Players.Add(player);
-        await ctx.SaveChangesAsync(ct);
+        // Arrange
+        var player = await CreateUniquePlayer("tx-admin-happy");
 
         var dto = new AdminCreateTransactionRequestDto
         {
@@ -87,7 +136,7 @@ public class TransactionServiceTests(
         // Act
         var tx = await transactionService.CreateTransaction(dto);
 
-        // Assert: basic fields
+        // Assert
         Assert.False(string.IsNullOrWhiteSpace(tx.Id));
         Assert.Equal(player.Id, tx.Playerid);
         Assert.Equal(dto.MobilePayNumber, tx.Mobilepaynumber);
@@ -97,42 +146,35 @@ public class TransactionServiceTests(
         Assert.Null(tx.Deletedat);
         Assert.Null(tx.Rejectionreason);
 
-        // Assert: transaction is stored in the database
-        var fromDb = await ctx.Transactions
-            .SingleAsync(t => t.Id == tx.Id, ct);
-
+        var fromDb = await ctx.Transactions.SingleAsync(t => t.Id == tx.Id, ct);
         Assert.Equal(tx.Playerid, fromDb.Playerid);
         Assert.Equal(tx.Status, fromDb.Status);
         Assert.Equal(tx.Amount, fromDb.Amount);
 
-        outputHelper.WriteLine($"Created transaction {tx.Id} with amount {tx.Amount} for player {player.Id}");
+        outputHelper.WriteLine($"[Transaction] Created {tx.Id} with amount {tx.Amount} for player {player.Id}");
     }
 
     [Fact]
     public async Task CreateTransaction_Throws_When_PlayerDoesNotExist()
     {
+        // Arrange
         var dto = new AdminCreateTransactionRequestDto
         {
-            PlayerId        = Guid.NewGuid().ToString(), // unknown player
+            PlayerId        = Guid.NewGuid().ToString(),
             MobilePayNumber = NewMobilePayNumber(),
             Amount          = 100
         };
 
+        // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.CreateTransaction(dto)
-        );
+            async () => await transactionService.CreateTransaction(dto));
     }
 
     [Fact]
     public async Task CreateTransaction_Throws_When_MobilePayNumberAlreadyExists()
     {
-        var ct = TestContext.Current.CancellationToken;
-
-        // Arrange: player + first transaction
-        var player = CreateActivePlayer("tx-duplicate@test.local");
-        ctx.Players.Add(player);
-        await ctx.SaveChangesAsync(ct);
-
+        // Arrange
+        var player = await CreateUniquePlayer("tx-duplicate");
         var mobile = NewMobilePayNumber();
 
         var firstDto = new AdminCreateTransactionRequestDto
@@ -143,9 +185,8 @@ public class TransactionServiceTests(
         };
 
         var first = await transactionService.CreateTransaction(firstDto);
-        outputHelper.WriteLine($"First transaction created with MobilePayNumber {mobile}, id={first.Id}");
+        outputHelper.WriteLine($"[Transaction] First tx created with MobilePayNumber {mobile}, id={first.Id}");
 
-        // Second DTO reuses the same MobilePay number
         var secondDto = new AdminCreateTransactionRequestDto
         {
             PlayerId        = player.Id,
@@ -155,25 +196,23 @@ public class TransactionServiceTests(
 
         // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.CreateTransaction(secondDto)
-        );
+            async () => await transactionService.CreateTransaction(secondDto));
     }
 
     [Fact]
     public async Task CreateTransaction_Throws_When_DtoFailsAttributeValidation()
     {
-        // This test relies on DataAnnotations on the DTO (for example Range on Amount).
-        // Amount = 0 is usually outside the allowed range for a payment.
+        // Arrange: violates Required / Range / MinLength
         var dto = new AdminCreateTransactionRequestDto
         {
-            PlayerId        = "",                // invalid for [Required]
-            MobilePayNumber = "123",            // too short if MinLength is used
-            Amount          = 0                 // outside valid range
+            PlayerId        = "",
+            MobilePayNumber = "123",
+            Amount          = 0
         };
 
+        // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.CreateTransaction(dto)
-        );
+            async () => await transactionService.CreateTransaction(dto));
     }
 
     // ============================================================
@@ -183,13 +222,8 @@ public class TransactionServiceTests(
     [Fact]
     public async Task CreateTransactionForCurrentUser_Succeeds_When_EmailClaimAndPlayerExist()
     {
-        var ct = TestContext.Current.CancellationToken;
-
-        const string email = "tx-current-user@test.local";
-
-        var player = CreateActivePlayer(email);
-        ctx.Players.Add(player);
-        await ctx.SaveChangesAsync(ct);
+        // Arrange
+        var player = await CreateUniquePlayer("tx-current-user");
 
         var dto = new CreateTransactionForCurrentUserRequestDto
         {
@@ -198,14 +232,15 @@ public class TransactionServiceTests(
         };
 
         var identity = new ClaimsIdentity(
-            new[] { new Claim(ClaimTypes.Email, email) },
+            new[] { new Claim(ClaimTypes.Email, player.Email) },
             authenticationType: "TestAuth");
+
         var user = new ClaimsPrincipal(identity);
 
         // Act
         var tx = await transactionService.CreateTransactionForCurrentUser(user, dto);
 
-        // Assert: transaction is linked to the resolved player
+        // Assert
         Assert.Equal(player.Id, tx.Playerid);
         Assert.Equal(dto.Amount, tx.Amount);
         Assert.Equal(dto.MobilePayNumber, tx.Mobilepaynumber);
@@ -215,23 +250,25 @@ public class TransactionServiceTests(
     [Fact]
     public async Task CreateTransactionForCurrentUser_Throws_When_EmailClaimMissing()
     {
+        // Arrange
         var dto = new CreateTransactionForCurrentUserRequestDto
         {
             MobilePayNumber = NewMobilePayNumber(),
             Amount          = 100
         };
 
-        var identity = new ClaimsIdentity(); // no email claim
-        var user = new ClaimsPrincipal(identity);
+        var identity = new ClaimsIdentity();
+        var user     = new ClaimsPrincipal(identity);
 
+        // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.CreateTransactionForCurrentUser(user, dto)
-        );
+            async () => await transactionService.CreateTransactionForCurrentUser(user, dto));
     }
 
     [Fact]
     public async Task CreateTransactionForCurrentUser_Throws_When_PlayerNotFoundForEmail()
     {
+        // Arrange
         var dto = new CreateTransactionForCurrentUserRequestDto
         {
             MobilePayNumber = NewMobilePayNumber(),
@@ -243,11 +280,12 @@ public class TransactionServiceTests(
         var identity = new ClaimsIdentity(
             new[] { new Claim(ClaimTypes.Email, email) },
             authenticationType: "TestAuth");
+
         var user = new ClaimsPrincipal(identity);
 
+        // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.CreateTransactionForCurrentUser(user, dto)
-        );
+            async () => await transactionService.CreateTransactionForCurrentUser(user, dto));
     }
 
     // ============================================================
@@ -257,11 +295,11 @@ public class TransactionServiceTests(
     [Fact]
     public async Task ApproveTransaction_SetsStatusApproved_AndApprovedAt_ForPendingTransaction()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Arrange: simple pending transaction
-        var player = CreateActivePlayer("approve@test.local");
-        ctx.Players.Add(player);
+        // Arrange: a pending transaction
+        var player = await CreateUniquePlayer("approve");
 
         var tx = new Transaction
         {
@@ -270,7 +308,7 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 300,
             Status          = "Pending",
-            Createdat       = DateTime.UtcNow.AddMinutes(-10),
+            Createdat       = now.AddMinutes(-10),
             Approvedat      = null,
             Deletedat       = null,
             Rejectionreason = null
@@ -287,9 +325,7 @@ public class TransactionServiceTests(
         Assert.NotNull(updated.Approvedat);
         Assert.Null(updated.Rejectionreason);
 
-        var fromDb = await ctx.Transactions
-            .SingleAsync(t => t.Id == tx.Id, ct);
-
+        var fromDb = await ctx.Transactions.SingleAsync(t => t.Id == tx.Id, ct);
         Assert.Equal("Approved", fromDb.Status);
         Assert.NotNull(fromDb.Approvedat);
     }
@@ -298,8 +334,7 @@ public class TransactionServiceTests(
     public async Task ApproveTransaction_Throws_When_IdIsEmpty()
     {
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.ApproveTransaction("")
-        );
+            async () => await transactionService.ApproveTransaction(""));
     }
 
     [Fact]
@@ -308,17 +343,17 @@ public class TransactionServiceTests(
         var unknownId = Guid.NewGuid().ToString();
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.ApproveTransaction(unknownId)
-        );
+            async () => await transactionService.ApproveTransaction(unknownId));
     }
 
     [Fact]
     public async Task ApproveTransaction_Throws_When_StatusIsNotPending()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        var player = CreateActivePlayer("approve-invalid-status@test.local");
-        ctx.Players.Add(player);
+        // Arrange: already approved transaction
+        var player = await CreateUniquePlayer("approve-invalid-status");
 
         var tx = new Transaction
         {
@@ -326,18 +361,18 @@ public class TransactionServiceTests(
             Playerid        = player.Id,
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 200,
-            Status          = "Approved", // already approved
-            Createdat       = DateTime.UtcNow,
-            Approvedat      = DateTime.UtcNow,
+            Status          = "Approved",
+            Createdat       = now,
+            Approvedat      = now,
             Deletedat       = null
         };
 
         ctx.Transactions.Add(tx);
         await ctx.SaveChangesAsync(ct);
 
+        // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.ApproveTransaction(tx.Id)
-        );
+            async () => await transactionService.ApproveTransaction(tx.Id));
     }
 
     // ============================================================
@@ -347,10 +382,11 @@ public class TransactionServiceTests(
     [Fact]
     public async Task RejectTransaction_SetsStatusRejected_ForPendingTransaction()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        var player = CreateActivePlayer("reject@test.local");
-        ctx.Players.Add(player);
+        // Arrange
+        var player = await CreateUniquePlayer("reject");
 
         var tx = new Transaction
         {
@@ -359,7 +395,7 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 250,
             Status          = "Pending",
-            Createdat       = DateTime.UtcNow.AddMinutes(-3),
+            Createdat       = now.AddMinutes(-3),
             Approvedat      = null,
             Deletedat       = null,
             Rejectionreason = null
@@ -375,9 +411,7 @@ public class TransactionServiceTests(
         Assert.Equal("Rejected", updated.Status);
         Assert.Null(updated.Approvedat);
 
-        var fromDb = await ctx.Transactions
-            .SingleAsync(t => t.Id == tx.Id, ct);
-
+        var fromDb = await ctx.Transactions.SingleAsync(t => t.Id == tx.Id, ct);
         Assert.Equal("Rejected", fromDb.Status);
         Assert.Null(fromDb.Approvedat);
     }
@@ -386,8 +420,7 @@ public class TransactionServiceTests(
     public async Task RejectTransaction_Throws_When_IdIsEmpty()
     {
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.RejectTransaction("")
-        );
+            async () => await transactionService.RejectTransaction(""));
     }
 
     [Fact]
@@ -396,17 +429,17 @@ public class TransactionServiceTests(
         var unknownId = Guid.NewGuid().ToString();
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.RejectTransaction(unknownId)
-        );
+            async () => await transactionService.RejectTransaction(unknownId));
     }
 
     [Fact]
     public async Task RejectTransaction_Throws_When_StatusIsNotPending()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        var player = CreateActivePlayer("reject-invalid-status@test.local");
-        ctx.Players.Add(player);
+        // Arrange: already approved transaction
+        var player = await CreateUniquePlayer("reject-invalid-status");
 
         var tx = new Transaction
         {
@@ -414,18 +447,18 @@ public class TransactionServiceTests(
             Playerid        = player.Id,
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 250,
-            Status          = "Approved", // already approved
-            Createdat       = DateTime.UtcNow,
-            Approvedat      = DateTime.UtcNow,
+            Status          = "Approved",
+            Createdat       = now,
+            Approvedat      = now,
             Deletedat       = null
         };
 
         ctx.Transactions.Add(tx);
         await ctx.SaveChangesAsync(ct);
 
+        // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.RejectTransaction(tx.Id)
-        );
+            async () => await transactionService.RejectTransaction(tx.Id));
     }
 
     // ============================================================
@@ -435,15 +468,12 @@ public class TransactionServiceTests(
     [Fact]
     public async Task GetTransactionsForPlayer_Returns_OnlyNonDeleted_ForPlayer_OrderedNewestFirst()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        var player      = CreateActivePlayer("history-player@test.local");
-        var otherPlayer = CreateActivePlayer("history-other@test.local");
-
-        ctx.Players.AddRange(player, otherPlayer);
-        await ctx.SaveChangesAsync(ct);
-
-        var now = DateTime.UtcNow;
+        // Arrange
+        var player      = await CreateUniquePlayer("history-player");
+        var otherPlayer = await CreateUniquePlayer("history-other");
 
         var older = new Transaction
         {
@@ -475,7 +505,7 @@ public class TransactionServiceTests(
             Amount          = 300,
             Status          = "Approved",
             Createdat       = now.AddMinutes(-2),
-            Deletedat       = now // soft-deleted
+            Deletedat       = now
         };
 
         var other = new Transaction
@@ -495,7 +525,7 @@ public class TransactionServiceTests(
         // Act
         var result = await transactionService.GetTransactionsForPlayer(player.Id);
 
-        // Assert: only non-deleted transactions for this player
+        // Assert
         Assert.Equal(2, result.Count);
         Assert.All(result, t =>
         {
@@ -503,13 +533,8 @@ public class TransactionServiceTests(
             Assert.Null(t.Deletedat);
         });
 
-        // Assert: ordered by CreatedAt descending (newest first)
-        Assert.Equal(
-            new[] { newer.Id, older.Id },
-            result.Select(t => t.Id).ToArray()
-        );
-
-        // Assert: navigation property Player is included
+        // Must be ordered by Createdat descending (newest first)
+        Assert.Equal(new[] { newer.Id, older.Id }, result.Select(t => t.Id).ToArray());
         Assert.All(result, t => Assert.NotNull(t.Player));
     }
 
@@ -520,15 +545,12 @@ public class TransactionServiceTests(
     [Fact]
     public async Task GetPendingTransactions_Returns_PendingOnly_OrderedByCreatedAt_AndIncludesPlayer()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        var p1 = CreateActivePlayer("pending-1@test.local");
-        var p2 = CreateActivePlayer("pending-2@test.local");
-
-        ctx.Players.AddRange(p1, p2);
-        await ctx.SaveChangesAsync(ct);
-
-        var now = DateTime.UtcNow;
+        // Arrange
+        var p1 = await CreateUniquePlayer("pending-1");
+        var p2 = await CreateUniquePlayer("pending-2");
 
         var pendingOld = new Transaction
         {
@@ -580,21 +602,15 @@ public class TransactionServiceTests(
         // Act
         var result = await transactionService.GetPendingTransactions();
 
-        // Filter only the ones we just created (in case there are others in DB)
+        // Assert: only non-deleted pending transactions, ordered by Createdat ascending
         var ours = result
             .Where(t => t.Id == pendingOld.Id || t.Id == pendingNew.Id)
             .OrderBy(t => t.Createdat)
             .ToList();
 
-        // Assert: both pending transactions are present and ordered by CreatedAt ascending
         Assert.Equal(2, ours.Count);
         Assert.All(ours, t => Assert.Equal("Pending", t.Status));
-        Assert.Equal(
-            new[] { pendingOld.Id, pendingNew.Id },
-            ours.Select(t => t.Id).ToArray()
-        );
-
-        // Assert: Player navigation is populated
+        Assert.Equal(new[] { pendingOld.Id, pendingNew.Id }, ours.Select(t => t.Id).ToArray());
         Assert.All(ours, t => Assert.NotNull(t.Player));
     }
 
@@ -605,13 +621,11 @@ public class TransactionServiceTests(
     [Fact]
     public async Task GetTransactionsHistory_Filters_ByPlayer_AndExcludesPendingByDefault()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        var player = CreateActivePlayer("history-filter@test.local");
-        ctx.Players.Add(player);
-        await ctx.SaveChangesAsync(ct);
-
-        var now = DateTime.UtcNow;
+        // Arrange
+        var player = await CreateUniquePlayer("history-filter");
 
         var pending = new Transaction
         {
@@ -649,10 +663,10 @@ public class TransactionServiceTests(
         ctx.Transactions.AddRange(pending, approved, rejected);
         await ctx.SaveChangesAsync(ct);
 
-        // Act: no explicit status => Pending should be excluded
+        // Act: status == null => exclude Pending by default
         var history = await transactionService.GetTransactionsHistory(playerId: player.Id, status: null);
 
-        // Assert: only Approved + Rejected
+        // Assert
         Assert.Equal(2, history.Count);
         Assert.All(history, t =>
         {
@@ -660,23 +674,18 @@ public class TransactionServiceTests(
             Assert.NotEqual("Pending", t.Status);
         });
 
-        // Assert: ordered by CreatedAt descending
-        Assert.Equal(
-            new[] { rejected.Id, approved.Id },
-            history.Select(t => t.Id).ToArray()
-        );
+        // Newest first (Rejected, then Approved)
+        Assert.Equal(new[] { rejected.Id, approved.Id }, history.Select(t => t.Id).ToArray());
     }
 
     [Fact]
     public async Task GetTransactionsHistory_Filters_ByStatus_WhenProvided()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        var player = CreateActivePlayer("history-status@test.local");
-        ctx.Players.Add(player);
-        await ctx.SaveChangesAsync(ct);
-
-        var now = DateTime.UtcNow;
+        // Arrange
+        var player = await CreateUniquePlayer("history-status");
 
         var approved = new Transaction
         {
@@ -716,8 +725,7 @@ public class TransactionServiceTests(
     public async Task GetTransactionsHistory_Throws_When_StatusIsInvalid()
     {
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.GetTransactionsHistory(playerId: null, status: "SomethingElse")
-        );
+            async () => await transactionService.GetTransactionsHistory(playerId: null, status: "SomethingElse"));
     }
 
     // ============================================================
@@ -727,17 +735,13 @@ public class TransactionServiceTests(
     [Fact]
     public async Task GetPlayerBalance_Computes_ApprovedMinusBoardsPrice()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Arrange: player with some payments and boards
-        var player = CreateActivePlayer("balance@test.local");
-        var game   = CreateGame(2025, 1, isActive: false);
+        // Arrange
+        var player = await CreateUniquePlayer("balance");
+        var game   = await CreateUniqueGame();
 
-        ctx.Players.Add(player);
-        ctx.Games.Add(game);
-        await ctx.SaveChangesAsync(ct);
-
-        // Boards (spending)
         var board1 = new Board
         {
             Id           = Guid.NewGuid().ToString(),
@@ -745,7 +749,10 @@ public class TransactionServiceTests(
             Gameid       = game.Id,
             Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
             Price        = 20,
-            Createdat    = DateTime.UtcNow.AddMinutes(-20),
+            Iswinning    = false,
+            Repeatweeks  = 0,
+            Repeatactive = false,
+            Createdat    = now.AddMinutes(-20),
             Deletedat    = null
         };
 
@@ -756,11 +763,13 @@ public class TransactionServiceTests(
             Gameid       = game.Id,
             Numbers      = new[] { 6, 7, 8, 9, 10 }.ToList(),
             Price        = 40,
-            Createdat    = DateTime.UtcNow.AddMinutes(-10),
+            Iswinning    = false,
+            Repeatweeks  = 0,
+            Repeatactive = false,
+            Createdat    = now.AddMinutes(-10),
             Deletedat    = null
         };
 
-        // Deleted board should not be counted
         var deletedBoard = new Board
         {
             Id           = Guid.NewGuid().ToString(),
@@ -768,13 +777,15 @@ public class TransactionServiceTests(
             Gameid       = game.Id,
             Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
             Price        = 100,
-            Createdat    = DateTime.UtcNow.AddMinutes(-5),
-            Deletedat    = DateTime.UtcNow
+            Iswinning    = false,
+            Repeatweeks  = 0,
+            Repeatactive = false,
+            Createdat    = now.AddMinutes(-5),
+            Deletedat    = now
         };
 
         ctx.Boards.AddRange(board1, board2, deletedBoard);
 
-        // Transactions (income)
         var approved1 = new Transaction
         {
             Id              = Guid.NewGuid().ToString(),
@@ -782,7 +793,7 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 100,
             Status          = "Approved",
-            Createdat       = DateTime.UtcNow.AddMinutes(-30),
+            Createdat       = now.AddMinutes(-30),
             Deletedat       = null
         };
 
@@ -793,7 +804,7 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 50,
             Status          = "Approved",
-            Createdat       = DateTime.UtcNow.AddMinutes(-25),
+            Createdat       = now.AddMinutes(-25),
             Deletedat       = null
         };
 
@@ -804,7 +815,7 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 999,
             Status          = "Pending",
-            Createdat       = DateTime.UtcNow.AddMinutes(-15),
+            Createdat       = now.AddMinutes(-15),
             Deletedat       = null
         };
 
@@ -815,7 +826,7 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 888,
             Status          = "Rejected",
-            Createdat       = DateTime.UtcNow.AddMinutes(-12),
+            Createdat       = now.AddMinutes(-12),
             Deletedat       = null
         };
 
@@ -825,9 +836,7 @@ public class TransactionServiceTests(
         // Act
         PlayerBalanceResponseDto balance = await transactionService.GetPlayerBalance(player.Id);
 
-        // Sum(Approved) = 100 + 50 = 150
-        // Sum(boards.Price) (non-deleted) = 20 + 40 = 60
-        // Balance = 150 - 60 = 90
+        // Assert: (100 + 50) - (20 + 40) = 90
         Assert.Equal(player.Id, balance.PlayerId);
         Assert.Equal(90, balance.Balance);
     }
@@ -838,22 +847,18 @@ public class TransactionServiceTests(
         var unknownPlayerId = Guid.NewGuid().ToString();
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.GetPlayerBalance(unknownPlayerId)
-        );
+            async () => await transactionService.GetPlayerBalance(unknownPlayerId));
     }
 
     [Fact]
     public async Task GetTransactionsForCurrentUser_Returns_OnlyNonDeletedTransactions_ForResolvedPlayer()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        const string email = "tx-current-history@test.local";
-
-        var player      = CreateActivePlayer(email);
-        var otherPlayer = CreateActivePlayer("tx-current-other@test.local");
-
-        ctx.Players.AddRange(player, otherPlayer);
-        await ctx.SaveChangesAsync(ct);
+        // Arrange
+        var player      = await CreateUniquePlayer("tx-current-history");
+        var otherPlayer = await CreateUniquePlayer("tx-current-other");
 
         var tx1 = new Transaction
         {
@@ -862,7 +867,7 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 10,
             Status          = "Approved",
-            Createdat       = DateTime.UtcNow.AddMinutes(-10),
+            Createdat       = now.AddMinutes(-10),
             Deletedat       = null
         };
 
@@ -873,7 +878,7 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 20,
             Status          = "Pending",
-            Createdat       = DateTime.UtcNow.AddMinutes(-5),
+            Createdat       = now.AddMinutes(-5),
             Deletedat       = null
         };
 
@@ -884,8 +889,8 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 30,
             Status          = "Approved",
-            Createdat       = DateTime.UtcNow.AddMinutes(-3),
-            Deletedat       = DateTime.UtcNow
+            Createdat       = now.AddMinutes(-3),
+            Deletedat       = now
         };
 
         var otherTx = new Transaction
@@ -895,7 +900,7 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 40,
             Status          = "Approved",
-            Createdat       = DateTime.UtcNow.AddMinutes(-1),
+            Createdat       = now.AddMinutes(-1),
             Deletedat       = null
         };
 
@@ -903,14 +908,15 @@ public class TransactionServiceTests(
         await ctx.SaveChangesAsync(ct);
 
         var identity = new ClaimsIdentity(
-            new[] { new Claim(ClaimTypes.Email, email) },
+            new[] { new Claim(ClaimTypes.Email, player.Email) },
             authenticationType: "TestAuth");
+
         var user = new ClaimsPrincipal(identity);
 
         // Act
         var result = await transactionService.GetTransactionsForCurrentUser(user);
 
-        // Assert: only non-deleted transactions for this player
+        // Assert
         Assert.Equal(2, result.Count);
         Assert.All(result, t =>
         {
@@ -922,19 +928,13 @@ public class TransactionServiceTests(
     [Fact]
     public async Task GetBalanceForCurrentUser_ResolvesPlayerAndReturnsSameBalanceAsGetPlayerBalance()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        const string email = "balance-current@test.local";
+        // Arrange
+        var player = await CreateUniquePlayer("balance-current");
+        var game   = await CreateUniqueGame();
 
-        var player = CreateActivePlayer(email);
-        ctx.Players.Add(player);
-        await ctx.SaveChangesAsync(ct);
-
-        var game = CreateGame(2025, 2, isActive: false);
-        ctx.Games.Add(game);
-        await ctx.SaveChangesAsync(ct);
-
-        // One board, one approved transaction
         var board = new Board
         {
             Id           = Guid.NewGuid().ToString(),
@@ -942,7 +942,10 @@ public class TransactionServiceTests(
             Gameid       = game.Id,
             Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
             Price        = 20,
-            Createdat    = DateTime.UtcNow.AddMinutes(-10),
+            Iswinning    = false,
+            Repeatweeks  = 0,
+            Repeatactive = false,
+            Createdat    = now.AddMinutes(-10),
             Deletedat    = null
         };
 
@@ -953,7 +956,7 @@ public class TransactionServiceTests(
             Mobilepaynumber = NewMobilePayNumber(),
             Amount          = 50,
             Status          = "Approved",
-            Createdat       = DateTime.UtcNow.AddMinutes(-15),
+            Createdat       = now.AddMinutes(-15),
             Deletedat       = null
         };
 
@@ -962,15 +965,16 @@ public class TransactionServiceTests(
         await ctx.SaveChangesAsync(ct);
 
         var identity = new ClaimsIdentity(
-            new[] { new Claim(ClaimTypes.Email, email) },
+            new[] { new Claim(ClaimTypes.Email, player.Email) },
             authenticationType: "TestAuth");
+
         var user = new ClaimsPrincipal(identity);
 
         // Act
-        var balanceDirect = await transactionService.GetPlayerBalance(player.Id);
+        var balanceDirect     = await transactionService.GetPlayerBalance(player.Id);
         var balanceFromClaims = await transactionService.GetBalanceForCurrentUser(user);
 
-        // Sum(Approved) = 50, Sum(Boards) = 20 => balance 30
+        // Assert: 50 - 20 = 30
         Assert.Equal(30, balanceDirect.Balance);
         Assert.Equal(30, balanceFromClaims.Balance);
         Assert.Equal(balanceDirect.Balance, balanceFromClaims.Balance);
@@ -979,12 +983,11 @@ public class TransactionServiceTests(
     [Fact]
     public async Task GetBalanceForCurrentUser_Throws_When_EmailMissing()
     {
-        var identity = new ClaimsIdentity(); // no email
-        var user = new ClaimsPrincipal(identity);
+        var identity = new ClaimsIdentity();
+        var user     = new ClaimsPrincipal(identity);
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.GetBalanceForCurrentUser(user)
-        );
+            async () => await transactionService.GetBalanceForCurrentUser(user));
     }
 
     [Fact]
@@ -995,10 +998,10 @@ public class TransactionServiceTests(
         var identity = new ClaimsIdentity(
             new[] { new Claim(ClaimTypes.Email, email) },
             authenticationType: "TestAuth");
+
         var user = new ClaimsPrincipal(identity);
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await transactionService.GetBalanceForCurrentUser(user)
-        );
+            async () => await transactionService.GetBalanceForCurrentUser(user));
     }
 }
