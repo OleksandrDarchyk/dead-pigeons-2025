@@ -5,6 +5,7 @@
 appsettings.json
 appsettings.Development.json
 appsettings.Production.json
+coverage/
 # dotenv files
 .env
 claude
