@@ -1,23 +1,27 @@
-name: Continuous integration
+name: Continuous Integration
 
 on:
   push:
     branches: ["main"]
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    types: [opened, synchronize, reopened]
     branches: ["main"]
+  workflow_dispatch:
 
 jobs:
-  client_test_job:
-    name: Client test
+  # ==========================================
+  # FRONTEND - React + Vite + Vitest
+  # ==========================================
+  frontend:
+    name: Frontend CI
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read
-      pull-requests: write
+      contents: read          
+      pull-requests: write    
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Node.js
@@ -27,89 +31,52 @@ jobs:
           cache: "npm"
           cache-dependency-path: client/package-lock.json
 
-      - name: Install client dependencies
-        run: npm clean-install --prefix=client
+      - name: Install dependencies
+        working-directory: client
+        run: npm ci
 
-      - name: Lint client
-        run: npm run lint --prefix=client
+      - name: Lint frontend
+        working-directory: client
+        run: npm run lint
 
-      - name: Build client
-        run: npm run build --prefix=client
+      - name: Build frontend
+        working-directory: client
+        run: npm run build
 
-      - name: Test client (with coverage)
-        run: npm run test:coverage --prefix=client
+      - name: Test frontend with coverage
+        working-directory: client
+        run: npm run test:coverage
 
-      - name: Report Coverage
-        if: always()
+      - name: Report coverage on PR
+        if: github.event_name == 'pull_request'
         uses: davelosert/vitest-coverage-report-action@v2
         with:
           json-summary-path: "./client/coverage/coverage-summary.json"
           json-final-path: "./client/coverage/coverage-final.json"
 
-
-  # ============================
-  # Server (.NET) – build & test
-  # ============================
-  server_test_job:
-    name: Server test
+  # ==========================================
+  # BACKEND - .NET 9 + tests (with Testcontainers)
+  # ==========================================
+  backend:
+    name: Backend CI
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: client_test_job   # серверні тести запускаються після клієнта
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup .NET
+      - name: Setup .NET SDK
         uses: actions/setup-dotnet@v4
         with:
-          # Backend targets net9.0
           dotnet-version: "9.0.x"
 
-      - name: Restore .NET solution
+      - name: Restore solution
         run: dotnet restore DeadPigeons.sln
 
-      - name: Build backend
-        run: dotnet build DeadPigeons.sln --no-restore
+      - name: Build solution
+        run: dotnet build DeadPigeons.sln --no-restore --configuration Release
 
-      - name: Test backend
-        run: dotnet test DeadPigeons.sln --no-build
-
-  # ============================
-  # End-to-end tests (Playwright + Docker) — пізніше
-  # ============================
-  # e2e_test_job:
-  #   name: End-to-end test
-  #   runs-on: ubuntu-latest
-  #   needs: [client_test_job, server_test_job]
-  #   timeout-minutes: 15
-  #
-  #   steps:
-  #     - name: Checkout repository
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: "22"
-  #         cache: "npm"
-  #         cache-dependency-path: client/package-lock.json
-  #
-  #     - name: Setup Docker Buildx
-  #       uses: docker/setup-buildx-action@v3
-  #
-  #     - name: Start services (API + DB)
-  #       run: docker compose up -d --wait
-  #
-  #     - name: Install client dependencies for e2e
-  #       run: npm clean-install --prefix=client
-  #
-  #     - name: Install Playwright browsers
-  #       run: npx --prefix=client playwright install --with-deps
-  #
-  #     - name: Run e2e tests
-  #       run: npm run e2e --prefix=client
-  #
-  #     - name: Stop services
-  #       if: always()
-  #       run: docker compose down
+      - name: Run tests
+        run: dotnet test DeadPigeons.sln --no-build --configuration Release --verbosity normal
+     
