@@ -7,17 +7,14 @@ import * as path from "node:path";
 export default defineConfig({
     plugins: [react()],
     test: {
-        // Use browser-like DOM implementation
         environment: "happy-dom",
-        // Allow using describe/it/expect without imports
+
         globals: true,
 
-        // Enable code coverage with V8 provider (@vitest/coverage-v8)
+
         coverage: {
-            provider: "v8", // <-- required when using @vitest/coverage-v8
-            // Reporters for local + CI usage
+            provider: "v8",
             reporter: ["text", "json-summary", "json"],
-            // Generate coverage report even if some tests fail
             reportOnFailure: true,
         },
     },

@@ -8,16 +8,13 @@ on:
     branches: ["main"]
 
 jobs:
-  # ============================
-  # Client (React) – lint, build, test + coverage
-  # ============================
   client_test_job:
     name: Client test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
-      contents: read          # потрібно для checkout
-      pull-requests: write    # потрібно для коментаря з coverage у PR
+      contents: read
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -48,6 +45,7 @@ jobs:
         with:
           json-summary-path: "./client/coverage/coverage-summary.json"
           json-final-path: "./client/coverage/coverage-final.json"
+
 
   # ============================
   # Server (.NET) – build & test
