@@ -30,9 +30,10 @@ export default function PlayerDashboardPage() {
     } = usePlayerBoards(isPlayer);
 
     // Filter: show only boards for the current active game, or all history
-    const [filterMode, setFilterMode] = useState<BoardFilterMode>("current");
+    const [filterMode, setFilterMode] =
+        useState<BoardFilterMode>("current");
 
-    // Server already filters out soft-deleted boards, so we can use boards directly
+    // Choose which boards to show based on filterMode and activeGame
     const visibleBoards = useMemo(() => {
         if (filterMode === "all") {
             return boards;
@@ -60,12 +61,16 @@ export default function PlayerDashboardPage() {
         });
     }, [boards, activeGame, filterMode]);
 
-    const handleStopRepeating = async (board: BoardResponseDto) => {
-        // Placeholder: repeating logic will be implemented later
+    // Placeholder handler for stopping repeating boards:
+    // when backend endpoint is ready, this will be replaced with a real API call.
+    const handleStopRepeating = (board: BoardResponseDto) => {
         console.log("Stop repeating board", board.id);
-        toast("Stopping repeating boards will be implemented on the server later.", {
-            icon: "ℹ️",
-        });
+        toast(
+            "Stopping repeating boards will be implemented on the server later.",
+            {
+                icon: "ℹ️",
+            },
+        );
     };
 
     const hasAnyBoards = boards.length > 0;
@@ -81,7 +86,9 @@ export default function PlayerDashboardPage() {
                         </h1>
                         <p className="mt-1 text-sm text-slate-500">
                             Logged in as{" "}
-                            <span className="font-medium">{user?.email}</span>
+                            <span className="font-medium">
+                                {user?.email}
+                            </span>
                         </p>
 
                         <PlayerTabs />
@@ -105,8 +112,8 @@ export default function PlayerDashboardPage() {
                             )}
 
                             <p className="mt-1 text-xs text-slate-500">
-                                Approved MobilePay payments minus the cost of
-                                your boards.
+                                Approved MobilePay payments minus the cost
+                                of your boards.
                             </p>
                         </div>
 
@@ -190,14 +197,17 @@ export default function PlayerDashboardPage() {
                                     value={filterMode}
                                     onChange={(e) =>
                                         setFilterMode(
-                                            e.target.value as BoardFilterMode
+                                            e.target
+                                                .value as BoardFilterMode,
                                         )
                                     }
                                 >
                                     <option value="current">
                                         Current round
                                     </option>
-                                    <option value="all">All history</option>
+                                    <option value="all">
+                                        All history
+                                    </option>
                                 </select>
                             </div>
                         </div>
@@ -210,7 +220,7 @@ export default function PlayerDashboardPage() {
                             <p className="text-sm text-slate-500">
                                 {filterMode === "current"
                                     ? hasAnyBoards
-                                        ? "You have no boards for the current round. Switch to “All history” to see your previous games."
+                                        ? 'You have no boards for the current round. Switch to "All history" to see your previous games.'
                                         : "You have no boards yet. Once you buy a board, it will appear here."
                                     : "You have no boards yet. Once you buy a board, it will appear here."}
                             </p>
@@ -220,16 +230,17 @@ export default function PlayerDashboardPage() {
                                     const created =
                                         b.createdAt &&
                                         new Date(
-                                            b.createdAt
+                                            b.createdAt,
                                         ).toLocaleDateString();
 
                                     const isRepeating = b.repeatActive;
                                     const numbers = [...b.numbers].sort(
-                                        (a, c) => a - c
+                                        (a, c) => a - c,
                                     );
 
                                     const hasGameInfo =
-                                        b.gameWeek > 0 && b.gameYear > 0;
+                                        b.gameWeek > 0 &&
+                                        b.gameYear > 0;
 
                                     return (
                                         <div
@@ -269,7 +280,10 @@ export default function PlayerDashboardPage() {
                                                 <p className="text-xs text-slate-500">
                                                     Price:{" "}
                                                     <span className="font-semibold text-slate-900">
-                                                        {b.price.toFixed(2)} DKK
+                                                        {b.price.toFixed(
+                                                            2,
+                                                        )}{" "}
+                                                        DKK
                                                     </span>
                                                 </p>
 
@@ -296,8 +310,8 @@ export default function PlayerDashboardPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() =>
-                                                            void handleStopRepeating(
-                                                                b
+                                                            handleStopRepeating(
+                                                                b,
                                                             )
                                                         }
                                                         className="rounded-full border border-red-300 px-3 py-1 text-xs font-semibold text-red-700 hover:bg-red-50"

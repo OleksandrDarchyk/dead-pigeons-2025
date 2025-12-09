@@ -21,6 +21,7 @@ export default function Register() {
 
     const [isLoading, setIsLoading] = useState(false);
 
+    // Handles all validation + API call for registration
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
@@ -42,14 +43,14 @@ export default function Register() {
         try {
             setIsLoading(true);
 
-            // Only email + password are sent to the API
+            // Only email + passwords are sent to the API
             await register({
                 email: form.email.trim(),
                 password: form.password,
                 confirmPassword: form.confirmPassword,
             });
 
-            // On success, the hook will log the user in and redirect
+            // On success, the auth hook will log the user in and redirect
         } catch (err) {
             console.error("Registration failed", err);
 
@@ -113,7 +114,13 @@ export default function Register() {
                     Create your Dead Pigeons account
                 </p>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form
+                    // Wrapper keeps React handler type as () => void, and we explicitly ignore the Promise from async handler
+                    onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                        void handleSubmit(e);
+                    }}
+                    className="space-y-5"
+                >
                     <div className="form-control">
                         <label className="label px-0 pb-1">
                             <span className="text-xs font-semibold text-slate-700">
@@ -126,6 +133,7 @@ export default function Register() {
                             placeholder="you@example.com"
                             value={form.email}
                             onChange={(e) => {
+                                // Clear any previous native validation message
                                 e.target.setCustomValidity("");
                                 setForm({
                                     ...form,

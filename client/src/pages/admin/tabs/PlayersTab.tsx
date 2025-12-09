@@ -96,6 +96,7 @@ export default function PlayersTab() {
 
     // Initial load + reload when filters / sorting change
     useEffect(() => {
+        // Explicitly ignore the Promise from loadData in this effect
         void loadData();
     }, [loadData]);
 
@@ -142,8 +143,7 @@ export default function PlayersTab() {
             const trimmedEmail = email.trim();
 
             if (editingPlayerId) {
-                // ✅ Update existing player:
-                // UpdatePlayerRequestDto { id, fullName, email?, phone }
+                // Update existing player
                 await playersApi.updatePlayer({
                     id: editingPlayerId,
                     fullName: trimmedFullName,
@@ -153,8 +153,7 @@ export default function PlayersTab() {
 
                 toast.success("Player updated");
             } else {
-                // ✅ Create new player:
-                // CreatePlayerRequestDto { fullName, email, phone }
+                // Create new player
                 const player = await playersApi.createPlayer({
                     fullName: trimmedFullName,
                     phone: trimmedPhone,
@@ -300,7 +299,10 @@ export default function PlayersTab() {
             {/* Create / Edit Player form */}
             {isFormOpen && (
                 <form
-                    onSubmit={handleSavePlayer}
+                    // Wrap async handler so React gets a sync function and we explicitly ignore the Promise
+                    onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                        void handleSavePlayer(e);
+                    }}
                     className="mb-6 rounded-2xl bg-slate-50 p-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4"
                 >
                     <div className="md:col-span-2">
@@ -493,7 +495,9 @@ export default function PlayersTab() {
                                         <button
                                             type="button"
                                             onClick={() =>
-                                                startEditPlayer(p)
+                                                startEditPlayer(
+                                                    p
+                                                )
                                             }
                                             className="inline-flex items-center rounded-full border border-slate-300 px-3 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"
                                         >
@@ -503,9 +507,12 @@ export default function PlayersTab() {
                                         {/* Activate / Deactivate button */}
                                         <button
                                             type="button"
-                                            onClick={() =>
-                                                toggleActive(p)
-                                            }
+                                            // Wrap async toggleActive in a sync handler and explicitly ignore the Promise
+                                            onClick={() => {
+                                                void toggleActive(
+                                                    p
+                                                );
+                                            }}
                                             className={
                                                 "inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold " +
                                                 (p.isActive

@@ -10,6 +10,7 @@
     { "path": "./src/components/tsconfig.json" },
     { "path": "./src/atoms/tsconfig.json" },
     { "path": "./src/pages/tsconfig.json" },
-    {"path": "./src/hooks/tsconfig.json"}
+    {"path": "./src/hooks/tsconfig.json"},
+    { "path": "./src/tsconfig.json" }
   ]
 }

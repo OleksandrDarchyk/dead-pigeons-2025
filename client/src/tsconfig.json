@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true
+  },
+  "include": [
+    "./main.tsx",
+    "./router.tsx",
+    "./vite-env.d.ts"
+  ]
+}

@@ -9,10 +9,14 @@ import toast from "react-hot-toast";
 
 export default function WinningNumbersTab() {
     // Active game loaded from API
-    const [activeGame, setActiveGame] = useState<GameResponseDto | null>(null);
+    const [activeGame, setActiveGame] = useState<GameResponseDto | null>(
+        null,
+    );
 
     // Last closed game summary (after successful submit)
-    const [summary, setSummary] = useState<GameResultSummaryDto | null>(null);
+    const [summary, setSummary] = useState<GameResultSummaryDto | null>(
+        null,
+    );
 
     // Local state for 3 winning numbers (number or empty string)
     const [n1, setN1] = useState<number | "">("");
@@ -34,13 +38,15 @@ export default function WinningNumbersTab() {
 
     // Load game on first render
     useEffect(() => {
+        // Explicitly ignore the Promise returned by the async loader
         void loadActiveGame();
     }, []);
 
     // Available numbers 1–16
     const numbers = Array.from({ length: 16 }, (_, i) => i + 1);
 
-    const handleSubmit = async (e: FormEvent) => {
+    // Async submit handler: validates and sends winning numbers to the API
+    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
         // Basic client-side validation: all 3 numbers must be selected
@@ -77,8 +83,8 @@ export default function WinningNumbersTab() {
 
             toast.success(
                 `Winning numbers ${result.winningNumbers.join(
-                    ", "
-                )} saved. Game ${result.weekNumber} is now finished.`
+                    ", ",
+                )} saved. Game ${result.weekNumber} is now finished.`,
             );
 
             // Reset local selects
@@ -90,8 +96,8 @@ export default function WinningNumbersTab() {
             await loadActiveGame();
         } catch (err) {
             console.error(err);
-            // Глобальний customFetch покаже текст помилки з сервера,
-            // тут просто резервний тост
+            // Global customFetch already shows the server error message,
+            // this is just a fallback toast in case something else goes wrong
             toast.error("Failed to save winning numbers");
         } finally {
             setIsSaving(false);
@@ -112,7 +118,13 @@ export default function WinningNumbersTab() {
                 {weekLabel ?? "Loading current game..."}
             </p>
 
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form
+                // Wrap async handler so onSubmit receives a void-returning function
+                onSubmit={(e) => {
+                    void handleSubmit(e);
+                }}
+                className="space-y-5"
+            >
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                         <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -125,7 +137,7 @@ export default function WinningNumbersTab() {
                                 setN1(
                                     e.target.value === ""
                                         ? ""
-                                        : Number(e.target.value)
+                                        : Number(e.target.value),
                                 )
                             }
                             disabled={isSaving || !activeGame}
@@ -150,7 +162,7 @@ export default function WinningNumbersTab() {
                                 setN2(
                                     e.target.value === ""
                                         ? ""
-                                        : Number(e.target.value)
+                                        : Number(e.target.value),
                                 )
                             }
                             disabled={isSaving || !activeGame}
@@ -175,7 +187,7 @@ export default function WinningNumbersTab() {
                                 setN3(
                                     e.target.value === ""
                                         ? ""
-                                        : Number(e.target.value)
+                                        : Number(e.target.value),
                                 )
                             }
                             disabled={isSaving || !activeGame}
@@ -208,7 +220,8 @@ export default function WinningNumbersTab() {
             {summary && (
                 <div className="mt-6 rounded-2xl border border-green-100 bg-green-50 p-4 text-xs text-slate-800">
                     <p className="font-semibold text-green-700 mb-1">
-                        Week {summary.weekNumber}, {summary.year} is now closed.
+                        Week {summary.weekNumber}, {summary.year} is now
+                        closed.
                     </p>
                     <p className="mb-1">
                         Winning numbers:{" "}
