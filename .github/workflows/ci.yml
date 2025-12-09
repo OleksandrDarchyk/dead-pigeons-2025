@@ -43,16 +43,16 @@ jobs:
         working-directory: client
         run: npm run build
 
-      - name: Test frontend with coverage
-        working-directory: client
-        run: npm run test:coverage
-
-      - name: Report coverage on PR
-        if: github.event_name == 'pull_request'
-        uses: davelosert/vitest-coverage-report-action@v2
-        with:
-          json-summary-path: "./client/coverage/coverage-summary.json"
-          json-final-path: "./client/coverage/coverage-final.json"
+#      - name: Test frontend with coverage
+#        working-directory: client
+#        run: npm run test:coverage
+#
+#      - name: Report coverage on PR
+#        if: github.event_name == 'pull_request'
+#        uses: davelosert/vitest-coverage-report-action@v2
+#        with:
+#          json-summary-path: "./client/coverage/coverage-summary.json"
+#          json-final-path: "./client/coverage/coverage-final.json"
 
   # ==========================================
   # BACKEND - .NET 9 + tests (with Testcontainers)

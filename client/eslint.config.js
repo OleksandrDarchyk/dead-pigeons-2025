@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-    // Ignore build output and dependencies
+    // Ігноруємо зібраний код і залежності
     globalIgnores(['dist', 'node_modules']),
 
     {
@@ -16,40 +16,52 @@ export default defineConfig([
             ecmaVersion: 2020,
             sourceType: 'module',
             globals: globals.browser,
+            parserOptions: {
+
+                project: [
+                    './tsconfig.node.json',
+                    './src/core/tsconfig.json',
+                    './src/utilities/tsconfig.json',
+                    './src/components/tsconfig.json',
+                    './src/atoms/tsconfig.json',
+                    './src/pages/tsconfig.json',
+                    './src/hooks/tsconfig.json',
+                    './src/tsconfig.json',
+
+                ],
+                tsconfigRootDir: import.meta.dirname,
+            },
         },
 
-        // Plugins must be OBJECTS in flat config
         plugins: {
             'react-hooks': reactHooks,
             'react-refresh': reactRefresh,
         },
 
-        // Base recommended configs for JS + TypeScript
         extends: [
             js.configs.recommended,
-            ...tseslint.configs.recommended,
-            // IMPORTANT: do NOT include reactHooks.configs[...] or reactRefresh.configs.vite here
+
+            ...tseslint.configs.recommendedTypeChecked,
+
+            // ...tseslint.configs.strictTypeChecked,
+            // ...tseslint.configs.stylisticTypeChecked,
         ],
 
         rules: {
-            // Let TypeScript handle undefined variables
             'no-undef': 'off',
 
-            // Disable base rule and use TS-aware version
             'no-unused-vars': 'off',
             '@typescript-eslint/no-unused-vars': [
                 'warn',
                 {
-                    argsIgnorePattern: '^_', // ignore arguments starting with "_"
-                    varsIgnorePattern: '^_', // ignore variables starting with "_"
+                    argsIgnorePattern: '^_',
+                    varsIgnorePattern: '^_',
                 },
             ],
 
-            // React hooks rules
             'react-hooks/rules-of-hooks': 'error',
             'react-hooks/exhaustive-deps': 'warn',
 
-            // Not required in modern React (React 17+ / Vite)
             'react/react-in-jsx-scope': 'off',
         },
     },

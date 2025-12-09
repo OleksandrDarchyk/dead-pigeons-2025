@@ -17,8 +17,8 @@ export default function BoardsStatsTab() {
     // All games history (active + finished + scheduled)
     const [games, setGames] = useState<GameResponseDto[]>([]);
 
-    // Id of the game selected in the dropdown
-    const [selectedGameId, setSelectedGameId] = useState<string | "">("");
+    // Selected game id for the dropdown (empty string means "nothing selected yet")
+    const [selectedGameId, setSelectedGameId] = useState<string>("");
 
     // Currently selected game (derived from games + selectedGameId)
     const selectedGame: GameResponseDto | null =
@@ -44,7 +44,7 @@ export default function BoardsStatsTab() {
                 setGames(Array.isArray(allGames) ? allGames : []);
 
                 // Pick initial game:
-                // Prefer the active game, otherwise the newest one
+                // Prefer the active game, otherwise the first in the list
                 if (allGames.length > 0) {
                     const active = allGames.find((g) => g.isActive);
                     const initial = active ?? allGames[0];
@@ -62,6 +62,7 @@ export default function BoardsStatsTab() {
             }
         };
 
+        // Explicitly ignore the Promise in effect
         void loadGamesAndPlayers();
     }, []);
 
@@ -78,7 +79,9 @@ export default function BoardsStatsTab() {
                 const boardsForGame = await boardsApi.getBoardsForGame(
                     selectedGameId,
                 );
-                setBoards(Array.isArray(boardsForGame) ? boardsForGame : []);
+                setBoards(
+                    Array.isArray(boardsForGame) ? boardsForGame : [],
+                );
             } catch (err) {
                 console.error(err);
                 toast.error("Failed to load boards for selected game");
@@ -88,6 +91,7 @@ export default function BoardsStatsTab() {
             }
         };
 
+        // Explicitly ignore the Promise in effect
         void loadBoardsForGame();
     }, [selectedGameId]);
 
@@ -108,7 +112,8 @@ export default function BoardsStatsTab() {
         const totalPlayersInGame = playersInGame.size;
 
         const activeBoards = boards.length;
-        const repeatingBoards = boards.filter((b) => b.repeatActive).length;
+        const repeatingBoards = boards.filter((b) => b.repeatActive)
+            .length;
         const winningBoards = boards.filter((b) => b.isWinning).length;
 
         // Sum of board prices for this game
@@ -169,8 +174,12 @@ export default function BoardsStatsTab() {
                         <select
                             className="select select-bordered w-full md:w-64 text-sm bg-slate-50"
                             value={selectedGameId}
-                            onChange={(e) => setSelectedGameId(e.target.value)}
-                            disabled={isLoadingGames || games.length === 0}
+                            onChange={(e) =>
+                                setSelectedGameId(e.target.value)
+                            }
+                            disabled={
+                                isLoadingGames || games.length === 0
+                            }
                         >
                             {games.length === 0 && (
                                 <option value="">No games found</option>
@@ -243,7 +252,8 @@ export default function BoardsStatsTab() {
                                     {stats.winningBoards}
                                 </p>
                                 <p className="mt-0.5 text-[11px] text-emerald-700">
-                                    Boards that matched all 3 winning numbers.
+                                    Boards that matched all 3 winning
+                                    numbers.
                                 </p>
                             </div>
 
@@ -277,7 +287,9 @@ export default function BoardsStatsTab() {
                 </p>
 
                 {isLoading ? (
-                    <p className="text-sm text-slate-500">Loading boards...</p>
+                    <p className="text-sm text-slate-500">
+                        Loading boards...
+                    </p>
                 ) : !selectedGame ? (
                     <p className="text-sm text-slate-500">
                         Select a game to see its boards.
@@ -292,7 +304,9 @@ export default function BoardsStatsTab() {
                             const playerName = getPlayerName(b);
                             const created =
                                 b.createdAt &&
-                                new Date(b.createdAt).toLocaleDateString();
+                                new Date(
+                                    b.createdAt,
+                                ).toLocaleDateString();
 
                             const isRepeating = b.repeatActive;
                             const isWinning = b.isWinning;

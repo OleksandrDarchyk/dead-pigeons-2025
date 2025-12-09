@@ -15,6 +15,7 @@ export default function Login() {
 
     const [isLoading, setIsLoading] = useState(false);
 
+    // Async submit handler: validates form, calls global login hook and shows errors
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
@@ -96,7 +97,12 @@ export default function Login() {
                     Jerne IF Lottery Login
                 </p>
 
-                <form onSubmit={handleSubmit} className="space-y-5">
+                <form
+                    onSubmit={(e: FormEvent<HTMLFormElement>) => {
+                        void handleSubmit(e);
+                    }}
+                    className="space-y-5"
+                >
                     <div className="form-control">
                         <label className="label px-0 pb-1">
                             <span className="text-xs font-semibold text-slate-700">

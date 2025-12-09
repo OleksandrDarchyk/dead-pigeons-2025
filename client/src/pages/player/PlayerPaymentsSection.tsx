@@ -1,13 +1,27 @@
+// client/src/pages/player/PlayerPaymentsSection.tsx
 import { usePlayerPayments } from "../../hooks/usePlayerPayments";
 import type { FormEvent } from "react";
 
 export default function PlayerPaymentsSection() {
-    const { payments, isLoading, isSaving, form, setForm, submitPayment } =
-        usePlayerPayments();
+    // Custom hook for player payments:
+    // keeps the list, the form state and the submit logic in one place
+    const {
+        payments,
+        isLoading,
+        isSaving,
+        form,
+        setForm,
+        submitPayment,
+    } = usePlayerPayments();
 
-    const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
+    // Form submit handler:
+    // - prevent default browser navigation
+    // - call async submitPayment() from the hook
+    // We keep this function NON-async and use `void` so ESLint
+    // does not complain about a Promise-returning handler.
+    const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        await submitPayment();
+        void submitPayment();
     };
 
     return (
@@ -29,6 +43,7 @@ export default function PlayerPaymentsSection() {
                 className="mb-6 grid gap-3 md:grid-cols-[1fr,1fr,auto]"
             >
                 <input
+                    // Amount is kept as string in form state and validated in the hook
                     type="text"
                     className="input input-bordered w-full text-sm bg-slate-50"
                     placeholder="Amount (DKK)"
@@ -42,6 +57,7 @@ export default function PlayerPaymentsSection() {
                 />
 
                 <input
+                    // MobilePay number as free text (validated on the server side)
                     type="text"
                     className="input input-bordered w-full text-sm bg-slate-50"
                     placeholder="MobilePay number"
@@ -65,7 +81,9 @@ export default function PlayerPaymentsSection() {
 
             {/* Payments list */}
             {isLoading ? (
-                <p className="text-sm text-slate-500">Loading payments...</p>
+                <p className="text-sm text-slate-500">
+                    Loading payments...
+                </p>
             ) : payments.length === 0 ? (
                 <p className="text-sm text-slate-500">
                     You have no payments yet.
@@ -76,14 +94,16 @@ export default function PlayerPaymentsSection() {
                         <thead>
                         <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
                             <th className="py-2 pr-4">Amount</th>
-                            <th className="py-2 pr-4">MobilePay #</th>
+                            <th className="py-2 pr-4">
+                                MobilePay #
+                            </th>
                             <th className="py-2 pr-4">Status</th>
                             <th className="py-2 pr-4">Date</th>
                         </tr>
                         </thead>
                         <tbody>
                         {payments.map((tx) => {
-                            // ✅ createdAt з API, форматування в локальну дату
+                            // createdAt comes from the API; format as local date
                             const date =
                                 tx.createdAt &&
                                 new Date(

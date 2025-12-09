@@ -49,14 +49,17 @@ export function usePlayerHistory(enabled: boolean = true) {
                     let existing = groupedByGame.get(gameId);
 
                     if (!existing) {
+                        // Build a lightweight GameResponseDto from the history item
                         const game: GameResponseDto = {
-                            id: entry.gameId!,
+                            id: entry.gameId, // non-null assertion removed (not needed for the type)
                             weekNumber: entry.weekNumber ?? 0,
                             year: entry.year ?? 0,
-                            winningNumbers: entry.winningNumbers ?? undefined,
+                            winningNumbers:
+                                entry.winningNumbers ?? undefined,
                             isActive: false,
                             createdAt: undefined,
-                            closedAt: entry.gameClosedAt ?? undefined,
+                            closedAt:
+                                entry.gameClosedAt ?? undefined,
                         };
 
                         existing = { game, boards: [] };
@@ -69,10 +72,14 @@ export function usePlayerHistory(enabled: boolean = true) {
                 const groupedArray: GameHistoryItem[] = Array.from(
                     groupedByGame.values()
                 ).sort((a, b) => {
-                    const yearDiff = (b.game.year ?? 0) - (a.game.year ?? 0);
+                    const yearDiff =
+                        (b.game.year ?? 0) - (a.game.year ?? 0);
                     if (yearDiff !== 0) return yearDiff;
 
-                    return (b.game.weekNumber ?? 0) - (a.game.weekNumber ?? 0);
+                    return (
+                        (b.game.weekNumber ?? 0) -
+                        (a.game.weekNumber ?? 0)
+                    );
                 });
 
                 setItems(groupedArray);
@@ -89,16 +96,19 @@ export function usePlayerHistory(enabled: boolean = true) {
                                 title?: string;
                                 detail?: string;
                             };
-                            problemTitle = parsed?.title ?? parsed?.detail;
+                            problemTitle =
+                                parsed?.title ?? parsed?.detail;
                         }
                     } catch {
-                        // ignore JSON parse errors
+                        // Ignore JSON parse errors
                     }
 
                     // Domain case: user is logged in, but there is no Player for this email
                     if (
                         problemTitle &&
-                        problemTitle.includes("Player not found for the current user.")
+                        problemTitle.includes(
+                            "Player not found for the current user.",
+                        )
                     ) {
                         setItems([]);
                         setIsNotPlayer(true);
@@ -117,6 +127,7 @@ export function usePlayerHistory(enabled: boolean = true) {
             }
         };
 
+        // Explicitly ignore the Promise returned by load in effect
         void load();
     }, [enabled]);
 

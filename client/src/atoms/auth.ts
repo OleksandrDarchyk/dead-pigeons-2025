@@ -1,3 +1,5 @@
+// src/atoms/auth.ts
+
 import { atom } from "jotai";
 import { atomWithStorage, createJSONStorage } from "jotai/utils";
 import { useAtom } from "jotai";
@@ -5,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { authApi } from "../utilities/authApi";
 import type { JwtClaims } from "@core/generated-client";
 
+// Simple DTOs for login / register data
 export type LoginCredentials = {
     email: string;
     password: string;
@@ -18,23 +21,24 @@ export type RegisterCredentials = {
 
 export const TOKEN_KEY = "jwt";
 
-// Safe choice for exams: sessionStorage (prevents long-term token theft)
+// Store token only in sessionStorage (safer for exams than localStorage)
 const tokenStorage = createJSONStorage<string | null>(() => sessionStorage);
 
-// JWT is kept in sessionStorage and loaded via atomWithStorage
+// Atom that keeps JWT in storage and in memory
 export const jwtAtom = atomWithStorage<string | null>(
     TOKEN_KEY,
     null,
     tokenStorage
 );
 
-// A derived atom: loads user info only when token exists
+// Derived atom: when we have token -> load current user via WhoAmI
 export const userAtom = atom(async (get): Promise<JwtClaims | null> => {
     const token = get(jwtAtom);
     if (!token) return null;
 
     try {
-        const me = await authApi.whoAmI(); // now uses customFetch -> token sent correctly
+        // Custom client already adds Authorization header
+        const me = await authApi.whoAmI();
         return me;
     } catch (err) {
         console.error("Failed to load user via WhoAmI", err);
@@ -42,45 +46,60 @@ export const userAtom = atom(async (get): Promise<JwtClaims | null> => {
     }
 });
 
-// Exposed hook for UI
+// Hook that UI components can use for auth
 export const useAuth = () => {
     const [token, setToken] = useAtom(jwtAtom);
     const [user] = useAtom(userAtom);
     const navigate = useNavigate();
 
-    const login = async (creds: LoginCredentials) => {
+    // Login + redirect based on role
+    const login = async (creds: LoginCredentials): Promise<void> => {
         const result = await authApi.login(creds);
 
-        // 1) Save token
+        // 1) Save token (Jotai + sessionStorage)
         setToken(result.token);
 
-        // 2) Load user
+        // 2) Try to load user and redirect
         try {
             const me = await authApi.whoAmI();
-            if (me.role === "Admin") navigate("/admin");
-            else navigate("/player");
+
+            if (me.role === "Admin") {
+                // Await so we don't leave a "floating" promise
+                await navigate("/admin");
+            } else {
+                await navigate("/player");
+            }
         } catch {
-            navigate("/login");
+            // If something goes wrong – send user back to login
+            await navigate("/login");
         }
     };
 
-    const register = async (creds: RegisterCredentials) => {
+    // Register behaves like login (token + redirect)
+    const register = async (creds: RegisterCredentials): Promise<void> => {
         const result = await authApi.register(creds);
 
+        // Save token from register response
         setToken(result.token);
 
         try {
             const me = await authApi.whoAmI();
-            if (me.role === "Admin") navigate("/admin");
-            else navigate("/player");
+
+            if (me.role === "Admin") {
+                await navigate("/admin");
+            } else {
+                await navigate("/player");
+            }
         } catch {
-            navigate("/login");
+            await navigate("/login");
         }
     };
 
-    const logout = () => {
-        setToken(null); // removes from sessionStorage
-        navigate("/login");
+    // Simple logout: clear token and go to login page
+    const logout = (): void => {
+        setToken(null); // Remove from atom + sessionStorage
+        // We intentionally ignore possible Promise from navigate
+        void navigate("/login");
     };
 
     return { token, user, login, register, logout };
