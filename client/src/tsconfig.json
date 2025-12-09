@@ -1,11 +1,27 @@
 {
-  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "composite": true
+    "composite": true,
+    "jsx": "react-jsx",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "target": "ESNext",
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "types": ["vite/client"],
+
+    // For import aliases like @core/..., @utilities/..., @atoms/...
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["core/*"],
+      "@utilities/*": ["utilities/*"],
+      "@atoms/*": ["atoms/*"],
+      "@components/*": ["components/*"],
+      "@pages/*": ["pages/*"],
+      "@hooks/*": ["hooks/*"]
+    }
   },
-  "include": [
-    "./main.tsx",
-    "./router.tsx",
-    "./vite-env.d.ts"
-  ]
+
+  "include": ["**/*"]
 }
