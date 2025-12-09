@@ -43,9 +43,9 @@ jobs:
         working-directory: client
         run: npm run build
 
-#      - name: Test frontend with coverage
-#        working-directory: client
-#        run: npm run test:coverage
+      - name: Test frontend with coverage
+        working-directory: client
+        run: npm run test:coverage
 
       - name: Report coverage on PR
         if: github.event_name == 'pull_request'
