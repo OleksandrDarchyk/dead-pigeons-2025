@@ -10,8 +10,6 @@
     "noEmit": true,
     "strict": true,
     "types": ["vite/client"],
-
-    // For import aliases like @core/..., @utilities/..., @atoms/...
     "baseUrl": ".",
     "paths": {
       "@core/*": ["core/*"],
@@ -20,8 +18,8 @@
       "@components/*": ["components/*"],
       "@pages/*": ["pages/*"],
       "@hooks/*": ["hooks/*"]
-    }
+    },
+    "skipLibCheck": true
   },
-
   "include": ["**/*"]
 }
