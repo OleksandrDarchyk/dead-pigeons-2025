@@ -89,12 +89,20 @@ public class Program
         services.AddCors();
 
         // Application services
+        // Application services
         services.AddScoped<IAuthService, AuthService>();
+
+        // ISeeder here is mainly for tests (they inject ISeeder).
+        // In Development we will explicitly use SieveDevSeeder in Program.ConfigureApp.
         services.AddScoped<ISeeder, SieveTestSeeder>();
+
+        services.AddScoped<SieveDevSeeder>(); // Dev seeder for local runs
+
         services.AddScoped<IPlayerService, PlayerService>();
         services.AddScoped<IGameService, GameService>();
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<ITransactionService, TransactionService>();
+
 
         // Password hasher (Argon2id)
         services.AddScoped<IPasswordHasher<User>, NSecArgon2idPasswordHasher>();
@@ -184,18 +192,19 @@ public class Program
 
         // Dev-only: generate TypeScript client and seed the database
         // Dev-only: generate TypeScript client and seed the database
+        // Dev-only: generate TypeScript client and seed the database
         if (app.Environment.IsDevelopment())
         {
-          
             app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts")
                 .GetAwaiter()
                 .GetResult();
 
-            // ❌ Disabled seeding to prevent data loss during development
+            // Use Dev seeder here so we do NOT wipe the database on each run.
             using var scope = app.Services.CreateScope();
-            var seeder = scope.ServiceProvider.GetRequiredService<ISeeder>();
-            seeder.Seed().GetAwaiter().GetResult();
+            var devSeeder = scope.ServiceProvider.GetRequiredService<SieveDevSeeder>();
+            devSeeder.Seed().GetAwaiter().GetResult();
         }
+
 
     }
 }

@@ -37,22 +37,27 @@ public class BoardServiceTests(
     /// </summary>
     private async Task<Game> CreateUniqueGame(bool isActive = true)
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Use random year/week to avoid collisions on (Year, Weeknumber, IsActive) constraints
-        var random = new Random();
-        var year = now.Year + random.Next(0, 10);
-        var weekNumber = random.Next(1, 52);
+        var year = now.Year + 20;
+
+        var existingWeeks = await ctx.Games
+            .Where(g => g.Year == year)
+            .Select(g => g.Weeknumber)
+            .ToListAsync(ct);
+
+        var weekNumber = Enumerable.Range(1, 52)
+            .First(w => !existingWeeks.Contains(w));
 
         var game = new Game
         {
-            Id = Guid.NewGuid().ToString(),
-            Year = year,
+            Id        = Guid.NewGuid().ToString(),
+            Year      = year,
             Weeknumber = weekNumber,
-            Isactive = isActive,
+            Isactive  = isActive,
             Createdat = now,
-            Closedat = null,
+            Closedat  = null,
             Deletedat = null
         };
 
@@ -60,6 +65,7 @@ public class BoardServiceTests(
         await ctx.SaveChangesAsync(ct);
         return game;
     }
+
 
     /// <summary>
     /// Helper to create a unique player.
