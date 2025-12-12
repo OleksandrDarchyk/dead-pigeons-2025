@@ -36,12 +36,12 @@ public static class SeedData
         {
             admin = new User
             {
-                // You already used this fixed Id before, keep it for consistency
-                Id = "cbeaed9a-1466-4763-a3c9-3b10a26cf081",
-                Email = adminEmail,
-                Role = "Admin",
+                // Keep fixed Id for consistency with existing data and tests
+                Id        = "cbeaed9a-1466-4763-a3c9-3b10a26cf081",
+                Email     = adminEmail,
+                Role      = "Admin",
                 Createdat = now,
-                Salt = string.Empty
+                Salt      = string.Empty
             };
             admin.Passwordhash = passwordHasher.HashPassword(admin, "Password123");
 
@@ -58,11 +58,11 @@ public static class SeedData
         {
             playerUser = new User
             {
-                Id = Guid.NewGuid().ToString(),
-                Email = playerEmail,
-                Role = "User",
+                Id        = Guid.NewGuid().ToString(),
+                Email     = playerEmail,
+                Role      = "User",
                 Createdat = now,
-                Salt = string.Empty
+                Salt      = string.Empty
             };
             playerUser.Passwordhash = passwordHasher.HashPassword(playerUser, "Password123");
 
@@ -79,11 +79,11 @@ public static class SeedData
         {
             testUser = new User
             {
-                Id = Guid.NewGuid().ToString(),
-                Email = testUserEmail,
-                Role = "User",
+                Id        = Guid.NewGuid().ToString(),
+                Email     = testUserEmail,
+                Role      = "User",
                 Createdat = now,
-                Salt = string.Empty
+                Salt      = string.Empty
             };
             testUser.Passwordhash = passwordHasher.HashPassword(testUser, "Password123");
 
@@ -103,14 +103,14 @@ public static class SeedData
         {
             player = new Player
             {
-                Id = Guid.NewGuid().ToString(),
-                Fullname = "Test Player",
-                Email = playerEmail, // must match User.Email
-                Phone = "12345678",
-                Isactive = true,
+                Id          = Guid.NewGuid().ToString(),
+                Fullname    = "Test Player",
+                Email       = playerEmail, // must match User.Email
+                Phone       = "12345678",
+                Isactive    = true,
                 Activatedat = now,
-                Createdat = now,
-                Deletedat = null
+                Createdat   = now,
+                Deletedat   = null
             };
             ctx.Players.Add(player);
             await ctx.SaveChangesAsync();
@@ -125,29 +125,46 @@ public static class SeedData
 
         if (!await ctx.Games.AnyAsync())
         {
-            // If there are no games yet, create a past game (week 47) and an active game (week 48)
+            // When there are no games yet, we create:
+            // - one past game (previous ISO week)
+            // - one active game (future ISO week)
+            //
+            // Important:
+            // We intentionally pick an active game in the future (now + 14 days),
+            // so that the "Saturday 17:00 Danish time" cutoff in BoardService
+            // will NOT block buying boards in local development.
+
+            var referenceDate = now.AddDays(14);      // ~ two weeks in the future
+            var pastDate      = referenceDate.AddDays(-7); // previous ISO week
+
+            var activeYear = System.Globalization.ISOWeek.GetYear(referenceDate);
+            var activeWeek = System.Globalization.ISOWeek.GetWeekOfYear(referenceDate);
+
+            var pastYear = System.Globalization.ISOWeek.GetYear(pastDate);
+            var pastWeek = System.Globalization.ISOWeek.GetWeekOfYear(pastDate);
+
             pastGame = new Game
             {
-                Id = Guid.NewGuid().ToString(),
-                Weeknumber = 47,
-                Year = 2025,
-                Isactive = false,
-                Createdat = now.AddDays(-14),
-                Closedat = now.AddDays(-7),
-                Deletedat = null,
+                Id             = Guid.NewGuid().ToString(),
+                Weeknumber     = pastWeek,
+                Year           = pastYear,
+                Isactive       = false,
+                Createdat      = pastDate.AddDays(-7),
+                Closedat       = pastDate,
+                Deletedat      = null,
                 Winningnumbers = new List<int> { 1, 5, 9 }
             };
             ctx.Games.Add(pastGame);
 
             activeGame = new Game
             {
-                Id = Guid.NewGuid().ToString(),
-                Weeknumber = 48,
-                Year = 2025,
-                Isactive = true,
-                Createdat = now,
-                Closedat = null,
-                Deletedat = null,
+                Id             = Guid.NewGuid().ToString(),
+                Weeknumber     = activeWeek,
+                Year           = activeYear,
+                Isactive       = true,
+                Createdat      = referenceDate,
+                Closedat       = null,
+                Deletedat      = null,
                 Winningnumbers = null
             };
             ctx.Games.Add(activeGame);
@@ -171,6 +188,33 @@ public static class SeedData
                     .OrderByDescending(g => g.Createdat)
                     .FirstAsync();
         }
+        // ============================
+        // DEBUG / DEMO: cutoff rule (DEV only)
+        // ============================
+        //  IMPORTANT:
+        // This block is ONLY for manual testing in Development.
+        // If you want to simulate that the deadline (Saturday 17:00 Danish time)
+        // is already over for the ACTIVE game, you can temporarily uncomment this.
+        //
+        // When enabled, it forces the active game to be in the past
+        // (for example ISO week 1 of year 2020), so the BoardService
+        // will always throw the "You can no longer join this week's game..."
+        // validation error when trying to buy a board for the active game.
+        //
+        // Remember to comment it back before committing / deploying.
+        //and also commit part in DevSeeder.cs
+        //cd server
+        // docker compose down -v
+        // docker compose up -d
+        //dotnet run 
+        // 
+        // #if DEBUG
+        // activeGame.Year = 2020;
+        // activeGame.Weeknumber = 1;
+        // ctx.Games.Update(activeGame);
+        // await ctx.SaveChangesAsync();
+        // #endif
+
 
         // ============================
         // FUTURE GAMES (state-less API tip)
@@ -185,15 +229,15 @@ public static class SeedData
         var existingSet = new HashSet<(int year, int week)>(
             existingKeys.Select(x => (x.Year, x.Weeknumber)));
 
-        var yearCursor = activeGame.Year;
-        var weekCursor = activeGame.Weeknumber;
+        var yearCursor    = activeGame.Year;
+        var weekCursor    = activeGame.Weeknumber;
         var createdCursor = activeGame.Createdat ?? now;
 
         const int weeksToCreate = 20 * 52; // about 20 years
 
         for (var i = 0; i < weeksToCreate; i++)
         {
-            // go to next week
+            // move to the next week
             if (weekCursor < 52)
             {
                 weekCursor++;
@@ -213,13 +257,13 @@ public static class SeedData
 
             var futureGame = new Game
             {
-                Id = Guid.NewGuid().ToString(),
-                Weeknumber = weekCursor,
-                Year = yearCursor,
-                Isactive = false,
-                Createdat = createdCursor,
-                Closedat = null,
-                Deletedat = null,
+                Id             = Guid.NewGuid().ToString(),
+                Weeknumber     = weekCursor,
+                Year           = yearCursor,
+                Isactive       = false,
+                Createdat      = createdCursor,
+                Closedat       = null,
+                Deletedat      = null,
                 Winningnumbers = null
             };
 
@@ -239,14 +283,14 @@ public static class SeedData
         {
             var approvedTransaction = new Transaction
             {
-                Id = Guid.NewGuid().ToString(),
-                Playerid = player.Id,
+                Id              = Guid.NewGuid().ToString(),
+                Playerid        = player.Id,
                 Mobilepaynumber = approvedMp,
-                Amount = 200, // DKK
-                Status = "Approved",
-                Createdat = now.AddMinutes(-30),
-                Approvedat = now.AddMinutes(-20),
-                Deletedat = null
+                Amount          = 200, // DKK
+                Status          = "Approved",
+                Createdat       = now.AddMinutes(-30),
+                Approvedat      = now.AddMinutes(-20),
+                Deletedat       = null
             };
             ctx.Transactions.Add(approvedTransaction);
         }
@@ -257,14 +301,14 @@ public static class SeedData
         {
             var pendingTransaction = new Transaction
             {
-                Id = Guid.NewGuid().ToString(),
-                Playerid = player.Id,
+                Id              = Guid.NewGuid().ToString(),
+                Playerid        = player.Id,
                 Mobilepaynumber = pendingMp,
-                Amount = 100,
-                Status = "Pending",
-                Createdat = now.AddMinutes(-10),
-                Approvedat = null,
-                Deletedat = null
+                Amount          = 100,
+                Status          = "Pending",
+                Createdat       = now.AddMinutes(-10),
+                Approvedat      = null,
+                Deletedat       = null
             };
             ctx.Transactions.Add(pendingTransaction);
         }
@@ -285,16 +329,16 @@ public static class SeedData
 
             var pastWinningBoard = new Board
             {
-                Id = Guid.NewGuid().ToString(),
-                Playerid = player.Id,
-                Gameid = pastGame.Id,
-                Numbers = new List<int>(winningNumbers) { 10, 11 }, // includes all winning numbers
-                Price = 20,
-                Iswinning = true,
-                Repeatweeks = 0,
+                Id           = Guid.NewGuid().ToString(),
+                Playerid     = player.Id,
+                Gameid       = pastGame.Id,
+                Numbers      = new List<int>(winningNumbers) { 10, 11 }, // includes all winning numbers
+                Price        = 20,
+                Iswinning    = true,
+                Repeatweeks  = 0,
                 Repeatactive = false,
-                Createdat = now.AddDays(-10),
-                Deletedat = null
+                Createdat    = now.AddDays(-10),
+                Deletedat    = null
             };
             ctx.Boards.Add(pastWinningBoard);
         }
@@ -307,30 +351,30 @@ public static class SeedData
         {
             var activeBoard1 = new Board
             {
-                Id = Guid.NewGuid().ToString(),
-                Playerid = player.Id,
-                Gameid = activeGame.Id,
-                Numbers = new List<int> { 1, 2, 3, 4, 5 }, // 5 numbers
-                Price = 20,
-                Iswinning = false,
-                Repeatweeks = 0,
+                Id           = Guid.NewGuid().ToString(),
+                Playerid     = player.Id,
+                Gameid       = activeGame.Id,
+                Numbers      = new List<int> { 1, 2, 3, 4, 5 }, // 5 numbers
+                Price        = 20,
+                Iswinning    = false,
+                Repeatweeks  = 0,
                 Repeatactive = false,
-                Createdat = now,
-                Deletedat = null
+                Createdat    = now,
+                Deletedat    = null
             };
 
             var activeBoard2 = new Board
             {
-                Id = Guid.NewGuid().ToString(),
-                Playerid = player.Id,
-                Gameid = activeGame.Id,
-                Numbers = new List<int> { 3, 6, 9, 12, 14, 16 }, // 6 numbers
-                Price = 40,
-                Iswinning = false,
-                Repeatweeks = 1,
+                Id           = Guid.NewGuid().ToString(),
+                Playerid     = player.Id,
+                Gameid       = activeGame.Id,
+                Numbers      = new List<int> { 3, 6, 9, 12, 14, 16 }, // 6 numbers
+                Price        = 40,
+                Iswinning    = false,
+                Repeatweeks  = 1,
                 Repeatactive = true,
-                Createdat = now,
-                Deletedat = null
+                Createdat    = now,
+                Deletedat    = null
             };
 
             ctx.Boards.AddRange(activeBoard1, activeBoard2);

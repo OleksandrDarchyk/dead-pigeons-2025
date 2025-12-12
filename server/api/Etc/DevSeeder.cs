@@ -20,12 +20,14 @@ public class DevSeeder(
         await ctx.Database.EnsureCreatedAsync();
 
         // If there is at least one user, we assume the database is already initialized.
+        // if check 17:00 not create game we need to commit this part from this to
         var hasAnyUsers = await ctx.Users.AnyAsync();
         if (hasAnyUsers)
         {
             // Dev seeder should be safe: do not touch or modify existing data.
             return;
         }
+        // End of check 17:00
 
         // Seed the shared core data (users, players, games, transactions, boards).
         // This uses the same core logic as the Test seeder (TestSeeder),
