@@ -6,9 +6,9 @@ namespace api.Etc;
 
 /// <summary>
 /// Seeder used ONLY for tests.
-/// It always starts from a clean database and then calls the shared SieveSeedData.
+/// It always starts from a clean database and then calls the shared SeedData.
 /// </summary>
-public class SieveTestSeeder(
+public class TestSeeder(
     MyDbContext ctx,
     TimeProvider timeProvider,
     IPasswordHasher<User> passwordHasher) : ISeeder
@@ -29,6 +29,6 @@ public class SieveTestSeeder(
         await ctx.SaveChangesAsync();
 
         // Re-use shared seed logic so Dev and Tests have the same basic data.
-        await SieveSeedData.SeedCoreAsync(ctx, timeProvider, passwordHasher);
+        await SeedData.SeedCoreAsync(ctx, timeProvider, passwordHasher);
     }
 }

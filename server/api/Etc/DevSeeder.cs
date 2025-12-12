@@ -9,7 +9,7 @@ namespace api.Etc;
 /// Seeder used in Development environment.
 /// It does NOT clear the database. It only seeds once when the DB is empty.
 /// </summary>
-public class SieveDevSeeder(
+public class DevSeeder(
     MyDbContext ctx,
     TimeProvider timeProvider,
     IPasswordHasher<User> passwordHasher) : ISeeder
@@ -28,8 +28,8 @@ public class SieveDevSeeder(
         }
 
         // Seed the shared core data (users, players, games, transactions, boards).
-        // This uses the same core logic as the Test seeder (SieveTestSeeder),
+        // This uses the same core logic as the Test seeder (TestSeeder),
         // so Dev and Tests work with the same data model and examples.
-        await SieveSeedData.SeedCoreAsync(ctx, timeProvider, passwordHasher);
+        await SeedData.SeedCoreAsync(ctx, timeProvider, passwordHasher);
     }
 }

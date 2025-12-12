@@ -13,7 +13,7 @@ namespace api.Etc;
 /// Shared seed logic used by both Dev and Test seeders.
 /// This class does NOT clear the database and is designed to be idempotent.
 /// </summary>
-public static class SieveSeedData
+public static class SeedData
 {
     public static async Task SeedCoreAsync(
         MyDbContext ctx,

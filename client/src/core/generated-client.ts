@@ -1164,14 +1164,6 @@ export interface PlayerBalanceResponseDto {
     balance: number;
 }
 
-/** String constants from SieveConstants */
-export interface SieveConstants {
-}
-
-/** Constant values for SieveConstants */
-export const SieveConstants = {
-} as const;
-
 export class ApiException extends Error {
     override message: string;
     status: number;
