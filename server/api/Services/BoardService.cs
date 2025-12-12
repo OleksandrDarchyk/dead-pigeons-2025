@@ -1,5 +1,6 @@
 // api/Services/BoardService.cs
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Security.Claims;
 using api.Models.Requests;
 using dataccess;
@@ -23,6 +24,8 @@ public class BoardService(
     /// Important business rules:
     /// - Only ACTIVE players can buy boards.
     /// - Boards can only be bought for ACTIVE games (not closed, not deleted).
+    /// - Boards can only be bought until Saturday 17:00 Danish local time
+    ///   for the corresponding game week.
     /// - Price is calculated on the server based on the number of numbers:
     ///     5 -> 20, 6 -> 40, 7 -> 80, 8 -> 160.
     /// - Balance check:
@@ -103,6 +106,29 @@ public class BoardService(
             throw new ValidationException("Cannot buy boards for an inactive game.");
         }
 
+        // Business rule: players may only join the game until
+        // Saturday 17:00 Danish local time (for this game's week/year).
+        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var dkZone = GetDanishTimeZone();
+        var nowDk = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, dkZone);
+
+        // ISO week start (Monday) for this game (year + weekNumber)
+        // We treat it as Danish local date.
+        var weekStartDk = ISOWeek.ToDateTime(game.Year, game.Weeknumber, DayOfWeek.Monday);
+
+        // Saturday of this ISO week at 17:00 Danish local time
+        var saturdayDeadlineDk = weekStartDk
+            .AddDays(5)          // Monday + 5 days = Saturday
+            .AddHours(17);       // 17:00 (5 PM)
+
+        // "Until 5 o'clock" means 16:59:59 is allowed, 17:00:00 is not.
+        if (nowDk >= saturdayDeadlineDk)
+        {
+            throw new ValidationException(
+                "You can no longer join this week's game. " +
+                "The deadline is Saturday at 17:00 Danish local time.");
+        }
+
         // Price is calculated on the server based on number of fields
         var count = sortedNumbers.Length;
         var weeklyPrice = count switch
@@ -130,27 +156,27 @@ public class BoardService(
 
         var board = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = playerId,
-            Gameid = dto.GameId,
-            Numbers = sortedNumbers.ToList(),
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = playerId,
+            Gameid       = dto.GameId,
+            Numbers      = sortedNumbers.ToList(),
 
             // Price is ALWAYS the weekly price for a single game.
             // There is no "prepaid multi-week" price stored in this column.
-            Price = weeklyPrice,
+            Price        = weeklyPrice,
 
-            Iswinning = false,
+            Iswinning    = false,
 
             // How many FUTURE games this board should repeat for.
             // Example: RepeatWeeks = 2 -> this board should auto-repeat
             // for the next 2 games (if repeat is still active and balance is OK).
-            Repeatweeks = dto.RepeatWeeks,
+            Repeatweeks  = dto.RepeatWeeks,
 
             // Auto-repeat is active only if there are any future repeats requested.
             Repeatactive = dto.RepeatWeeks > 0,
 
-            Createdat = now,
-            Deletedat = null
+            Createdat    = now,
+            Deletedat    = null
         };
 
         ctx.Boards.Add(board);
@@ -315,5 +341,37 @@ public class BoardService(
             .SumAsync(b => (int?)b.Price) ?? 0;
 
         return approvedAmount - spentOnBoards;
+    }
+
+    /// <summary>
+    /// Returns the Danish time zone (Europe/Copenhagen) if available.
+    /// Falls back to local server time zone if it cannot be resolved.
+    /// This keeps the "Danish local time" rule robust across environments.
+    /// </summary>
+    private static TimeZoneInfo GetDanishTimeZone()
+    {
+        try
+        {
+            // Linux / macOS (IANA time zone id)
+            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Copenhagen");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                // Windows fallback with a matching offset/DST rules
+                return TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                // Final fallback: use server local time zone
+                return TimeZoneInfo.Local;
+            }
+        }
+        catch (InvalidTimeZoneException)
+        {
+            // If something is wrong with the time zone data, use local as best effort
+            return TimeZoneInfo.Local;
+        }
     }
 }
