@@ -1446,12 +1446,6 @@
             "format": "int32"
           }
         }
-      },
-      "SieveConstants": {
-        "type": "object",
-        "description": "String constants from SieveConstants",
-        "additionalProperties": false,
-        "x-constant-values": {}
       }
     },
     "securitySchemes": {

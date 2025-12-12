@@ -5,32 +5,12 @@ using NJsonSchema.CodeGeneration.TypeScript;
 using NSwag;
 using NSwag.CodeGeneration.TypeScript;
 using NSwag.Generation;
-using NSwag.Generation.Processors;
-using Testcontainers.PostgreSql;
+
 
 namespace api.Etc;
 
 public static class DiExtensions
 {
-    /// <summary>
-    ///     Adds a type to Swagger schemas
-    /// </summary>
-    public static void AddTypeToSwagger<T>(this OpenApiDocumentGeneratorSettings settings)
-    {
-        settings.DocumentProcessors.Add(new TypeMapDocumentProcessor<T>());
-    }
-
-    /// <summary>
-    ///     Adds string constants from a static class to OpenAPI schema
-    ///     Usage: config.AddStringConstants(typeof(SieveConstants));
-    /// </summary>
-    public static void AddStringConstants(this OpenApiDocumentGeneratorSettings settings, Type type)
-    {
-        var processorType = typeof(StringConstantsDocumentProcessor<>).MakeGenericType(type);
-        var processor = (IDocumentProcessor)Activator.CreateInstance(processorType)!;
-        settings.DocumentProcessors.Add(processor);
-    }
-
     public static async Task GenerateApiClientsFromOpenApi(this WebApplication app, string path)
     {
         // Step 1: Generate OpenAPI document with full documentation

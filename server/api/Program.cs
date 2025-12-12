@@ -5,10 +5,7 @@ using dataccess.Entities;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.Extensions.Configuration;
 using Scalar.AspNetCore;
-using Sieve.Models;
-using Sieve.Services;
 using System.Text.Json.Serialization;
 
 namespace api;
@@ -81,9 +78,7 @@ public class Program
 
             options.OperationProcessors.Add(
                 new NSwag.Generation.Processors.Security.AspNetCoreOperationSecurityScopeProcessor("JWT"));
-
-            // Expose Sieve constants to the generated TypeScript client
-            options.AddStringConstants(typeof(SieveConstants));
+            
         });
 
         services.AddCors();
@@ -93,10 +88,10 @@ public class Program
         services.AddScoped<IAuthService, AuthService>();
 
         // ISeeder here is mainly for tests (they inject ISeeder).
-        // In Development we will explicitly use SieveDevSeeder in Program.ConfigureApp.
-        services.AddScoped<ISeeder, SieveTestSeeder>();
+        // In Development we will explicitly use DevSeeder in Program.ConfigureApp.
+        services.AddScoped<ISeeder, TestSeeder>();
 
-        services.AddScoped<SieveDevSeeder>(); // Dev seeder for local runs
+        services.AddScoped<DevSeeder>(); // Dev seeder for local runs
 
         services.AddScoped<IPlayerService, PlayerService>();
         services.AddScoped<IGameService, GameService>();
@@ -109,17 +104,7 @@ public class Program
 
         // JWT token service (used by JwtBearer validation)
         services.AddScoped<ITokenService, JwtService>();
-
-        // Sieve configuration
-        services.Configure<SieveOptions>(options =>
-        {
-            options.CaseSensitive = false;
-            options.DefaultPageSize = 10;
-            options.MaxPageSize = 100;
-        });
-
-        services.AddScoped<ISieveProcessor, ApplicationSieveProcessor>();
-
+        
         // Authentication setup
         services
             .AddAuthentication(options =>
@@ -201,7 +186,7 @@ public class Program
 
             // Use Dev seeder here so we do NOT wipe the database on each run.
             using var scope = app.Services.CreateScope();
-            var devSeeder = scope.ServiceProvider.GetRequiredService<SieveDevSeeder>();
+            var devSeeder = scope.ServiceProvider.GetRequiredService<DevSeeder>();
             devSeeder.Seed().GetAwaiter().GetResult();
         }
 
