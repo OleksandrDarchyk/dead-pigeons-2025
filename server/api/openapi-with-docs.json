@@ -132,6 +132,43 @@
         ]
       }
     },
+    "/Board/StopRepeatingMyBoard": {
+      "post": {
+        "tags": [
+          "Board"
+        ],
+        "operationId": "Board_StopRepeatingMyBoard",
+        "requestBody": {
+          "x-name": "dto",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StopRepeatingBoardRequestDto"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardResponseDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "JWT": []
+          }
+        ]
+      }
+    },
     "/Board/GetBoardsForGame": {
       "get": {
         "tags": [
@@ -1119,6 +1156,19 @@
             "format": "int32",
             "maximum": 52.0,
             "minimum": 0.0
+          }
+        }
+      },
+      "StopRepeatingBoardRequestDto": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "boardId"
+        ],
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1
           }
         }
       },

@@ -1,3 +1,4 @@
+// client/src/hooks/usePlayerBoards.ts
 import { useEffect, useState } from "react";
 import { boardsApi } from "../utilities/boardsApi";
 import { gamesApi } from "../utilities/gamesApi";
@@ -40,7 +41,7 @@ export function usePlayerBoards(enabled: boolean = true) {
     // Active game (DTO)
     const [activeGame, setActiveGame] = useState<GameResponseDto | null>(null);
 
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState<boolean>(enabled);
     const [isSaving, setIsSaving] = useState(false);
 
     const [form, setForm] = useState<BoardFormState>({
@@ -51,6 +52,9 @@ export function usePlayerBoards(enabled: boolean = true) {
 
     // Load active game and current player's boards
     const loadBoards = async () => {
+        // Якщо хук вимкнений – взагалі не робимо запитів
+        if (!enabled) return;
+
         try {
             setIsLoading(true);
 
@@ -70,7 +74,13 @@ export function usePlayerBoards(enabled: boolean = true) {
     };
 
     useEffect(() => {
-        if (!enabled) return;
+        if (!enabled) {
+            setIsLoading(false);
+            setBoards([]);
+            setActiveGame(null);
+            return;
+        }
+
         void loadBoards();
     }, [enabled]);
 
@@ -94,10 +104,10 @@ export function usePlayerBoards(enabled: boolean = true) {
         });
     };
 
-    const setRepeatEnabled = (enabled: boolean) => {
+    const setRepeatEnabled = (enabledFlag: boolean) => {
         setForm((prev) => ({
             ...prev,
-            repeatEnabled: enabled,
+            repeatEnabled: enabledFlag,
         }));
     };
 
@@ -167,6 +177,34 @@ export function usePlayerBoards(enabled: boolean = true) {
         }
     };
 
+    /**
+     * Stop repeating a specific board for the current user.
+     * Backend:
+     *  - знайде борду по id + поточному гравцю
+     *  - поставить RepeatActive = false, RepeatWeeks = 0
+     *  - поверне оновлений BoardResponseDto
+     */
+    const stopRepeating = async (boardId: string) => {
+        try {
+            setIsSaving(true);
+
+            const updated = await boardsApi.stopRepeatingMyBoard({ boardId });
+
+            // Акуратно оновлюємо локальний список:
+            // замінюємо тільки цю одну борду, всі інші лишаються як були.
+            setBoards((prev) =>
+                prev.map((b) => (b.id === updated.id ? updated : b)),
+            );
+
+            toast.success("Repeating disabled for this board");
+        } catch (err) {
+            console.error(err);
+            toast.error("Failed to stop repeating this board");
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     // Price preview
     const currentPrice = getPriceForCount(form.selectedNumbers.length);
     const totalPrice =
@@ -177,7 +215,10 @@ export function usePlayerBoards(enabled: boolean = true) {
     return {
         boards,
         activeGame,
+        // старе імʼя прапорця — нічого не ламаємо
         isLoading,
+        // нове імʼя, яке використовує сторінка PlayerBuyBoardPage
+        isLoadingBoards: isLoading,
         isSaving,
         form,
         setForm,
@@ -187,5 +228,8 @@ export function usePlayerBoards(enabled: boolean = true) {
         totalPrice,
         setRepeatEnabled,
         setRepeatWeeks,
+        stopRepeating,
+        // якщо десь ще захочеш вручну перезавантажувати
+        reloadBoards: loadBoards,
     };
 }

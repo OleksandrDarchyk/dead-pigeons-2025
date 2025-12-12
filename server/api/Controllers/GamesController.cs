@@ -3,15 +3,15 @@ using api.Models.Game;
 using api.Models.Requests;
 using api.Models.Responses;
 using api.Services;
-using dataccess.Entities;
 using Api.Security;
+using dataccess.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace api.Controllers;
 
 [ApiController]
-[Authorize] // all endpoints here require an authenticated user
+[Authorize] // All endpoints here require an authenticated user
 public class GamesController(IGameService gameService) : ControllerBase
 {
     // GET /GetActiveGame
@@ -47,8 +47,13 @@ public class GamesController(IGameService gameService) : ControllerBase
             User.FindFirst(ClaimTypes.Email)?.Value ??
             User.FindFirst("email")?.Value;
 
-        var history = await gameService.GetPlayerHistory(email!);
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            // This should normally not happen if JWT is configured correctly
+            throw new UnauthorizedAccessException("Email claim is missing for the current user.");
+        }
 
+        var history = await gameService.GetPlayerHistory(email);
         return history;
     }
 
@@ -63,7 +68,8 @@ public class GamesController(IGameService gameService) : ControllerBase
         // - close the game and set winning numbers
         // - mark winning boards
         // - activate next game
-        // - calculate total boards, winners and revenue
+        // - create repeating boards for the next game (if balance allows)
+        // - calculate total boards, winners and revenue for this game
         var summary = await gameService.SetWinningNumbers(dto);
 
         // We return the summary directly to the frontend
@@ -73,12 +79,12 @@ public class GamesController(IGameService gameService) : ControllerBase
     // Maps EF entity to a safe API response DTO
     private static GameResponseDto MapToDto(Game g) => new()
     {
-        Id = g.Id,
-        WeekNumber = g.Weeknumber,
-        Year = g.Year,
+        Id            = g.Id,
+        WeekNumber    = g.Weeknumber,
+        Year          = g.Year,
         WinningNumbers = g.Winningnumbers?.ToArray(),
-        IsActive = g.Isactive,
-        CreatedAt = g.Createdat,
-        ClosedAt = g.Closedat
+        IsActive      = g.Isactive,
+        CreatedAt     = g.Createdat,
+        ClosedAt      = g.Closedat
     };
 }

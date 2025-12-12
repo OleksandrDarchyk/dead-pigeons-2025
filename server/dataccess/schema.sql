@@ -77,12 +77,26 @@ create table deadpigeons.board
     gameId       text             references deadpigeons.game(id)   on delete restrict,
 
     numbers      int[]            not null,
+
+    -- IMPORTANT:
+    -- price is always the price for ONE game (one week),
+    -- not the total prepaid amount for multiple weeks.
     price        int              not null,
+
     isWinning    boolean          not null default false,
+
+    -- repeatWeeks now means: how many FUTURE games this board
+    -- should still auto-repeat for (remaining repeats).
     repeatWeeks  int              not null default 0,
+
+    -- repeatActive indicates whether auto-repeat is currently enabled.
     repeatActive boolean          not null default false,
+
     createdAt    timestamp with time zone,
-    deletedAt    timestamp with time zone
+    deletedAt    timestamp with time zone,
+
+    constraint chk_board_price_positive
+        check (price > 0)
 );
 
 -- ==========================

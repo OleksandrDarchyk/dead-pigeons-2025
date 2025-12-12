@@ -118,8 +118,9 @@ public class GameService(
             // Make the next week active
             nextGame.Isactive = true;
 
-            // 6) Create new boards for all repeating boards of the just-closed game
-            CreateRepeatingBoardsForNextGame(game, nextGame);
+            // 6) Create new boards for all repeating boards of the just-closed game.
+            //    Now each repeat is charged per week if the player has enough balance.
+            await CreateRepeatingBoardsForNextGame(game, nextGame);
         }
 
         // 7) Calculate summary for the just-closed game
@@ -129,13 +130,12 @@ public class GameService(
         var winningBoards = game.Boards
             .Count(b => b.Deletedat == null && b.Iswinning);
 
-        // ❗Digital revenue per week:
-        // We do NOT use Board.Price here, because for repeating boards
-        // Price contains the full prepaid amount for ALL weeks.
-        // For game revenue we only care about weekly price.
+        // Digital revenue for this game:
+        // We now store weekly price in Board.Price,
+        // so the revenue for this game is simply the sum of Price.
         var digitalRevenue = game.Boards
             .Where(b => b.Deletedat == null)
-            .Sum(b => CalculateWeeklyPrice(b));
+            .Sum(b => b.Price);
 
         // 8) Save all changes in one go
         await ctx.SaveChangesAsync();
@@ -155,50 +155,93 @@ public class GameService(
 
     /// <summary>
     /// For all boards in the current game that are marked as repeating,
-    /// create a new board in the next game and decrease remaining weeks.
+    /// try to create a new board in the next game and charge the weekly price again.
     ///
     /// Important:
-    /// - The player already paid for ALL weeks up front (Board.Price = total prepaid).
-    /// - Repeating boards created here get Price = 0, so they do not change balance again.
+    /// - RepeatWeeks means "how many FUTURE games this board should still participate in".
+    ///   Example: RepeatWeeks = 3 => this board should auto-repeat for the next 3 games.
+    /// - We only repeat boards where Repeatactive = true and Repeatweeks > 0.
+    /// - For each repeat we:
+    ///     * check the player's current balance (including extra charges planned in this loop),
+    ///     * if enough balance -> create a new board with Price = weekly price,
+    ///     * decrease remaining future weeks on the new board,
+    ///     * if not enough balance -> stop repeating for this board (Repeatactive = false, Repeatweeks = 0).
     /// </summary>
-    private void CreateRepeatingBoardsForNextGame(Game currentGame, Game nextGame)
+    private async Task CreateRepeatingBoardsForNextGame(Game currentGame, Game nextGame)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Take only non-deleted boards that:
-        // - are marked as repeating
-        // - still have more than 1 week left (this week + future)
+        // Only non-deleted boards that are still set to repeat in future games
         var repeatingBoards = currentGame.Boards
             .Where(b =>
                 b.Deletedat == null &&
                 b.Repeatactive &&
-                b.Repeatweeks > 1)
+                b.Repeatweeks > 0)
             .ToList();
+
+        // Track additional "planned" charges per player so we do not overspend
+        // when a player has multiple repeating boards in the same game.
+        var extraChargesPerPlayer = new Dictionary<string, int>();
 
         foreach (var board in repeatingBoards)
         {
-            // This week is already played, so for the next week we decrease by 1
-            var remainingWeeks = board.Repeatweeks - 1;
+            var playerId = board.Playerid;
+            if (string.IsNullOrWhiteSpace(playerId))
+            {
+                continue;
+            }
+
+            var weeklyPrice = CalculateWeeklyPrice(board);
+            if (weeklyPrice <= 0)
+            {
+                // Invalid board configuration, skip silently.
+                continue;
+            }
+
+            // Current balance from DB
+            var currentBalance = await GetCurrentBalance(playerId);
+
+            // Subtract charges we already decided to apply during this loop
+            extraChargesPerPlayer.TryGetValue(playerId, out var alreadyPlanned);
+            var availableBalance = currentBalance - alreadyPlanned;
+
+            if (availableBalance < weeklyPrice)
+            {
+                // Not enough money to repeat this board.
+                // We also disable repeating so we do not try again next time.
+                board.Repeatactive = false;
+                board.Repeatweeks = 0;
+                continue;
+            }
+
+            // There is enough balance to repeat this board for the next game.
+            // We create a new board in the next game and charge one weekly price.
+            var remainingFutureWeeks = board.Repeatweeks - 1;
 
             var newBoard = new Board
             {
                 Id           = Guid.NewGuid().ToString(),
-                Playerid     = board.Playerid,
+                Playerid     = playerId,
                 Gameid       = nextGame.Id,
                 Numbers      = board.Numbers.ToList(),
 
-                // ❗Repeating boards for future games do not charge again.
-                // The full amount was already charged when the user bought the original board.
-                Price        = 0,
+                // We always charge the weekly price per game.
+                Price        = weeklyPrice,
 
                 Iswinning    = false,
-                Repeatweeks  = remainingWeeks,
-                Repeatactive = remainingWeeks > 1,
+
+                // Remaining future weeks for auto-repeat after this newly created game
+                Repeatweeks  = remainingFutureWeeks,
+                Repeatactive = remainingFutureWeeks > 0,
+
                 Createdat    = now,
                 Deletedat    = null
             };
 
             ctx.Boards.Add(newBoard);
+
+            // Remember that we have "spent" this weekly price from the player's balance
+            extraChargesPerPlayer[playerId] = alreadyPlanned + weeklyPrice;
         }
     }
 
@@ -244,8 +287,9 @@ public class GameService(
 
                 BoardId        = b.Id,
                 Numbers        = b.Numbers.ToArray(),
-                // For UI we show weekly price, not total prepaid amount
-                Price          = CalculateWeeklyPrice(b),
+
+                // We show per-game price, and now Board.Price already stores weekly price.
+                Price          = b.Price,
                 BoardCreatedAt = b.Createdat,
 
                 WinningNumbers = b.Game.Winningnumbers?.ToArray(),
@@ -259,7 +303,7 @@ public class GameService(
     /// <summary>
     /// Helper for weekly board price based on count of numbers:
     /// 5 -> 20, 6 -> 40, 7 -> 80, 8 -> 160, otherwise 0.
-    /// We use the same rule as in BoardService.
+    /// Must be consistent with BoardService.
     /// </summary>
     private static int CalculateWeeklyPrice(Board board)
     {
@@ -273,5 +317,29 @@ public class GameService(
             8 => 160,
             _ => 0
         };
+    }
+
+    /// <summary>
+    /// Calculates current balance for a player as:
+    ///   sum(Approved transactions.amount) - sum(boards.Price).
+    ///
+    /// This is the same rule as in BoardService.
+    /// </summary>
+    private async Task<int> GetCurrentBalance(string playerId)
+    {
+        var approvedAmount = await ctx.Transactions
+            .Where(t =>
+                t.Playerid == playerId &&
+                t.Deletedat == null &&
+                t.Status == "Approved")
+            .SumAsync(t => (int?)t.Amount) ?? 0;
+
+        var spentOnBoards = await ctx.Boards
+            .Where(b =>
+                b.Playerid == playerId &&
+                b.Deletedat == null)
+            .SumAsync(b => (int?)b.Price) ?? 0;
+
+        return approvedAmount - spentOnBoards;
     }
 }

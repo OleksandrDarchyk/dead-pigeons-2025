@@ -21,4 +21,7 @@ public interface IBoardService
 
     // Boards belonging to the current logged-in user
     Task<List<Board>> GetBoardsForCurrentUser(ClaimsPrincipal user);
+
+    // Stop repeating a board that belongs to the current logged-in user
+    Task<Board> StopRepeatingBoardForCurrentUser(ClaimsPrincipal user, string boardId);
 }
