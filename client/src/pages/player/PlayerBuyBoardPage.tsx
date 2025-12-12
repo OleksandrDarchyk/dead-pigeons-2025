@@ -11,6 +11,7 @@ export default function PlayerBuyBoardPage() {
     const isPlayer = Boolean(token && user && role === "User");
 
     const {
+        boards,
         activeGame,
         form,
         toggleNumber,
@@ -18,8 +19,10 @@ export default function PlayerBuyBoardPage() {
         currentPrice,
         totalPrice,
         isSaving,
+        isLoadingBoards,
         setRepeatEnabled,
         setRepeatWeeks,
+        stopRepeating,
     } = usePlayerBoards(isPlayer);
 
     const {
@@ -67,6 +70,12 @@ export default function PlayerBuyBoardPage() {
 
                 return list;
             })()
+            : [];
+
+    // Boards only for the current active game (nice, clean view for the player)
+    const boardsForActiveGame =
+        activeGame && boards.length > 0
+            ? boards.filter((b) => b.gameId === activeGame.id)
             : [];
 
     // After creating a board, also reload the balance from the server
@@ -129,7 +138,9 @@ export default function PlayerBuyBoardPage() {
                                     {Array.from({ length: 16 }, (_, i) => i + 1).map(
                                         (num) => {
                                             const isSelected =
-                                                form.selectedNumbers.includes(num);
+                                                form.selectedNumbers.includes(
+                                                    num,
+                                                );
 
                                             return (
                                                 <button
@@ -149,7 +160,7 @@ export default function PlayerBuyBoardPage() {
                                                     {num}
                                                 </button>
                                             );
-                                        }
+                                        },
                                     )}
                                 </div>
 
@@ -169,7 +180,7 @@ export default function PlayerBuyBoardPage() {
                                                 <span className="font-semibold text-slate-900">
                                                     {currentPrice !== null
                                                         ? `${currentPrice.toFixed(
-                                                            2
+                                                            2,
                                                         )} DKK`
                                                         : "–"}
                                                 </span>
@@ -186,7 +197,7 @@ export default function PlayerBuyBoardPage() {
                                                 checked={form.repeatEnabled}
                                                 onChange={(e) =>
                                                     setRepeatEnabled(
-                                                        e.target.checked
+                                                        e.target.checked,
                                                     )
                                                 }
                                             />
@@ -204,22 +215,28 @@ export default function PlayerBuyBoardPage() {
                                         {form.repeatEnabled && (
                                             <div className="space-y-1">
                                                 <div className="mt-2 flex items-center gap-3 text-xs">
-                                                    <span>Number of weeks:</span>
+                                                    <span>
+                                                        Number of weeks:
+                                                    </span>
                                                     <input
                                                         type="number"
                                                         min={1}
                                                         max={52}
-                                                        value={form.repeatWeeks}
+                                                        value={
+                                                            form.repeatWeeks
+                                                        }
                                                         onChange={(e) => {
-                                                            const value = Number(
-                                                                e.target.value
-                                                            );
+                                                            const value =
+                                                                Number(
+                                                                    e.target
+                                                                        .value,
+                                                                );
                                                             setRepeatWeeks(
                                                                 Number.isNaN(
-                                                                    value
+                                                                    value,
                                                                 )
                                                                     ? 1
-                                                                    : value
+                                                                    : value,
                                                             );
                                                         }}
                                                         className="w-20 rounded-lg border border-slate-300 px-2 py-1 text-sm"
@@ -234,7 +251,8 @@ export default function PlayerBuyBoardPage() {
 
                                                 {/* PREVIEW OF WEEKS FOR REPEATING BOARD */}
                                                 {repeatSchedule &&
-                                                    repeatSchedule.length > 0 && (
+                                                    repeatSchedule.length >
+                                                    0 && (
                                                         <div className="mt-2 text-[11px] text-slate-500">
                                                             <p>
                                                                 This board will
@@ -255,7 +273,7 @@ export default function PlayerBuyBoardPage() {
                                                                                 w.year
                                                                             }
                                                                         </li>
-                                                                    )
+                                                                    ),
                                                                 )}
                                                             </ul>
                                                         </div>
@@ -270,7 +288,7 @@ export default function PlayerBuyBoardPage() {
                                             <span className="font-semibold text-slate-900">
                                                 {totalPrice !== null
                                                     ? `${totalPrice.toFixed(
-                                                        2
+                                                        2,
                                                     )} DKK`
                                                     : "–"}
                                             </span>
@@ -299,7 +317,9 @@ export default function PlayerBuyBoardPage() {
                                     {/* ACTION BUTTON */}
                                     <button
                                         type="button"
-                                        onClick={() => void handleConfirmBoard()}
+                                        onClick={() =>
+                                            void handleConfirmBoard()
+                                        }
                                         disabled={
                                             isSaving ||
                                             !activeGame ||
@@ -318,6 +338,76 @@ export default function PlayerBuyBoardPage() {
                             </>
                         )}
                     </section>
+
+                    {/* MY BOARDS FOR CURRENT ROUND */}
+                    {activeGame && (
+                        <section className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm">
+                            <h2 className="mb-2 text-lg font-semibold text-slate-900">
+                                My boards for this round
+                            </h2>
+
+                            {isLoadingBoards ? (
+                                <p className="text-sm text-slate-500">
+                                    Loading your boards...
+                                </p>
+                            ) : boardsForActiveGame.length === 0 ? (
+                                <p className="text-sm text-slate-500">
+                                    You don&apos;t have any boards yet for this
+                                    round.
+                                </p>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="table table-zebra w-full text-xs">
+                                        <thead>
+                                        <tr>
+                                            <th>Numbers</th>
+                                            <th>Price (DKK)</th>
+                                            <th>Repeating</th>
+                                            <th></th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        {boardsForActiveGame.map((b) => (
+                                            <tr key={b.id}>
+                                                <td>
+                                                    {b.numbers.join(", ")}
+                                                </td>
+                                                <td>{b.price}</td>
+                                                <td>
+                                                    {b.repeatActive &&
+                                                    b.repeatWeeks > 0
+                                                        ? `Yes (${b.repeatWeeks} weeks left)`
+                                                        : "No"}
+                                                </td>
+                                                <td>
+                                                    {b.repeatActive &&
+                                                        b.repeatWeeks >
+                                                        0 && (
+                                                            <button
+                                                                type="button"
+                                                                className="btn btn-xs btn-outline"
+                                                                onClick={() =>
+                                                                    void stopRepeating(
+                                                                        b.id,
+                                                                    )
+                                                                }
+                                                                disabled={
+                                                                    isSaving
+                                                                }
+                                                            >
+                                                                Stop
+                                                                repeating
+                                                            </button>
+                                                        )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </section>
+                    )}
                 </div>
             </div>
         </PlayerGuard>
