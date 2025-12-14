@@ -1,3 +1,4 @@
+// api/Etc/DevSeeder.cs
 using dataccess;
 using dataccess.Entities;
 using Microsoft.AspNetCore.Identity;
@@ -7,31 +8,26 @@ namespace api.Etc;
 
 /// <summary>
 /// Seeder used in Development environment.
-/// It does NOT clear the database. It only seeds once when the DB is empty.
+/// - Does NOT clear the database.
+/// - Seeds core demo data only once when the DB is empty (based on Users).
+/// - Ensures games exist (Tip 1) via GameSeeder in an idempotent way.
 /// </summary>
 public class DevSeeder(
     MyDbContext ctx,
     TimeProvider timeProvider,
-    IPasswordHasher<User> passwordHasher) : ISeeder
+    IPasswordHasher<User> passwordHasher,
+    GameSeeder gameSeeder) : ISeeder
 {
     public async Task Seed()
     {
-        // Ensure the database is created (Dev only, not for production migrations).
         await ctx.Database.EnsureCreatedAsync();
 
-        // If there is at least one user, we assume the database is already initialized.
-        // if check 17:00 not create game we need to commit this part from this to
         var hasAnyUsers = await ctx.Users.AnyAsync();
-        if (hasAnyUsers)
+        if (!hasAnyUsers)
         {
-            // Dev seeder should be safe: do not touch or modify existing data.
-            return;
+            await SeedData.SeedCoreAsync(ctx, timeProvider, passwordHasher);
         }
-        // End of check 17:00
 
-        // Seed the shared core data (users, players, games, transactions, boards).
-        // This uses the same core logic as the Test seeder (TestSeeder),
-        // so Dev and Tests work with the same data model and examples.
-        await SeedData.SeedCoreAsync(ctx, timeProvider, passwordHasher);
+        await gameSeeder.SeedGamesIfMissingAsync();
     }
 }
