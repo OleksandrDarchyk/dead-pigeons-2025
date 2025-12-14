@@ -8,11 +8,7 @@ using Microsoft.Extensions.Options;
 
 namespace api.Etc;
 
-/// <summary>
-/// One-time admin bootstrap for Production:
-/// - Якщо в БД уже є активний Admin — нічого не робимо.
-/// - Якщо немає — створюємо або "оновлюємо" користувача з email з конфігурації до ролі Admin.
-/// </summary>
+
 public class AdminBootstrapper
 {
     private readonly MyDbContext _ctx;
@@ -39,7 +35,6 @@ public class AdminBootstrapper
     {
         _logger.LogInformation("AdminBootstrapper: started");
 
-        // 1) Якщо вже є активний Admin – нічого не робимо
         var existingAdmin = await _ctx.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Role == "Admin" && u.Deletedat == null);
@@ -53,7 +48,6 @@ public class AdminBootstrapper
             return;
         }
 
-        // 2) Читаємо email і password для адміна з конфігурації (секрети / змінні оточення)
         var email = _options.Value.Email;
         var password = _options.Value.Password;
 
@@ -68,7 +62,6 @@ public class AdminBootstrapper
         var normalizedEmail = email.Trim().ToLowerInvariant();
         var now = _timeProvider.GetUtcNow().UtcDateTime;
 
-        // 3) Шукаємо існуючого не-видаленого користувача з таким email
         var existingUser = await _ctx.Users
             .FirstOrDefaultAsync(u => u.Email == normalizedEmail && u.Deletedat == null);
 
@@ -76,7 +69,6 @@ public class AdminBootstrapper
 
         if (existingUser != null)
         {
-            // Якщо такий користувач є – робимо його Admin і ставимо новий пароль
             user = existingUser;
             user.Role = "Admin";
             user.Createdat ??= now;
@@ -87,7 +79,6 @@ public class AdminBootstrapper
         }
         else
         {
-            // Якщо користувача немає – створюємо нового Admin
             user = new User
             {
                 Id = Guid.NewGuid().ToString(),
@@ -103,16 +94,10 @@ public class AdminBootstrapper
                 normalizedEmail);
         }
 
-        // 4) Хешуємо пароль через наш Argon2id-хешер
         var hashedPassword = _passwordHasher.HashPassword(user, password);
         user.Passwordhash = hashedPassword;
 
-        // 5) Захист від падіння: якщо Salt все ще порожній – ставимо хоч якесь значення,
-        // щоб виконалась NOT NULL умова в БД.
-        if (string.IsNullOrWhiteSpace(user.Salt))
-        {
-            user.Salt = Guid.NewGuid().ToString("N");
-        }
+        
 
         await _ctx.SaveChangesAsync();
 
