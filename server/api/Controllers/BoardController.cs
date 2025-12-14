@@ -3,8 +3,8 @@
 using api.Models.Board;
 using api.Models.Requests;
 using api.Services;
-using dataccess.Entities;
 using Api.Security;
+using dataccess.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,11 +18,27 @@ public class BoardController(IBoardService boardService) : ControllerBase
     /// <summary>
     /// Player buys a new board for the selected game.
     /// PlayerId is resolved from JWT inside the service.
+    /// The server:
+    /// - validates the numbers and target game,
+    /// - checks player balance,
+    /// - charges the weekly price for this game,
+    /// - stores repeat settings (RepeatWeeks, RepeatActive) for future games.
     /// </summary>
     [HttpPost(nameof(CreateBoard))] // POST /Board/CreateBoard
     public async Task<BoardResponseDto> CreateBoard([FromBody] CreateBoardRequestDto dto)
     {
         var board = await boardService.CreateBoardForCurrentUser(User, dto);
+        return MapToDto(board);
+    }
+
+    /// <summary>
+    /// Player: stop repeating a board they own.
+    /// This only affects FUTURE games; the current board is not removed.
+    /// </summary>
+    [HttpPost(nameof(StopRepeatingMyBoard))] // POST /Board/StopRepeatingMyBoard
+    public async Task<BoardResponseDto> StopRepeatingMyBoard([FromBody] StopRepeatingBoardRequestDto dto)
+    {
+        var board = await boardService.StopRepeatingBoardForCurrentUser(User, dto.BoardId);
         return MapToDto(board);
     }
 
@@ -76,7 +92,7 @@ public class BoardController(IBoardService boardService) : ControllerBase
     {
         Id           = b.Id,
         PlayerId     = b.Playerid ?? string.Empty,
-        GameId       = b.Gameid ?? string.Empty,
+        GameId       = b.Gameid   ?? string.Empty,
         Numbers      = b.Numbers.ToArray(),
         Price        = b.Price,
         IsWinning    = b.Iswinning,

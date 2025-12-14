@@ -1,3 +1,4 @@
+using api.Configuration; // Admin bootstrap options (Email + Password from config)
 using api.Etc;
 using Api.Security;
 using api.Services;
@@ -54,6 +55,11 @@ public class Program
         services.InjectAppOptions();          // uses AppOptions from configuration (Db, JwtSecret)
         services.AddMyDbContext();
 
+        // Admin bootstrap options (used in Production for initial Admin user)
+        services
+            .AddOptions<AdminBootstrapOptions>()
+            .Bind(configuration.GetSection("AdminBootstrap"));
+
         // Controllers + JSON configuration
         services.AddControllers().AddJsonOptions(opts =>
         {
@@ -92,12 +98,17 @@ public class Program
         services.AddScoped<ISeeder, TestSeeder>();
 
         services.AddScoped<DevSeeder>(); // Dev seeder for local runs
+        
+        services.AddScoped<GameSeeder>();
+
 
         services.AddScoped<IPlayerService, PlayerService>();
         services.AddScoped<IGameService, GameService>();
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<ITransactionService, TransactionService>();
 
+        // Admin bootstrapper (one-time Admin creation in Production)
+        services.AddScoped<AdminBootstrapper>();
 
         // Password hasher (Argon2id)
         services.AddScoped<IPasswordHasher<User>, NSecArgon2idPasswordHasher>();
@@ -175,20 +186,38 @@ public class Program
         // Map controllers
         app.MapControllers();
 
-        
+        // Production: ensure games exist (Tip 1) + ensure there is at least one Admin user
+        if (app.Environment.IsProduction())
+        {
+            using var scope = app.Services.CreateScope();
+
+            var gameSeeder = scope.ServiceProvider.GetRequiredService<GameSeeder>();
+            gameSeeder.SeedGamesIfMissingAsync().GetAwaiter().GetResult();
+
+            var bootstrapper = scope.ServiceProvider.GetRequiredService<AdminBootstrapper>();
+            bootstrapper.RunAsync().GetAwaiter().GetResult();
+        }
+
+
+    
+    
+    
+        Console.WriteLine($"ENV = {app.Environment.EnvironmentName}");
+
         // Dev-only: generate TypeScript client and seed the database
         if (app.Environment.IsDevelopment())
         {
+            Console.WriteLine("PROD: seeding games started");
+
             app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts")
                 .GetAwaiter()
                 .GetResult();
+            Console.WriteLine("PROD: seeding games finished");
 
             // Use Dev seeder here so we do NOT wipe the database on each run.
             using var scope = app.Services.CreateScope();
             var devSeeder = scope.ServiceProvider.GetRequiredService<DevSeeder>();
             devSeeder.Seed().GetAwaiter().GetResult();
         }
-
-
     }
 }

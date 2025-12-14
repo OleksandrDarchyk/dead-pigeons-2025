@@ -119,14 +119,14 @@ public class GameServiceTests(
 
         var player = new Player
         {
-            Id         = Guid.NewGuid().ToString(),
-            Fullname   = "Test Player",
-            Email      = $"player-{Guid.NewGuid()}@gameservice.test",
-            Phone      = "12345678",
-            Isactive   = true,
+            Id          = Guid.NewGuid().ToString(),
+            Fullname    = "Test Player",
+            Email       = $"player-{Guid.NewGuid()}@gameservice.test",
+            Phone       = "12345678",
+            Isactive    = true,
             Activatedat = now,
-            Createdat  = now,
-            Deletedat  = null
+            Createdat   = now,
+            Deletedat   = null
         };
         ctx.Players.Add(player);
 
@@ -152,43 +152,61 @@ public class GameServiceTests(
 
         ctx.Games.AddRange(currentGame, nextGame);
 
-        // Repeating winning board (3 weeks prepaid)
+        // Repeating winning board:
+        // - numbers: 5 numbers -> weekly price is 20 DKK
+        // - Repeatweeks = 3 means it should try to auto-repeat for 3 future games.
         var winningBoard = new Board
         {
-            Id          = Guid.NewGuid().ToString(),
-            Playerid    = player.Id,
-            Gameid      = currentGame.Id,
-            Numbers     = new[] { 1, 2, 3, 4, 5 }.ToList(),
-            Price       = 20 * 3,   // prepaid for 3 weeks
-            Iswinning   = false,
-            Repeatweeks = 3,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = currentGame.Id,
+            Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
+            Price        = 20,   // weekly price (not prepaid for all weeks)
+            Iswinning    = false,
+            Repeatweeks  = 3,
             Repeatactive = true,
-            Createdat   = now,
-            Deletedat   = null
+            Createdat    = now,
+            Deletedat    = null
         };
 
-        // Non-repeating losing board
+        // Non-repeating losing board (also 5 numbers -> weekly price 20 DKK)
         var losingBoard = new Board
         {
-            Id          = Guid.NewGuid().ToString(),
-            Playerid    = player.Id,
-            Gameid      = currentGame.Id,
-            Numbers     = new[] { 6, 7, 8, 9, 10 }.ToList(),
-            Price       = 20,
-            Iswinning   = false,
-            Repeatweeks = 1,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = currentGame.Id,
+            Numbers      = new[] { 6, 7, 8, 9, 10 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 1,
             Repeatactive = false,
-            Createdat   = now,
-            Deletedat   = null
+            Createdat    = now,
+            Deletedat    = null
         };
 
+        // Approved transaction so that the player has enough balance
+        // to pay for one more weekly board when repeating.
+        var approvedTransaction = new Transaction
+        {
+            Id               = Guid.NewGuid().ToString(),
+            Playerid         = player.Id,
+            Mobilepaynumber  = "TX-SETWINNING-1",
+            Amount           = 100,          // enough to cover the weekly price
+            Status           = "Approved",
+            Createdat        = now,
+            Approvedat       = now,
+            Rejectionreason  = null,
+            Deletedat        = null
+        };
+
+        ctx.Transactions.Add(approvedTransaction);
         ctx.Boards.AddRange(winningBoard, losingBoard);
         await ctx.SaveChangesAsync(ct);
 
         // Act: set winning numbers in a different order (order must not matter)
         var request = new SetWinningNumbersRequestDto
         {
-            GameId        = currentGame.Id,
+            GameId         = currentGame.Id,
             WinningNumbers = new[] { 3, 1, 2 }
         };
 
@@ -220,10 +238,12 @@ public class GameServiceTests(
         Assert.Single(repeatedBoards);
 
         var repeated = repeatedBoards.Single();
-        Assert.Equal(2, repeated.Repeatweeks);       // 3 -> 2 remaining
+        Assert.Equal(2, repeated.Repeatweeks);       // 3 -> 2 remaining future games
         Assert.True(repeated.Repeatactive);          // still more than 1 week left
-        Assert.Equal(0, repeated.Price);             // future repeats must not charge again
-        Assert.Equal(winningBoard.Numbers.OrderBy(n => n), repeated.Numbers.OrderBy(n => n));
+        Assert.Equal(20, repeated.Price);            // weekly price is charged again for the next game
+        Assert.Equal(
+            winningBoard.Numbers.OrderBy(n => n),
+            repeated.Numbers.OrderBy(n => n));
 
         // Assert: summary DTO must match the closed game and weekly revenue rules
         Assert.Equal(currentGame.Id, summary.GameId);
@@ -250,7 +270,7 @@ public class GameServiceTests(
 
         var dto = new SetWinningNumbersRequestDto
         {
-            GameId = game.Id,
+            GameId         = game.Id,
             WinningNumbers = new[] { 1, 1, 2 } // duplicate "1"
         };
 
@@ -268,7 +288,7 @@ public class GameServiceTests(
 
         var dto = new SetWinningNumbersRequestDto
         {
-            GameId = game.Id,
+            GameId         = game.Id,
             WinningNumbers = new[] { 0, 1, 2 } // 0 is outside [1;16]
         };
 
@@ -303,26 +323,26 @@ public class GameServiceTests(
         // Arrange: one player with boards in two games, and another player with its own board
         var player = new Player
         {
-            Id         = Guid.NewGuid().ToString(),
-            Fullname   = "History Player",
-            Email      = $"history-{Guid.NewGuid()}@gameservice.test",
-            Phone      = "87654321",
-            Isactive   = true,
+            Id          = Guid.NewGuid().ToString(),
+            Fullname    = "History Player",
+            Email       = $"history-{Guid.NewGuid()}@gameservice.test",
+            Phone       = "87654321",
+            Isactive    = true,
             Activatedat = now,
-            Createdat  = now,
-            Deletedat  = null
+            Createdat   = now,
+            Deletedat   = null
         };
 
         var otherPlayer = new Player
         {
-            Id         = Guid.NewGuid().ToString(),
-            Fullname   = "Other Player",
-            Email      = $"other-{Guid.NewGuid()}@gameservice.test",
-            Phone      = "11111111",
-            Isactive   = true,
+            Id          = Guid.NewGuid().ToString(),
+            Fullname    = "Other Player",
+            Email       = $"other-{Guid.NewGuid()}@gameservice.test",
+            Phone       = "11111111",
+            Isactive    = true,
             Activatedat = now,
-            Createdat  = now,
-            Deletedat  = null
+            Createdat   = now,
+            Deletedat   = null
         };
 
         ctx.Players.AddRange(player, otherPlayer);
@@ -354,44 +374,44 @@ public class GameServiceTests(
 
         var olderBoard = new Board
         {
-            Id          = Guid.NewGuid().ToString(),
-            Playerid    = player.Id,
-            Gameid      = olderGame.Id,
-            Numbers     = new[] { 1, 2, 3, 4, 5 }.ToList(),
-            Price       = 20,
-            Iswinning   = false,
-            Repeatweeks = 1,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = olderGame.Id,
+            Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 1,
             Repeatactive = false,
-            Createdat   = now.AddDays(-10),
-            Deletedat   = null
+            Createdat    = now.AddDays(-10),
+            Deletedat    = null
         };
 
         var newerBoard = new Board
         {
-            Id          = Guid.NewGuid().ToString(),
-            Playerid    = player.Id,
-            Gameid      = newerGame.Id,
-            Numbers     = new[] { 1, 2, 3, 4, 5, 6 }.ToList(),
-            Price       = 40,
-            Iswinning   = true,
-            Repeatweeks = 1,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = newerGame.Id,
+            Numbers      = new[] { 1, 2, 3, 4, 5, 6 }.ToList(),
+            Price        = 40,
+            Iswinning    = true,
+            Repeatweeks  = 1,
             Repeatactive = false,
-            Createdat   = now.AddDays(-3),
-            Deletedat   = null
+            Createdat    = now.AddDays(-3),
+            Deletedat    = null
         };
 
         var otherBoard = new Board
         {
-            Id          = Guid.NewGuid().ToString(),
-            Playerid    = otherPlayer.Id,
-            Gameid      = newerGame.Id,
-            Numbers     = new[] { 7, 8, 9, 10, 11 }.ToList(),
-            Price       = 20,
-            Iswinning   = false,
-            Repeatweeks = 1,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = otherPlayer.Id,
+            Gameid       = newerGame.Id,
+            Numbers      = new[] { 7, 8, 9, 10, 11 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 1,
             Repeatactive = false,
-            Createdat   = now,
-            Deletedat   = null
+            Createdat    = now,
+            Deletedat    = null
         };
 
         ctx.Boards.AddRange(olderBoard, newerBoard, otherBoard);

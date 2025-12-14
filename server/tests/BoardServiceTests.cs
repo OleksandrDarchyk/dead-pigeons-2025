@@ -1,19 +1,23 @@
+using System;
+using System.Globalization;
+using System.Linq;
 using System.Security.Claims;
 using api.Models.Requests;
 using api.Services;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Time.Testing;
 using ValidationException = Bogus.ValidationException;
 using DataAnnotationValidationException = System.ComponentModel.DataAnnotations.ValidationException;
-
 
 namespace tests;
 
 /// <summary>
 /// Service-level tests for BoardService.
 /// These tests ensure that board creation and querying follow all business rules,
-/// including balance calculation, validation and claim-based player resolution.
+/// including balance calculation, validation, claim-based player resolution
+/// and the "Saturday 17:00" join cutoff rule.
 /// </summary>
 public class BoardServiceTests(
     IBoardService boardService,
@@ -52,13 +56,13 @@ public class BoardServiceTests(
 
         var game = new Game
         {
-            Id        = Guid.NewGuid().ToString(),
-            Year      = year,
+            Id         = Guid.NewGuid().ToString(),
+            Year       = year,
             Weeknumber = weekNumber,
-            Isactive  = isActive,
-            Createdat = now,
-            Closedat  = null,
-            Deletedat = null
+            Isactive   = isActive,
+            Createdat  = now,
+            Closedat   = null,
+            Deletedat  = null
         };
 
         ctx.Games.Add(game);
@@ -66,27 +70,26 @@ public class BoardServiceTests(
         return game;
     }
 
-
     /// <summary>
     /// Helper to create a unique player.
     /// Optionally seeds an approved transaction to give the player some balance.
     /// </summary>
     private async Task<Player> CreateUniquePlayer(string emailPrefix, int balance = 0, bool isActive = true)
     {
-        var ct = TestContext.Current.CancellationToken;
-        var now = timeProvider.GetUtcNow().UtcDateTime;
+        var ct       = TestContext.Current.CancellationToken;
+        var now      = timeProvider.GetUtcNow().UtcDateTime;
         var uniqueId = Guid.NewGuid().ToString();
 
         var player = new Player
         {
-            Id = uniqueId,
-            Fullname = $"Test Player {uniqueId[..8]}",
-            Email = $"{emailPrefix}-{uniqueId}@test.local",
-            Phone = "12345678",
-            Isactive = isActive,
+            Id          = uniqueId,
+            Fullname    = $"Test Player {uniqueId[..8]}",
+            Email       = $"{emailPrefix}-{uniqueId}@test.local",
+            Phone       = "12345678",
+            Isactive    = isActive,
             Activatedat = isActive ? now : null,
-            Createdat = now,
-            Deletedat = null
+            Createdat   = now,
+            Deletedat   = null
         };
 
         ctx.Players.Add(player);
@@ -96,14 +99,14 @@ public class BoardServiceTests(
         {
             var tx = new Transaction
             {
-                Id = Guid.NewGuid().ToString(),
-                Playerid = player.Id,
-                Amount = balance,
-                Status = "Approved",
+                Id              = Guid.NewGuid().ToString(),
+                Playerid        = player.Id,
+                Amount          = balance,
+                Status          = "Approved",
                 Mobilepaynumber = $"{now.Ticks}{Random.Shared.Next(1000, 9999)}",
-                Createdat = now,
-                Approvedat = now,
-                Deletedat = null
+                Createdat       = now,
+                Approvedat      = now,
+                Deletedat       = null
             };
             ctx.Transactions.Add(tx);
         }
@@ -118,12 +121,12 @@ public class BoardServiceTests(
         var ct = TestContext.Current.CancellationToken;
 
         var player = await CreateUniquePlayer("board-happy", balance: 100);
-        var game = await CreateUniqueGame(isActive: true);
+        var game   = await CreateUniqueGame(isActive: true);
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = game.Id,
-            Numbers = new[] { 5, 1, 4, 2, 3 },
+            GameId      = game.Id,
+            Numbers     = new[] { 5, 1, 4, 2, 3 },
             RepeatWeeks = 0
         };
 
@@ -155,12 +158,12 @@ public class BoardServiceTests(
     public async Task CreateBoard_Throws_When_PlayerHasNotEnoughBalance()
     {
         var player = await CreateUniquePlayer("no-balance", balance: 0);
-        var game = await CreateUniqueGame(isActive: true);
+        var game   = await CreateUniqueGame(isActive: true);
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = game.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 },
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 2, 3, 4, 5 },
             RepeatWeeks = 1
         };
 
@@ -173,12 +176,12 @@ public class BoardServiceTests(
     {
         // This is expected to be caught by DataAnnotations on the DTO
         var player = await CreateUniquePlayer("count-invalid", balance: 1000);
-        var game = await CreateUniqueGame(isActive: true);
+        var game   = await CreateUniqueGame(isActive: true);
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = game.Id,
-            Numbers = new[] { 1, 2, 3, 4 }, // only 4 numbers
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 2, 3, 4 }, // only 4 numbers
             RepeatWeeks = 0
         };
 
@@ -190,12 +193,12 @@ public class BoardServiceTests(
     public async Task CreateBoard_Throws_When_NumbersAreNotDistinct()
     {
         var player = await CreateUniquePlayer("duplicate-numbers", balance: 1000);
-        var game = await CreateUniqueGame(isActive: true);
+        var game   = await CreateUniqueGame(isActive: true);
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = game.Id,
-            Numbers = new[] { 1, 1, 2, 3, 4 }, // duplicated "1"
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 1, 2, 3, 4 }, // duplicated "1"
             RepeatWeeks = 0
         };
 
@@ -207,12 +210,12 @@ public class BoardServiceTests(
     public async Task CreateBoard_Throws_When_NumberOutOfRange()
     {
         var player = await CreateUniquePlayer("range-invalid", balance: 1000);
-        var game = await CreateUniqueGame(isActive: true);
+        var game   = await CreateUniqueGame(isActive: true);
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = game.Id,
-            Numbers = new[] { 1, 2, 3, 4, 17 }, // 17 is out of [1;16]
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 2, 3, 4, 17 }, // 17 is out of [1;16]
             RepeatWeeks = 0
         };
 
@@ -227,8 +230,8 @@ public class BoardServiceTests(
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = game.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 },
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 2, 3, 4, 5 },
             RepeatWeeks = 0
         };
 
@@ -240,12 +243,12 @@ public class BoardServiceTests(
     public async Task CreateBoard_Throws_When_PlayerIsInactive()
     {
         var player = await CreateUniquePlayer("inactive", balance: 1000, isActive: false);
-        var game = await CreateUniqueGame(isActive: true);
+        var game   = await CreateUniqueGame(isActive: true);
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = game.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 },
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 2, 3, 4, 5 },
             RepeatWeeks = 0
         };
 
@@ -260,8 +263,8 @@ public class BoardServiceTests(
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = Guid.NewGuid().ToString(),
-            Numbers = new[] { 1, 2, 3, 4, 5 },
+            GameId      = Guid.NewGuid().ToString(),
+            Numbers     = new[] { 1, 2, 3, 4, 5 },
             RepeatWeeks = 0
         };
 
@@ -273,12 +276,12 @@ public class BoardServiceTests(
     public async Task CreateBoard_Throws_When_GameIsInactive()
     {
         var player = await CreateUniquePlayer("inactive-game", balance: 1000);
-        var game = await CreateUniqueGame(isActive: false);
+        var game   = await CreateUniqueGame(isActive: false);
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = game.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 },
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 2, 3, 4, 5 },
             RepeatWeeks = 0
         };
 
@@ -291,66 +294,66 @@ public class BoardServiceTests(
     {
         var ct = TestContext.Current.CancellationToken;
 
-        var player = await CreateUniquePlayer("boards-game");
+        var player     = await CreateUniquePlayer("boards-game");
         var targetGame = await CreateUniqueGame(isActive: true);
-        var otherGame = await CreateUniqueGame(isActive: false);
+        var otherGame  = await CreateUniqueGame(isActive: false);
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         var boardOld = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = player.Id,
-            Gameid = targetGame.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 }.ToList(),
-            Price = 20,
-            Iswinning = false,
-            Repeatweeks = 1,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = targetGame.Id,
+            Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 1,
             Repeatactive = false,
-            Createdat = now.AddMinutes(1),
-            Deletedat = null
+            Createdat    = now.AddMinutes(1),
+            Deletedat    = null
         };
 
         var boardDeleted = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = player.Id,
-            Gameid = targetGame.Id,
-            Numbers = new[] { 6, 7, 8, 9, 10 }.ToList(),
-            Price = 20,
-            Iswinning = false,
-            Repeatweeks = 1,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = targetGame.Id,
+            Numbers      = new[] { 6, 7, 8, 9, 10 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 1,
             Repeatactive = false,
-            Createdat = now.AddMinutes(2),
-            Deletedat = now.AddMinutes(3)
+            Createdat    = now.AddMinutes(2),
+            Deletedat    = now.AddMinutes(3)
         };
 
         var boardNew = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = player.Id,
-            Gameid = targetGame.Id,
-            Numbers = new[] { 11, 12, 13, 14, 15 }.ToList(),
-            Price = 20,
-            Iswinning = false,
-            Repeatweeks = 1,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = targetGame.Id,
+            Numbers      = new[] { 11, 12, 13, 14, 15 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 1,
             Repeatactive = false,
-            Createdat = now.AddMinutes(4),
-            Deletedat = null
+            Createdat    = now.AddMinutes(4),
+            Deletedat    = null
         };
 
         var boardOtherGame = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = player.Id,
-            Gameid = otherGame.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 }.ToList(),
-            Price = 20,
-            Iswinning = false,
-            Repeatweeks = 1,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = otherGame.Id,
+            Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 1,
             Repeatactive = false,
-            Createdat = now.AddMinutes(5),
-            Deletedat = null
+            Createdat    = now.AddMinutes(5),
+            Deletedat    = null
         };
 
         ctx.Boards.AddRange(boardOld, boardDeleted, boardNew, boardOtherGame);
@@ -373,66 +376,66 @@ public class BoardServiceTests(
     {
         var ct = TestContext.Current.CancellationToken;
 
-        var player = await CreateUniquePlayer("boards-player");
+        var player      = await CreateUniquePlayer("boards-player");
         var otherPlayer = await CreateUniquePlayer("other-player");
-        var game = await CreateUniqueGame(isActive: true);
+        var game        = await CreateUniqueGame(isActive: true);
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         var olderBoard = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = player.Id,
-            Gameid = game.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 }.ToList(),
-            Price = 20,
-            Iswinning = false,
-            Repeatweeks = 0,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = game.Id,
+            Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 0,
             Repeatactive = false,
-            Createdat = now.AddMinutes(-10),
-            Deletedat = null
+            Createdat    = now.AddMinutes(-10),
+            Deletedat    = null
         };
 
         var newerBoard = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = player.Id,
-            Gameid = game.Id,
-            Numbers = new[] { 6, 7, 8, 9, 10 }.ToList(),
-            Price = 20,
-            Iswinning = false,
-            Repeatweeks = 0,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = game.Id,
+            Numbers      = new[] { 6, 7, 8, 9, 10 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 0,
             Repeatactive = false,
-            Createdat = now.AddMinutes(-5),
-            Deletedat = null
+            Createdat    = now.AddMinutes(-5),
+            Deletedat    = null
         };
 
         var deletedBoard = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = player.Id,
-            Gameid = game.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 }.ToList(),
-            Price = 20,
-            Iswinning = false,
-            Repeatweeks = 0,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = game.Id,
+            Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 0,
             Repeatactive = false,
-            Createdat = now.AddMinutes(-3),
-            Deletedat = now
+            Createdat    = now.AddMinutes(-3),
+            Deletedat    = now
         };
 
         var otherPlayerBoard = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = otherPlayer.Id,
-            Gameid = game.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 }.ToList(),
-            Price = 20,
-            Iswinning = false,
-            Repeatweeks = 0,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = otherPlayer.Id,
+            Gameid       = game.Id,
+            Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 0,
             Repeatactive = false,
-            Createdat = now.AddMinutes(-1),
-            Deletedat = null
+            Createdat    = now.AddMinutes(-1),
+            Deletedat    = null
         };
 
         ctx.Boards.AddRange(olderBoard, newerBoard, deletedBoard, otherPlayerBoard);
@@ -449,7 +452,7 @@ public class BoardServiceTests(
     public async Task CreateBoardForCurrentUser_ResolvesPlayerFromEmailClaim_AndCreatesBoard()
     {
         var player = await CreateUniquePlayer("claims-player", balance: 100);
-        var game = await CreateUniqueGame(isActive: true);
+        var game   = await CreateUniqueGame(isActive: true);
 
         var identity = new ClaimsIdentity(
             new[] { new Claim(ClaimTypes.Email, player.Email) },
@@ -458,8 +461,8 @@ public class BoardServiceTests(
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = game.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 },
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 2, 3, 4, 5 },
             RepeatWeeks = 0
         };
 
@@ -473,12 +476,12 @@ public class BoardServiceTests(
     public async Task CreateBoardForCurrentUser_Throws_When_EmailClaimMissing()
     {
         var identity = new ClaimsIdentity();
-        var user = new ClaimsPrincipal(identity);
+        var user     = new ClaimsPrincipal(identity);
 
         var dto = new CreateBoardRequestDto
         {
-            GameId = "dummy",
-            Numbers = new[] { 1, 2, 3, 4, 5 },
+            GameId      = "dummy",
+            Numbers     = new[] { 1, 2, 3, 4, 5 },
             RepeatWeeks = 0
         };
 
@@ -491,38 +494,38 @@ public class BoardServiceTests(
     {
         var ct = TestContext.Current.CancellationToken;
 
-        var player = await CreateUniquePlayer("history-claims");
+        var player      = await CreateUniquePlayer("history-claims");
         var otherPlayer = await CreateUniquePlayer("other-claims");
-        var game = await CreateUniqueGame(isActive: true);
+        var game        = await CreateUniqueGame(isActive: true);
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         var boardForPlayer = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = player.Id,
-            Gameid = game.Id,
-            Numbers = new[] { 1, 2, 3, 4, 5 }.ToList(),
-            Price = 20,
-            Iswinning = false,
-            Repeatweeks = 0,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = game.Id,
+            Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 0,
             Repeatactive = false,
-            Createdat = now.AddMinutes(-5),
-            Deletedat = null
+            Createdat    = now.AddMinutes(-5),
+            Deletedat    = null
         };
 
         var boardForOther = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = otherPlayer.Id,
-            Gameid = game.Id,
-            Numbers = new[] { 6, 7, 8, 9, 10 }.ToList(),
-            Price = 20,
-            Iswinning = false,
-            Repeatweeks = 0,
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = otherPlayer.Id,
+            Gameid       = game.Id,
+            Numbers      = new[] { 6, 7, 8, 9, 10 }.ToList(),
+            Price        = 20,
+            Iswinning    = false,
+            Repeatweeks  = 0,
             Repeatactive = false,
-            Createdat = now.AddMinutes(-1),
-            Deletedat = null
+            Createdat    = now.AddMinutes(-1),
+            Deletedat    = null
         };
 
         ctx.Boards.AddRange(boardForPlayer, boardForOther);
@@ -537,5 +540,148 @@ public class BoardServiceTests(
 
         Assert.Single(result);
         Assert.Equal(player.Id, result[0].Playerid);
+    }
+
+    // ==========================================
+    // Saturday 17:00 Danish local time cutoff
+    // ==========================================
+
+    private static TimeZoneInfo GetDanishTimeZoneForTests()
+    {
+        try
+        {
+            // Linux / macOS
+            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Copenhagen");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                // Windows fallback
+                return TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                return TimeZoneInfo.Local;
+            }
+        }
+        catch (InvalidTimeZoneException)
+        {
+            return TimeZoneInfo.Local;
+        }
+    }
+
+    private static DateTime GetDanishSaturdayBeforeCutoffUtc(Game game)
+    {
+        var dkZone = GetDanishTimeZoneForTests();
+
+        var saturdayLocal = ISOWeek
+            .ToDateTime(game.Year, game.Weeknumber, DayOfWeek.Saturday)
+            .AddHours(16)
+            .AddMinutes(59); // 16:59 Danish local time
+
+        return TimeZoneInfo.ConvertTimeToUtc(saturdayLocal, dkZone);
+    }
+
+    private static DateTime GetDanishSaturdayCutoffUtc(Game game)
+    {
+        var dkZone = GetDanishTimeZoneForTests();
+
+        var saturdayLocal = ISOWeek
+            .ToDateTime(game.Year, game.Weeknumber, DayOfWeek.Saturday)
+            .AddHours(17); // 17:00 Danish local time
+
+        return TimeZoneInfo.ConvertTimeToUtc(saturdayLocal, dkZone);
+    }
+
+    private static DateTime GetDanishSaturdayAfterCutoffUtc(Game game)
+    {
+        var dkZone = GetDanishTimeZoneForTests();
+
+        var saturdayLocal = ISOWeek
+            .ToDateTime(game.Year, game.Weeknumber, DayOfWeek.Saturday)
+            .AddHours(18); // 18:00 Danish local time
+
+        return TimeZoneInfo.ConvertTimeToUtc(saturdayLocal, dkZone);
+    }
+
+    [Fact]
+    public async Task CreateBoard_AllowsPurchase_BeforeSaturday1700_ForGameWeek()
+    {
+        var fakeTime = Assert.IsType<FakeTimeProvider>(timeProvider);
+
+        var player = await CreateUniquePlayer("cutoff-before", balance: 100);
+        var game   = await CreateUniqueGame(isActive: true);
+
+        var beforeCutoffUtc = GetDanishSaturdayBeforeCutoffUtc(game);
+        fakeTime.SetUtcNow(beforeCutoffUtc);
+
+        var dto = new CreateBoardRequestDto
+        {
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 2, 3, 4, 5 },
+            RepeatWeeks = 0
+        };
+
+        var board = await boardService.CreateBoard(player.Id, dto);
+
+        Assert.Equal(game.Id, board.Gameid);
+        Assert.Equal(player.Id, board.Playerid);
+
+        outputHelper.WriteLine(
+            $"[Cutoff-Before] Game week={game.Weeknumber}/{game.Year}, nowUTC={fakeTime.GetUtcNow()}"
+        );
+    }
+
+    [Fact]
+    public async Task CreateBoard_Throws_AtExactlySaturday1700_ForGameWeek()
+    {
+        var fakeTime = Assert.IsType<FakeTimeProvider>(timeProvider);
+
+        var player = await CreateUniquePlayer("cutoff-exact", balance: 100);
+        var game   = await CreateUniqueGame(isActive: true);
+
+        var cutoffUtc = GetDanishSaturdayCutoffUtc(game);
+        fakeTime.SetUtcNow(cutoffUtc);
+
+        var dto = new CreateBoardRequestDto
+        {
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 2, 3, 4, 5 },
+            RepeatWeeks = 0
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await boardService.CreateBoard(player.Id, dto));
+
+        outputHelper.WriteLine(
+            $"[Cutoff-Exact] Game week={game.Weeknumber}/{game.Year}, nowUTC={fakeTime.GetUtcNow()}, blocked at 17:00 Danish time as expected"
+        );
+    }
+
+    [Fact]
+    public async Task CreateBoard_Throws_AfterSaturday1700_ForGameWeek()
+    {
+        var fakeTime = Assert.IsType<FakeTimeProvider>(timeProvider);
+
+        var player = await CreateUniquePlayer("cutoff-after", balance: 100);
+        var game   = await CreateUniqueGame(isActive: true);
+
+        var afterCutoffUtc = GetDanishSaturdayAfterCutoffUtc(game);
+        fakeTime.SetUtcNow(afterCutoffUtc);
+
+        var dto = new CreateBoardRequestDto
+        {
+            GameId      = game.Id,
+            Numbers     = new[] { 1, 2, 3, 4, 5 },
+            RepeatWeeks = 0
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await boardService.CreateBoard(player.Id, dto));
+
+        outputHelper.WriteLine(
+            $"[Cutoff-After] Game week={game.Weeknumber}/{game.Year}, nowUTC={fakeTime.GetUtcNow()}, blocked after 17:00 Danish time as expected"
+        );
     }
 }

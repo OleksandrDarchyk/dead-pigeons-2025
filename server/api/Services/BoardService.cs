@@ -1,5 +1,6 @@
 // api/Services/BoardService.cs
 using System.ComponentModel.DataAnnotations;
+using System.Globalization;
 using System.Security.Claims;
 using api.Models.Requests;
 using dataccess;
@@ -10,10 +11,29 @@ using ValidationException = Bogus.ValidationException;
 
 namespace api.Services;
 
+/// <summary>
+/// Service responsible for creating and reading boards (tickets) for games.
+/// </summary>
 public class BoardService(
     MyDbContext ctx,
     TimeProvider timeProvider) : IBoardService
 {
+    /// <summary>
+    /// Creates a new board for a given player and game.
+    ///
+    /// Important business rules:
+    /// - Only ACTIVE players can buy boards.
+    /// - Boards can only be bought for ACTIVE games (not closed, not deleted).
+    /// - Boards can only be bought until Saturday 17:00 Danish local time
+    ///   for the corresponding game week.
+    /// - Price is calculated on the server based on the number of numbers:
+    ///     5 -> 20, 6 -> 40, 7 -> 80, 8 -> 160.
+    /// - Balance check:
+    ///     We only charge for ONE game (this week) here.
+    ///     RepeatWeeks does NOT prepay future games.
+    ///     Future repeat boards will be created by GameService
+    ///     and will charge the weekly price again at that time.
+    /// </summary>
     public async Task<Board> CreateBoard(string playerId, CreateBoardRequestDto dto)
     {
         // Validate DTO using DataAnnotations attributes
@@ -86,6 +106,29 @@ public class BoardService(
             throw new ValidationException("Cannot buy boards for an inactive game.");
         }
 
+        // Business rule: players may only join the game until
+        // Saturday 17:00 Danish local time (for this game's week/year).
+        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var dkZone = GetDanishTimeZone();
+        var nowDk = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, dkZone);
+
+        // ISO week start (Monday) for this game (year + weekNumber)
+        // We treat it as Danish local date.
+        var weekStartDk = ISOWeek.ToDateTime(game.Year, game.Weeknumber, DayOfWeek.Monday);
+
+        // Saturday of this ISO week at 17:00 Danish local time
+        var saturdayDeadlineDk = weekStartDk
+            .AddDays(5)          // Monday + 5 days = Saturday
+            .AddHours(17);       // 17:00 (5 PM)
+
+        // "Until 5 o'clock" means 16:59:59 is allowed, 17:00:00 is not.
+        if (nowDk >= saturdayDeadlineDk)
+        {
+            throw new ValidationException(
+                "You can no longer join this week's game. " +
+                "The deadline is Saturday at 17:00 Danish local time.");
+        }
+
         // Price is calculated on the server based on number of fields
         var count = sortedNumbers.Length;
         var weeklyPrice = count switch
@@ -97,44 +140,43 @@ public class BoardService(
             _ => throw new ValidationException("Board must have between 5 and 8 numbers.")
         };
 
-        // How many weeks we must be able to cover with current balance:
-        // 0 -> no repeat -> at least 1 week
-        var weeksToCover = dto.RepeatWeeks <= 0 ? 1 : dto.RepeatWeeks;
+        // We only charge for ONE game (this game) here.
+        var totalCostForThisGame = weeklyPrice;
 
-        // ❗ New logic:
-        // We charge the FULL amount for all selected weeks *now*,
-        // and store this full charge in Board.Price.
-        var totalCost = weeklyPrice * weeksToCover;
-
-        // Balance = sum(approved transactions) - sum(board charges)
+        // Balance = sum(approved transactions) - sum(board.Price)
         var currentBalance = await GetCurrentBalance(playerId);
 
-        if (currentBalance < totalCost)
+        if (currentBalance < totalCostForThisGame)
         {
             throw new ValidationException(
-                "Not enough balance to buy this board for the selected number of weeks.");
+                "Not enough balance to buy this board for this game.");
         }
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         var board = new Board
         {
-            Id = Guid.NewGuid().ToString(),
-            Playerid = playerId,
-            Gameid = dto.GameId,
-            Numbers = sortedNumbers.ToList(),
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = playerId,
+            Gameid       = dto.GameId,
+            Numbers      = sortedNumbers.ToList(),
 
-            // ❗ Very important:
-            // For non-repeating boards: Price = weeklyPrice (1 week).
-            // For repeating boards: Price = totalCost for ALL weeks (prepaid).
-            // Repeating copies created later will have Price = 0.
-            Price = totalCost,
+            // Price is ALWAYS the weekly price for a single game.
+            // There is no "prepaid multi-week" price stored in this column.
+            Price        = weeklyPrice,
 
-            Iswinning = false,
-            Repeatweeks = dto.RepeatWeeks,
+            Iswinning    = false,
+
+            // How many FUTURE games this board should repeat for.
+            // Example: RepeatWeeks = 2 -> this board should auto-repeat
+            // for the next 2 games (if repeat is still active and balance is OK).
+            Repeatweeks  = dto.RepeatWeeks,
+
+            // Auto-repeat is active only if there are any future repeats requested.
             Repeatactive = dto.RepeatWeeks > 0,
-            Createdat = now,
-            Deletedat = null
+
+            Createdat    = now,
+            Deletedat    = null
         };
 
         ctx.Boards.Add(board);
@@ -143,9 +185,13 @@ public class BoardService(
         return board;
     }
 
+    /// <summary>
+    /// Returns all non-deleted boards for a specific game,
+    /// including Player and Game navigation properties.
+    /// Used mostly for admin overview.
+    /// </summary>
     public async Task<List<Board>> GetBoardsForGame(string gameId)
     {
-        // All non-deleted boards for a specific game, with Player and Game included
         return await ctx.Boards
             .Where(b => b.Gameid == gameId && b.Deletedat == null)
             .Include(b => b.Player) // used for admin overview (player details)
@@ -154,16 +200,23 @@ public class BoardService(
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Returns all non-deleted boards for a specific player (latest first),
+    /// including Game navigation property for week/year metadata.
+    /// </summary>
     public async Task<List<Board>> GetBoardsForPlayer(string playerId)
     {
-        // All non-deleted boards for a specific player (latest first), with Game included
         return await ctx.Boards
             .Where(b => b.Playerid == playerId && b.Deletedat == null)
-            .Include(b => b.Game) // we can expose GameWeek / GameYear in DTO later
+            .Include(b => b.Game) // used to expose GameWeek / GameYear in DTO
             .OrderByDescending(b => b.Createdat)
             .ToListAsync();
     }
 
+    /// <summary>
+    /// Creates a board for the player connected to the current JWT user.
+    /// The email is resolved from claims and mapped to a Player entity.
+    /// </summary>
     public async Task<Board> CreateBoardForCurrentUser(
         ClaimsPrincipal claims,
         CreateBoardRequestDto dto)
@@ -187,6 +240,9 @@ public class BoardService(
         return await CreateBoard(player.Id, dto);
     }
 
+    /// <summary>
+    /// Returns all boards for the current JWT user (resolved via email -> Player).
+    /// </summary>
     public async Task<List<Board>> GetBoardsForCurrentUser(ClaimsPrincipal claims)
     {
         var email = claims.FindFirst(ClaimTypes.Email)?.Value;
@@ -207,13 +263,67 @@ public class BoardService(
     }
 
     /// <summary>
+    /// Stop repeating for a board that belongs to the current logged-in user.
+    /// We do NOT refund anything, because we never prepaid future games.
+    /// We just prevent creating new boards in future games.
+    /// </summary>
+    public async Task<Board> StopRepeatingBoardForCurrentUser(ClaimsPrincipal claims, string boardId)
+    {
+        var email = claims.FindFirst(ClaimTypes.Email)?.Value;
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            throw new ValidationException("Email not found on current user.");
+        }
+
+        var player = await ctx.Players
+            .FirstOrDefaultAsync(p => p.Email == email && p.Deletedat == null);
+
+        if (player == null)
+        {
+            throw new ValidationException("Player not found for current user.");
+        }
+
+        var board = await ctx.Boards
+            .Include(b => b.Game)
+            .FirstOrDefaultAsync(b => b.Id == boardId && b.Deletedat == null);
+
+        if (board == null)
+        {
+            throw new ValidationException("Board not found.");
+        }
+
+        if (board.Playerid != player.Id)
+        {
+            throw new ValidationException("You can only stop repeating for your own boards.");
+        }
+
+        // If already stopped, we can just return it as-is
+        if (!board.Repeatactive && board.Repeatweeks == 0)
+        {
+            return board;
+        }
+
+        // Disable auto-repeat for future games
+        board.Repeatactive = false;
+        board.Repeatweeks = 0;
+
+        await ctx.SaveChangesAsync();
+
+        return board;
+    }
+
+    /// <summary>
     /// Calculates current balance for a player as:
-    ///   sum(Approved transactions) - sum(board charges).
+    ///   sum(Approved transactions.amount) - sum(boards.Price).
     ///
     /// Important:
-    /// - For non-repeating boards: board.Price = weekly price (one game).
-    /// - For repeating boards: board.Price = full prepaid amount for all weeks.
-    ///   Repeating copies created later have Price = 0 and do not change the balance.
+    /// - For ALL boards (normal or "repeat"), Price is ALWAYS the weekly price
+    ///   for a single game (20 / 40 / 80 / 160).
+    /// - When a board is repeated to a future game, that new board also
+    ///   has Price = weekly price, and balance is checked again at creation time.
+    /// - There are no "zero-price" repeat copies anymore; every board
+    ///   that exists in the database represents money actually spent
+    ///   for that specific game.
     /// </summary>
     private async Task<int> GetCurrentBalance(string playerId)
     {
@@ -231,5 +341,37 @@ public class BoardService(
             .SumAsync(b => (int?)b.Price) ?? 0;
 
         return approvedAmount - spentOnBoards;
+    }
+
+    /// <summary>
+    /// Returns the Danish time zone (Europe/Copenhagen) if available.
+    /// Falls back to local server time zone if it cannot be resolved.
+    /// This keeps the "Danish local time" rule robust across environments.
+    /// </summary>
+    private static TimeZoneInfo GetDanishTimeZone()
+    {
+        try
+        {
+            // Linux / macOS (IANA time zone id)
+            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Copenhagen");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                // Windows fallback with a matching offset/DST rules
+                return TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
+            }
+            catch (TimeZoneNotFoundException)
+            {
+                // Final fallback: use server local time zone
+                return TimeZoneInfo.Local;
+            }
+        }
+        catch (InvalidTimeZoneException)
+        {
+            // If something is wrong with the time zone data, use local as best effort
+            return TimeZoneInfo.Local;
+        }
     }
 }
