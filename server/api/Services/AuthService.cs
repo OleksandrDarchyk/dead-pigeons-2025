@@ -130,7 +130,6 @@ public class AuthService(
             Email = normalizedEmail,      // store normalized email
             Createdat = now,
             Role = Roles.User,
-            Salt = string.Empty           // Argon2id hash contains its own salt
         };
 
         // Hash the raw password using Argon2id
