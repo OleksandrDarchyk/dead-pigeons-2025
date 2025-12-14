@@ -1,5 +1,6 @@
 // api/Services/GameService.cs
 using System.ComponentModel.DataAnnotations;
+using System.Data;
 using api.Models.Game;
 using api.Models.Requests;
 using dataccess;
@@ -41,30 +42,33 @@ public class GameService(
             .ThenByDescending(g => g.Weeknumber)
             .ToListAsync();
     }
+    
+public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersRequestDto dto)
+{
+    Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
-    public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersRequestDto dto)
+    var numbers = dto.WinningNumbers;
+
+    if (numbers.Distinct().Count() != 3)
     {
-        // 1) Validate DTO via DataAnnotations attributes
-        Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
+        throw new ValidationException("Winning numbers must be 3 distinct values.");
+    }
 
-        var numbers = dto.WinningNumbers;
+    if (numbers.Any(n => n < 1 || n > 16))
+    {
+        throw new ValidationException("Winning numbers must be between 1 and 16.");
+    }
 
-        // Must be exactly 3 distinct numbers
-        if (numbers.Distinct().Count() != 3)
-        {
-            throw new ValidationException("Winning numbers must be 3 distinct values.");
-        }
+    var sortedNumbers = numbers.OrderBy(n => n).ToArray();
 
-        // Each number must be in [1;16]
-        if (numbers.Any(n => n < 1 || n > 16))
-        {
-            throw new ValidationException("Winning numbers must be between 1 and 16.");
-        }
+    var alreadyInTransaction = ctx.Database.CurrentTransaction != null;
 
-        // We always sort them so order never matters
-        var sortedNumbers = numbers.OrderBy(n => n).ToArray();
+    await using var tx = alreadyInTransaction
+        ? null
+        : await ctx.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
-        // 2) Load the game with its boards (only if not soft-deleted)
+    try
+    {
         var game = await ctx.Games
             .Include(g => g.Boards)
             .FirstOrDefaultAsync(g => g.Id == dto.GameId && g.Deletedat == null);
@@ -74,35 +78,16 @@ public class GameService(
             throw new ValidationException("Game not found.");
         }
 
-        // Protect from double-submit: if the game is not active, then it is already finished
         if (!game.Isactive)
         {
             throw new ValidationException("Game already finished.");
         }
 
-        // Extra guard: if for some reason game is still active, but winning numbers already exist
         if (game.Winningnumbers != null)
         {
             throw new ValidationException("Winning numbers already set for this game.");
         }
 
-        // 3) Close current game and set winning numbers
-        game.Winningnumbers = sortedNumbers.ToList();
-        game.Closedat = timeProvider.GetUtcNow().UtcDateTime;
-        game.Isactive = false;
-
-        // 4) Mark winning boards:
-        //    a board wins if it contains all 3 winning numbers
-        var winningSet = sortedNumbers.ToHashSet();
-
-        foreach (var board in game.Boards.Where(b => b.Deletedat == null))
-        {
-            var boardSet = board.Numbers.ToHashSet();
-            var isWinning = winningSet.All(n => boardSet.Contains(n));
-            board.Iswinning = isWinning;
-        }
-
-        // 5) Activate the next upcoming game by (year, weekNumber)
         var nextGame = await ctx.Games
             .Where(g =>
                 g.Deletedat == null &&
@@ -113,45 +98,64 @@ public class GameService(
             .ThenBy(g => g.Weeknumber)
             .FirstOrDefaultAsync();
 
-        if (nextGame != null)
+        if (nextGame == null)
         {
-            // Make the next week active
-            nextGame.Isactive = true;
-
-            // 6) Create new boards for all repeating boards of the just-closed game.
-            //    Now each repeat is charged per week if the player has enough balance.
-            await CreateRepeatingBoardsForNextGame(game, nextGame);
+            throw new ValidationException("Next game not found. Seeding is missing or data is corrupted.");
         }
 
-        // 7) Calculate summary for the just-closed game
-        var totalBoards = game.Boards
-            .Count(b => b.Deletedat == null);
+        game.Winningnumbers = sortedNumbers.ToList();
+        game.Closedat = timeProvider.GetUtcNow().UtcDateTime;
+        game.Isactive = false;
 
-        var winningBoards = game.Boards
-            .Count(b => b.Deletedat == null && b.Iswinning);
+        var winningSet = sortedNumbers.ToHashSet();
 
-        // Digital revenue for this game:
-        // We now store weekly price in Board.Price,
-        // so the revenue for this game is simply the sum of Price.
+        foreach (var board in game.Boards.Where(b => b.Deletedat == null))
+        {
+            var boardSet = board.Numbers.ToHashSet();
+            board.Iswinning = winningSet.All(n => boardSet.Contains(n));
+        }
+
+        nextGame.Isactive = true;
+
+        await CreateRepeatingBoardsForNextGame(game, nextGame);
+
+        var totalBoards = game.Boards.Count(b => b.Deletedat == null);
+        var winningBoards = game.Boards.Count(b => b.Deletedat == null && b.Iswinning);
         var digitalRevenue = game.Boards
             .Where(b => b.Deletedat == null)
             .Sum(b => b.Price);
 
-        // 8) Save all changes in one go
         await ctx.SaveChangesAsync();
 
-        // 9) Return a summary DTO for the UI
+        if (tx != null)
+        {
+            await tx.CommitAsync();
+        }
+
         return new GameResultSummaryDto
         {
-            GameId         = game.Id,
-            WeekNumber     = game.Weeknumber,
-            Year           = game.Year,
+            GameId = game.Id,
+            WeekNumber = game.Weeknumber,
+            Year = game.Year,
             WinningNumbers = sortedNumbers,
-            TotalBoards    = totalBoards,
-            WinningBoards  = winningBoards,
+            TotalBoards = totalBoards,
+            WinningBoards = winningBoards,
             DigitalRevenue = digitalRevenue
         };
     }
+    catch
+    {
+        if (tx != null)
+        {
+            await tx.RollbackAsync();
+        }
+
+        throw;
+    }
+}
+
+
+
 
     /// <summary>
     /// For all boards in the current game that are marked as repeating,
