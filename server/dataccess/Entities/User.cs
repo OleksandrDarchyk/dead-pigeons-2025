@@ -11,8 +11,6 @@ public partial class User
 
     public string Passwordhash { get; set; } = null!;
 
-    public string Salt { get; set; } = null!;
-
     public string Role { get; set; } = null!;
 
     public DateTime? Createdat { get; set; }
