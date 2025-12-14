@@ -175,8 +175,7 @@ public class Program
         // Map controllers
         app.MapControllers();
 
-        // Dev-only: generate TypeScript client and seed the database
-        // Dev-only: generate TypeScript client and seed the database
+        
         // Dev-only: generate TypeScript client and seed the database
         if (app.Environment.IsDevelopment())
         {

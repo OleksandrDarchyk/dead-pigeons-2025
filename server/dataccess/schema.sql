@@ -10,7 +10,6 @@ create table deadpigeons.users
     id           text primary key not null,
     email        text             not null,
     passwordhash text             not null,
-    salt         text             not null,
     role         text             not null default 'User',
     createdAt    timestamp with time zone,
     deletedAt    timestamp with time zone  -- soft delete for auth users

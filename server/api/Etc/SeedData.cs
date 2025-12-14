@@ -41,7 +41,6 @@ public static class SeedData
                 Email = adminEmail,
                 Role = "Admin",
                 Createdat = now,
-                Salt = string.Empty
             };
             admin.Passwordhash = passwordHasher.HashPassword(admin, "Password123");
 
@@ -62,7 +61,6 @@ public static class SeedData
                 Email = playerEmail,
                 Role = "User",
                 Createdat = now,
-                Salt = string.Empty
             };
             playerUser.Passwordhash = passwordHasher.HashPassword(playerUser, "Password123");
 
@@ -83,7 +81,6 @@ public static class SeedData
                 Email = testUserEmail,
                 Role = "User",
                 Createdat = now,
-                Salt = string.Empty
             };
             testUser.Passwordhash = passwordHasher.HashPassword(testUser, "Password123");
 

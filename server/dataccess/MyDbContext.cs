@@ -146,7 +146,6 @@ public partial class MyDbContext : DbContext
             entity.Property(e => e.Role)
                 .HasDefaultValueSql("'User'::text")
                 .HasColumnName("role");
-            entity.Property(e => e.Salt).HasColumnName("salt");
         });
 
         OnModelCreatingPartial(modelBuilder);
