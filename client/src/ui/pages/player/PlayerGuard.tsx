@@ -10,7 +10,6 @@ export default function PlayerGuard({ children }: PlayerGuardProps) {
     const { user, token } = useAuth();
     const role = user?.role;
 
-    // 1) користувач взагалі не залогінений
     if (!token) {
         return (
             <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
@@ -39,7 +38,6 @@ export default function PlayerGuard({ children }: PlayerGuardProps) {
         );
     }
 
-    // 3) юзер залогінений, але роль не "User" (тобто не Player)
     if (role !== "User") {
         return (
             <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
@@ -55,6 +53,5 @@ export default function PlayerGuard({ children }: PlayerGuardProps) {
         );
     }
 
-    // 4) все ок — показуємо справжню сторінку
     return <>{children}</>;
 }
