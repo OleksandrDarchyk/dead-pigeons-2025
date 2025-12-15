@@ -8,10 +8,7 @@ export default defineConfig({
     plugins: [react()],
     test: {
         environment: "happy-dom",
-
         globals: true,
-
-
         coverage: {
             provider: "v8",
             reporter: ["text", "json-summary", "json"],
@@ -21,9 +18,10 @@ export default defineConfig({
     resolve: {
         alias: {
             "@core": path.resolve(__dirname, "./src/core"),
-            "@utilities": path.resolve(__dirname, "./src/utilities"),
-            "@components": path.resolve(__dirname, "./src/components"),
-            "@atoms": path.resolve(__dirname, "./src/atoms"),
+            "@hooks": path.resolve(__dirname, "./src/utils/hooks"),
+            "@pages": path.resolve(__dirname, "./src/ui/pages"),
+            "@layouts": path.resolve(__dirname, "./src/ui/layouts"),
+            "@app": path.resolve(__dirname, "./src/ui/app"),
         },
     },
 });

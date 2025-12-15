@@ -8,15 +8,15 @@
     "outDir": "./dist",
     "rootDir": ".",
 
-    "baseUrl": "./src",
+    "baseUrl": ".",
     "paths": {
-      "@atoms/*": ["atoms/*"],
-      "@components/*": ["components/*"],
-      "@core/*": ["core/*"],
-      "@utilities/*": ["utilities/*"],
-      "@pages/*": ["pages/*"],
-      "@hooks/*": ["hooks/*"]
+      "@core/*": ["./src/core/*"],
+      "@hooks/*": ["./src/utils/hooks/*"],
+      "@pages/*": ["./src/ui/pages/*"],
+      "@layouts/*": ["./src/ui/layouts/*"],
+      "@app/*": ["./src/ui/app/*"]
     }
+
   },
   "include": [
     "**/*.ts",

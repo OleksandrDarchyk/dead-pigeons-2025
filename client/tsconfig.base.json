@@ -2,14 +2,10 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": [
-      "ES2020",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
-    /* Bundler mode */
+
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
@@ -17,21 +13,25 @@
     "emitDeclarationOnly": true,
     "declaration": true,
     "jsx": "react-jsx",
-    /* Project references */
+
     "composite": true,
     "outDir": "../../dist",
     "rootDir": ".",
-    /* Path aliases */
+
     "baseUrl": ".",
     "paths": {
       "@core/*": ["./src/core/*"],
-      "@utilities/*": ["./src/utilities/*"],
-      "@components/*": ["./src/components/*"],
-      "@pages/*": ["./src/pages/*"],
-      "@atoms/*": ["./src/atoms/*"],
-      "@hooks/*": ["./src/hooks/*"]
+      "@hooks/*": ["./src/utils/hooks/*"],
+      "@pages/*": ["./src/ui/pages/*"],
+      "@layouts/*": ["./src/ui/layouts/*"],
+      "@app/*": ["./src/ui/app/*"],
+
+      "@ui/*": ["./src/ui/*"],
+      "@utils/*": ["./src/utils/*"]
     },
-    /* Linting */
+
+
+
     "noImplicitAny": false,
     "strict": true,
     "noUnusedLocals": false,
@@ -39,8 +39,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "exclude": [
-    "node_modules",
-    "tmp"
-  ]
+  "exclude": ["node_modules", "tmp"]
 }

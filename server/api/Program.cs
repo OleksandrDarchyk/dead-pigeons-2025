@@ -209,7 +209,7 @@ public class Program
         {
             Console.WriteLine("PROD: seeding games started");
 
-            app.GenerateApiClientsFromOpenApi("/../../client/src/core/generated-client.ts")
+            app.GenerateApiClientsFromOpenApi("/../../client/src/core/api/generated/generated-client.ts")
                 .GetAwaiter()
                 .GetResult();
             Console.WriteLine("PROD: seeding games finished");

@@ -20,15 +20,9 @@ export default defineConfig([
 
                 project: [
                     './tsconfig.node.json',
-                    './src/core/tsconfig.json',
-                    './src/utilities/tsconfig.json',
-                    './src/components/tsconfig.json',
-                    './src/atoms/tsconfig.json',
-                    './src/pages/tsconfig.json',
-                    './src/hooks/tsconfig.json',
-                    './src/tsconfig.json',
-
+                    './src/tsconfig.json'
                 ],
+
                 tsconfigRootDir: import.meta.dirname,
             },
         },
