@@ -1,4 +1,5 @@
 {
+  "extends": "../tsconfig.settings.json",
   "compilerOptions": {
     "composite": true,
     "jsx": "react-jsx",
@@ -13,13 +14,18 @@
     "baseUrl": ".",
     "paths": {
       "@core/*": ["core/*"],
-      "@utilities/*": ["utilities/*"],
-      "@atoms/*": ["atoms/*"],
-      "@components/*": ["components/*"],
-      "@pages/*": ["pages/*"],
-      "@hooks/*": ["hooks/*"]
+      "@ui/*": ["ui/*"],
+      "@utils/*": ["utils/*"],
+      "@pages/*": ["ui/pages/*"],
+      "@layouts/*": ["ui/layouts/*"],
+      "@hooks/*": ["utils/hooks/*"]
     },
     "skipLibCheck": true
   },
-  "include": ["**/*"]
+  "include": ["**/*"],
+  "references": [
+    { "path": "./core" },
+    { "path": "./utils" },
+    { "path": "./ui" }
+  ]
 }

@@ -1,19 +1,19 @@
-// src/router.tsx
 import {
     createBrowserRouter,
     createRoutesFromElements,
     Route,
 } from "react-router-dom";
 
-import HomeLayout from "./components/layout/HomeLayout";
-import HomePage from "./pages/home/HomePage";
-import LoginPage from "./pages/auth/LoginPage";
-import AdminDashboardPage from "./pages/admin/AdminDashboardPage";
-import RegisterPage from "./pages/auth/RegisterPage";
-import PlayerDashboardPage from "./pages/player/PlayerDashboardPage";
-import PlayerBalancePage from "./pages/player/PlayerBalancePage";
-import PlayerHistoryPage from "./pages/player/PlayerHistoryPage";
-import PlayerBuyBoardPage from "./pages/player/PlayerBuyBoardPage";
+import HomeLayout from "@layouts/HomeLayout";
+import HomePage from "@pages/home/HomePage";
+import LoginPage from "@pages/auth/LoginPage";
+import AdminDashboardPage from "@pages/admin/AdminDashboardPage";
+import RegisterPage from "@pages/auth/RegisterPage";
+import PlayerDashboardPage from "@pages/player/PlayerDashboardPage";
+import PlayerBalancePage from "@pages/player/PlayerBalancePage";
+import PlayerHistoryPage from "@pages/player/PlayerHistoryPage";
+import PlayerBuyBoardPage from "@pages/player/PlayerBuyBoardPage";
+
 
 const router = createBrowserRouter(
     createRoutesFromElements(
@@ -24,7 +24,6 @@ const router = createBrowserRouter(
             <Route path="register" element={<RegisterPage />} />
             <Route path="admin" element={<AdminDashboardPage />} />
 
-            {/* player area */}
             <Route path="player" element={<PlayerDashboardPage />} />
             <Route path="buy-board" element={<PlayerBuyBoardPage />} />
             <Route path="balance" element={<PlayerBalancePage />} />
