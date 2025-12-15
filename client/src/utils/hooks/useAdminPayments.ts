@@ -16,7 +16,6 @@ type NewPaymentState = {
     mobilePayNumber: string;
 };
 
-// Optional but nice client-side validation pattern for MobilePay numbers:
 // - allow digits, spaces, + and -
 // - length between 4 and 30 characters
 const mobilePayCleanPattern = /^[0-9+\-\s]{4,30}$/;
