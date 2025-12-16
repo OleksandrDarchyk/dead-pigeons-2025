@@ -1,280 +1,364 @@
-// tests/GameServiceTests.cs
-using api.Etc;
+// server/tests/GameServiceTests.cs
 using api.Models.Requests;
 using api.Services;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Time.Testing;
 using ValidationException = Bogus.ValidationException;
-
 
 namespace tests;
 
 /// <summary>
-/// Service-level tests for <see cref="GameService"/>.
-/// Verifies active game lookup, game history ordering, winning numbers logic,
-/// repeating boards and player history mapping.
+/// Service-level tests for GameService.
+/// Covers:
+/// - GetActiveGame
+/// - GetGamesHistory ordering + soft delete
+/// - SetWinningNumbers: closes current game, marks winners, activates next game, repeats boards
+/// - GetPlayerHistory mapping + ordering + error cases
 /// </summary>
 public class GameServiceTests(
     IGameService gameService,
     MyDbContext ctx,
     TestTransactionScope transaction,
     TimeProvider timeProvider,
-    ISeeder seeder,
-    ITestOutputHelper outputHelper) : IAsyncLifetime
+    ITestOutputHelper output) : IAsyncLifetime
 {
-    /// <summary>
-    /// Each test runs inside its own database transaction.
-    /// The transaction is rolled back automatically after the test.
-    /// </summary>
     public async ValueTask InitializeAsync()
     {
-        await transaction.BeginTransactionAsync();
+        var ct = TestContext.Current.CancellationToken;
+        await transaction.BeginTransactionAsync(ct);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        transaction.Dispose(); // guarantee rollback
+        return ValueTask.CompletedTask;
+    }
+
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
+    private async Task<Game> CreateGame(int year, int week, bool isActive)
+    {
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+
+        var game = new Game
+        {
+            Id         = Guid.NewGuid().ToString(),
+            Year       = year,
+            Weeknumber = week,
+            Isactive   = isActive,
+            Createdat  = now,
+            Closedat   = null,
+            Winningnumbers = null,
+            Deletedat  = null
+        };
+
+        ctx.Games.Add(game);
+        await ctx.SaveChangesAsync(ct);
+        return game;
+    }
+
+    private async Task<(Game current, Game next)> CreateCurrentAndNextGame()
+    {
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+
+        // Use far future years/weeks to avoid collisions with any seeded data.
+        var year = now.Year + 30;
+        var currentWeek = 10;
+        var nextWeek = 11;
+
+        // Ensure there is exactly 1 active game, and at least 1 future inactive game.
+        var current = new Game
+        {
+            Id         = Guid.NewGuid().ToString(),
+            Year       = year,
+            Weeknumber = currentWeek,
+            Isactive   = true,
+            Createdat  = now,
+            Closedat   = null,
+            Winningnumbers = null,
+            Deletedat  = null
+        };
+
+        var next = new Game
+        {
+            Id         = Guid.NewGuid().ToString(),
+            Year       = year,
+            Weeknumber = nextWeek,
+            Isactive   = false,
+            Createdat  = now,
+            Closedat   = null,
+            Winningnumbers = null,
+            Deletedat  = null
+        };
+
+        ctx.Games.AddRange(current, next);
+        await ctx.SaveChangesAsync(ct);
+
+        return (current, next);
+    }
+
+    private async Task<Player> CreatePlayer(string email, bool isActive = true)
+    {
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+
+        var p = new Player
+        {
+            Id          = Guid.NewGuid().ToString(),
+            Fullname    = "Test Player",
+            Email       = email,
+            Phone       = "12345678",
+            Isactive    = isActive,
+            Activatedat = isActive ? now : null,
+            Createdat   = now,
+            Deletedat   = null
+        };
+
+        ctx.Players.Add(p);
+        await ctx.SaveChangesAsync(ct);
+        return p;
+    }
+
+    private async Task<Transaction> AddApprovedTransaction(Player player, int amount)
+    {
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+
+        var tx = new Transaction
+        {
+            Id              = Guid.NewGuid().ToString(),
+            Playerid        = player.Id,
+            Amount          = amount,
+            Status          = "Approved",
+            Mobilepaynumber = $"TX-{now.Ticks}-{Random.Shared.Next(1000,9999)}",
+            Createdat       = now,
+            Approvedat      = now,
+            Rejectionreason = null,
+            Deletedat       = null
+        };
+
+        ctx.Transactions.Add(tx);
+        await ctx.SaveChangesAsync(ct);
+        return tx;
+    }
+
+    private async Task<Board> AddBoard(
+        Player player,
+        Game game,
+        int[] numbers,
+        int price,
+        bool repeatActive,
+        int repeatWeeks)
+    {
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+
+        var b = new Board
+        {
+            Id           = Guid.NewGuid().ToString(),
+            Playerid     = player.Id,
+            Gameid       = game.Id,
+            Numbers      = numbers.ToList(),
+            Price        = price,
+            Iswinning    = false,
+            Repeatactive = repeatActive,
+            Repeatweeks  = repeatWeeks,
+            Createdat    = now,
+            Deletedat    = null
+        };
+
+        ctx.Boards.Add(b);
+        await ctx.SaveChangesAsync(ct);
+        return b;
+    }
+
+    // ------------------------------------------------------------
+    // GetActiveGame
+    // ------------------------------------------------------------
 
     [Fact]
-    public async Task GetActiveGame_Returns_ActiveGame_FromSeedData()
+    public async Task GetActiveGame_Returns_ActiveGame()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Arrange: seed database with initial data (should create exactly one active game)
-        await seeder.Seed();
+        // Arrange: create one active + one inactive
+        var year = now.Year + 40;
+        var active = await CreateGame(year, 1, isActive: true);
+        await CreateGame(year, 2, isActive: false);
 
-        // Act: use the service to retrieve the current active game
-        var activeFromService = await gameService.GetActiveGame();
+        // Act
+        var result = await gameService.GetActiveGame();
 
-        // Assert: database must contain exactly one non-deleted active game,
-        // and it must be the same game returned by the service
-        var activeFromDb = await ctx.Games
-            .Where(g => g.Deletedat == null && g.Isactive)
-            .SingleAsync(ct);
-
-        Assert.Equal(activeFromDb.Id, activeFromService.Id);
-        Assert.True(activeFromService.Isactive);
-
-        // Helpful output for debugging test failures
-        outputHelper.WriteLine(
-            $"[GameServiceTests] Active game: {activeFromService.Id}, year={activeFromService.Year}, week={activeFromService.Weeknumber}"
-        );
+        // Assert
+        Assert.Equal(active.Id, result.Id);
+        Assert.True(result.Isactive);
+        Assert.Null(result.Deletedat);
     }
 
     [Fact]
     public async Task GetActiveGame_Throws_When_NoActiveGameExists()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Arrange: seed normal data and then manually deactivate all games
-        await seeder.Seed();
+        // Arrange: only inactive games
+        var year = now.Year + 41;
+        await CreateGame(year, 1, isActive: false);
+        await CreateGame(year, 2, isActive: false);
 
-        foreach (var g in ctx.Games)
-        {
-            g.Isactive = false;
-        }
-
-        await ctx.SaveChangesAsync(ct);
-
-        // Act + Assert: service should fail with a domain validation error
+        // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
             async () => await gameService.GetActiveGame());
     }
 
+    // ------------------------------------------------------------
+    // GetGamesHistory
+    // ------------------------------------------------------------
+
     [Fact]
     public async Task GetGamesHistory_Returns_NonDeletedGames_NewestFirst()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Arrange: seed initial data and soft-delete one game
-        await seeder.Seed();
+        // Arrange: create multiple games + soft-delete one
+        var year = now.Year + 42;
 
-        var toDelete = await ctx.Games.FirstAsync(ct);
-        toDelete.Deletedat = timeProvider.GetUtcNow().UtcDateTime;
+        var g1 = await CreateGame(year, 1, isActive: false);
+        var g2 = await CreateGame(year, 2, isActive: false);
+        var g3 = await CreateGame(year, 3, isActive: true);
+
+        g2.Deletedat = now;
         await ctx.SaveChangesAsync(ct);
 
         // Act
         var history = await gameService.GetGamesHistory();
 
-        // Assert: soft-deleted games must not be included
+        // Assert: excludes deleted
         Assert.DoesNotContain(history, g => g.Deletedat != null);
 
-        // And ordering must be newest first: Year desc, then Weeknumber desc
-        var ordered = history
+        // Assert ordering: Year desc, Week desc
+        var orderedIds = history
             .OrderByDescending(g => g.Year)
             .ThenByDescending(g => g.Weeknumber)
             .Select(g => g.Id)
             .ToList();
 
-        Assert.Equal(ordered, history.Select(g => g.Id).ToList());
+        Assert.Equal(orderedIds, history.Select(g => g.Id).ToList());
+
+        // sanity: contains g3 and g1, not g2
+        Assert.Contains(history, g => g.Id == g3.Id);
+        Assert.Contains(history, g => g.Id == g1.Id);
+        Assert.DoesNotContain(history, g => g.Id == g2.Id);
     }
 
+    // ------------------------------------------------------------
+    // SetWinningNumbers
+    // ------------------------------------------------------------
+
     [Fact]
-    public async Task SetWinningNumbers_ClosesGame_ActivatesNext_CreatesRepeats_AndReturnsSummary()
+    public async Task SetWinningNumbers_ClosesGame_ActivatesNext_MarksWinners_CreatesRepeatBoard_AndReturnsSummary()
     {
         var ct = TestContext.Current.CancellationToken;
 
-        // Arrange: create a player, two games (current + next) and two boards
-        var now = timeProvider.GetUtcNow().UtcDateTime;
-        var random = new Random();
+        // Arrange
+        var (current, next) = await CreateCurrentAndNextGame();
 
-        var player = new Player
-        {
-            Id          = Guid.NewGuid().ToString(),
-            Fullname    = "Test Player",
-            Email       = $"player-{Guid.NewGuid()}@gameservice.test",
-            Phone       = "12345678",
-            Isactive    = true,
-            Activatedat = now,
-            Createdat   = now,
-            Deletedat   = null
-        };
-        ctx.Players.Add(player);
+        var player = await CreatePlayer($"player-{Guid.NewGuid()}@test.local", isActive: true);
 
-        var currentGame = new Game
-        {
-            Id         = Guid.NewGuid().ToString(),
-            Year       = now.Year + random.Next(0, 5),
-            Weeknumber = random.Next(1, 52),
-            Isactive   = true,
-            Deletedat  = null,
-            Createdat  = now
-        };
+        // Give balance so repeating can be created in next game
+        await AddApprovedTransaction(player, amount: 100);
 
-        var nextGame = new Game
+        // Board that will WIN and repeats:
+        // Winning numbers will be {1,2,3}, board has {1,2,3,4,5} -> win
+        var winningBoard = await AddBoard(
+            player, current,
+            numbers: new[] { 1, 2, 3, 4, 5 },
+            price: 20,
+            repeatActive: true,
+            repeatWeeks: 3);
+
+        // Board that will LOSE and does not repeat
+        await AddBoard(
+            player, current,
+            numbers: new[] { 6, 7, 8, 9, 10 },
+            price: 20,
+            repeatActive: false,
+            repeatWeeks: 0);
+
+        // Act
+        var dto = new SetWinningNumbersRequestDto
         {
-            Id         = Guid.NewGuid().ToString(),
-            Year       = currentGame.Year + 1,
-            Weeknumber = random.Next(1, 52),
-            Isactive   = false,
-            Deletedat  = null,
-            Createdat  = now
+            GameId = current.Id,
+            WinningNumbers = new[] { 3, 1, 2 } // shuffled on purpose
         };
 
-        ctx.Games.AddRange(currentGame, nextGame);
+        var summary = await gameService.SetWinningNumbers(dto);
 
-        // Repeating winning board:
-        // - numbers: 5 numbers -> weekly price is 20 DKK
-        // - Repeatweeks = 3 means it should try to auto-repeat for 3 future games.
-        var winningBoard = new Board
-        {
-            Id           = Guid.NewGuid().ToString(),
-            Playerid     = player.Id,
-            Gameid       = currentGame.Id,
-            Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
-            Price        = 20,   // weekly price (not prepaid for all weeks)
-            Iswinning    = false,
-            Repeatweeks  = 3,
-            Repeatactive = true,
-            Createdat    = now,
-            Deletedat    = null
-        };
-
-        // Non-repeating losing board (also 5 numbers -> weekly price 20 DKK)
-        var losingBoard = new Board
-        {
-            Id           = Guid.NewGuid().ToString(),
-            Playerid     = player.Id,
-            Gameid       = currentGame.Id,
-            Numbers      = new[] { 6, 7, 8, 9, 10 }.ToList(),
-            Price        = 20,
-            Iswinning    = false,
-            Repeatweeks  = 1,
-            Repeatactive = false,
-            Createdat    = now,
-            Deletedat    = null
-        };
-
-        // Approved transaction so that the player has enough balance
-        // to pay for one more weekly board when repeating.
-        var approvedTransaction = new Transaction
-        {
-            Id               = Guid.NewGuid().ToString(),
-            Playerid         = player.Id,
-            Mobilepaynumber  = "TX-SETWINNING-1",
-            Amount           = 100,          // enough to cover the weekly price
-            Status           = "Approved",
-            Createdat        = now,
-            Approvedat       = now,
-            Rejectionreason  = null,
-            Deletedat        = null
-        };
-
-        ctx.Transactions.Add(approvedTransaction);
-        ctx.Boards.AddRange(winningBoard, losingBoard);
-        await ctx.SaveChangesAsync(ct);
-
-        // Act: set winning numbers in a different order (order must not matter)
-        var request = new SetWinningNumbersRequestDto
-        {
-            GameId         = currentGame.Id,
-            WinningNumbers = new[] { 3, 1, 2 }
-        };
-
-        var summary = await gameService.SetWinningNumbers(request);
-
-        // Reload games with boards from the database
-        var currentGameFromDb = await ctx.Games
+        // Reload
+        var currentDb = await ctx.Games
             .Include(g => g.Boards)
-            .SingleAsync(g => g.Id == currentGame.Id, ct);
+            .SingleAsync(g => g.Id == current.Id, ct);
 
-        var nextGameFromDb = await ctx.Games
+        var nextDb = await ctx.Games
             .Include(g => g.Boards)
-            .SingleAsync(g => g.Id == nextGame.Id, ct);
+            .SingleAsync(g => g.Id == next.Id, ct);
 
-        // Assert: current game is closed with correct winning numbers
-        Assert.False(currentGameFromDb.Isactive);
-        Assert.NotNull(currentGameFromDb.Closedat);
-        Assert.Equal(new[] { 1, 2, 3 }, currentGameFromDb.Winningnumbers!.OrderBy(n => n).ToArray());
+        // Assert: current closed + numbers sorted
+        Assert.False(currentDb.Isactive);
+        Assert.NotNull(currentDb.Closedat);
+        Assert.Equal(new[] { 1, 2, 3 }, currentDb.Winningnumbers!.OrderBy(x => x).ToArray());
 
-        // The board that contains all three winning numbers must be marked as winning
-        var winningBoardFromDb = currentGameFromDb.Boards.Single(b => b.Id == winningBoard.Id);
-        Assert.True(winningBoardFromDb.Iswinning);
+        // Winning board marked
+        var winBoardDb = currentDb.Boards.Single(b => b.Id == winningBoard.Id);
+        Assert.True(winBoardDb.Iswinning);
 
-        // Next game must be activated
-        Assert.True(nextGameFromDb.Isactive);
+        // Next active
+        Assert.True(nextDb.Isactive);
 
-        // Exactly one repeating board should be created for the next game
-        var repeatedBoards = nextGameFromDb.Boards.ToList();
-        Assert.Single(repeatedBoards);
+        // Repeat board created (because repeatWeeks>0 and enough balance)
+        Assert.Single(nextDb.Boards);
+        var repeated = nextDb.Boards.Single();
 
-        var repeated = repeatedBoards.Single();
-        Assert.Equal(2, repeated.Repeatweeks);       // 3 -> 2 remaining future games
-        Assert.True(repeated.Repeatactive);          // still more than 1 week left
-        Assert.Equal(20, repeated.Price);            // weekly price is charged again for the next game
+        Assert.Equal(player.Id, repeated.Playerid);
+        Assert.Equal(nextDb.Id, repeated.Gameid);
+        Assert.Equal(20, repeated.Price);          // weekly price charged again
+        Assert.Equal(2, repeated.Repeatweeks);     // 3 -> 2 left
+        Assert.True(repeated.Repeatactive);
         Assert.Equal(
             winningBoard.Numbers.OrderBy(n => n),
-            repeated.Numbers.OrderBy(n => n));
+            repeated.Numbers.OrderBy(n => n)
+        );
 
-        // Assert: summary DTO must match the closed game and weekly revenue rules
-        Assert.Equal(currentGame.Id, summary.GameId);
-        Assert.Equal(currentGame.Weeknumber, summary.WeekNumber);
-        Assert.Equal(currentGame.Year, summary.Year);
-        Assert.Equal(new[] { 1, 2, 3 }, summary.WinningNumbers.OrderBy(n => n).ToArray());
+        // Summary checks
+        Assert.Equal(current.Id, summary.GameId);
+        Assert.Equal(current.Year, summary.Year);
+        Assert.Equal(current.Weeknumber, summary.WeekNumber);
+        Assert.Equal(new[] { 1, 2, 3 }, summary.WinningNumbers.OrderBy(x => x).ToArray());
         Assert.Equal(2, summary.TotalBoards);
         Assert.Equal(1, summary.WinningBoards);
+        Assert.Equal(40, summary.DigitalRevenue); // 20 + 20
 
-        // Weekly digital revenue: both boards have 5 numbers -> 20 + 20 = 40
-        Assert.Equal(40, summary.DigitalRevenue);
-
-        outputHelper.WriteLine(
-            $"[GameServiceTests] Summary: game={summary.GameId}, boards={summary.TotalBoards}, winners={summary.WinningBoards}, revenue={summary.DigitalRevenue}"
-        );
+        output.WriteLine($"[Summary] game={summary.GameId}, winners={summary.WinningBoards}, revenue={summary.DigitalRevenue}");
     }
 
     [Fact]
     public async Task SetWinningNumbers_Throws_When_NotThreeDistinctNumbers()
     {
-        // Arrange: use seeded active game
-        await seeder.Seed();
-        var game = await gameService.GetActiveGame();
+        var (current, next) = await CreateCurrentAndNextGame();
 
         var dto = new SetWinningNumbersRequestDto
         {
-            GameId         = game.Id,
-            WinningNumbers = new[] { 1, 1, 2 } // duplicate "1"
+            GameId = current.Id,
+            WinningNumbers = new[] { 1, 1, 2 }
         };
 
-        // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
             async () => await gameService.SetWinningNumbers(dto));
     }
@@ -282,25 +366,75 @@ public class GameServiceTests(
     [Fact]
     public async Task SetWinningNumbers_Throws_When_NumberOutOfRange()
     {
-        // Arrange: use seeded active game
-        await seeder.Seed();
-        var game = await gameService.GetActiveGame();
+        var (current, next) = await CreateCurrentAndNextGame();
 
         var dto = new SetWinningNumbersRequestDto
         {
-            GameId         = game.Id,
-            WinningNumbers = new[] { 0, 1, 2 } // 0 is outside [1;16]
+            GameId = current.Id,
+            WinningNumbers = new[] { 0, 1, 2 }
         };
 
-        // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
             async () => await gameService.SetWinningNumbers(dto));
     }
 
     [Fact]
+    public async Task SetWinningNumbers_Throws_When_GameNotFound()
+    {
+        var dto = new SetWinningNumbersRequestDto
+        {
+            GameId = Guid.NewGuid().ToString(),
+            WinningNumbers = new[] { 1, 2, 3 }
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await gameService.SetWinningNumbers(dto));
+    }
+
+    [Fact]
+    public async Task SetWinningNumbers_Throws_When_GameAlreadyFinished()
+    {
+        var (current, next) = await CreateCurrentAndNextGame();
+
+        current.Isactive = false;
+        await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        var dto = new SetWinningNumbersRequestDto
+        {
+            GameId = current.Id,
+            WinningNumbers = new[] { 1, 2, 3 }
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await gameService.SetWinningNumbers(dto));
+    }
+
+    [Fact]
+    public async Task SetWinningNumbers_Throws_When_WinningNumbersAlreadySet()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        var (current, next) = await CreateCurrentAndNextGame();
+
+        current.Winningnumbers = new List<int> { 1, 2, 3 };
+        await ctx.SaveChangesAsync(ct);
+
+        var dto = new SetWinningNumbersRequestDto
+        {
+            GameId = current.Id,
+            WinningNumbers = new[] { 1, 2, 3 }
+        };
+
+        await Assert.ThrowsAsync<ValidationException>(
+            async () => await gameService.SetWinningNumbers(dto));
+    }
+
+    // ------------------------------------------------------------
+    // GetPlayerHistory
+    // ------------------------------------------------------------
+
+    [Fact]
     public async Task GetPlayerHistory_Throws_When_EmailMissing()
     {
-        // Empty email should not be allowed
         await Assert.ThrowsAsync<ValidationException>(
             async () => await gameService.GetPlayerHistory(""));
     }
@@ -308,125 +442,41 @@ public class GameServiceTests(
     [Fact]
     public async Task GetPlayerHistory_Throws_When_PlayerNotFound()
     {
-        // Non-existing email should result in a domain error
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await gameService.GetPlayerHistory("does-not-exist@gameservice.test"));
+            async () => await gameService.GetPlayerHistory("nope@test.local"));
     }
 
     [Fact]
-    public async Task GetPlayerHistory_Returns_OnlyPlayersBoards_OrderedNewestFirst()
+    public async Task GetPlayerHistory_Returns_OnlyPlayersBoards_OrderedNewestFirst_ByGame()
     {
-        var ct = TestContext.Current.CancellationToken;
+        var ct  = TestContext.Current.CancellationToken;
         var now = timeProvider.GetUtcNow().UtcDateTime;
-        var random = new Random();
 
-        // Arrange: one player with boards in two games, and another player with its own board
-        var player = new Player
-        {
-            Id          = Guid.NewGuid().ToString(),
-            Fullname    = "History Player",
-            Email       = $"history-{Guid.NewGuid()}@gameservice.test",
-            Phone       = "87654321",
-            Isactive    = true,
-            Activatedat = now,
-            Createdat   = now,
-            Deletedat   = null
-        };
+        var player = await CreatePlayer($"history-{Guid.NewGuid()}@test.local", isActive: true);
+        var other  = await CreatePlayer($"other-{Guid.NewGuid()}@test.local", isActive: true);
 
-        var otherPlayer = new Player
-        {
-            Id          = Guid.NewGuid().ToString(),
-            Fullname    = "Other Player",
-            Email       = $"other-{Guid.NewGuid()}@gameservice.test",
-            Phone       = "11111111",
-            Isactive    = true,
-            Activatedat = now,
-            Createdat   = now,
-            Deletedat   = null
-        };
+        var olderGame = await CreateGame(year: now.Year + 50, week: 1, isActive: false);
+        olderGame.Closedat = now.AddDays(-7);
 
-        ctx.Players.AddRange(player, otherPlayer);
+        var newerGame = await CreateGame(year: now.Year + 50, week: 2, isActive: false);
+        newerGame.Closedat = now;
 
-        var olderGame = new Game
-        {
-            Id         = Guid.NewGuid().ToString(),
-            Year       = now.Year - 1,
-            Weeknumber = random.Next(1, 52),
-            Isactive   = false,
-            Closedat   = now.AddDays(-7),
-            Deletedat  = null,
-            Createdat  = now.AddDays(-14)
-        };
-
-        var newerGame = new Game
-        {
-            Id         = Guid.NewGuid().ToString(),
-            Year       = now.Year,
-            Weeknumber = random.Next(1, 52),
-            Isactive   = false,
-            Closedat   = now,
-            Deletedat  = null,
-            Createdat  = now.AddDays(-1)
-        };
-
-        ctx.Games.AddRange(olderGame, newerGame);
         await ctx.SaveChangesAsync(ct);
 
-        var olderBoard = new Board
-        {
-            Id           = Guid.NewGuid().ToString(),
-            Playerid     = player.Id,
-            Gameid       = olderGame.Id,
-            Numbers      = new[] { 1, 2, 3, 4, 5 }.ToList(),
-            Price        = 20,
-            Iswinning    = false,
-            Repeatweeks  = 1,
-            Repeatactive = false,
-            Createdat    = now.AddDays(-10),
-            Deletedat    = null
-        };
-
-        var newerBoard = new Board
-        {
-            Id           = Guid.NewGuid().ToString(),
-            Playerid     = player.Id,
-            Gameid       = newerGame.Id,
-            Numbers      = new[] { 1, 2, 3, 4, 5, 6 }.ToList(),
-            Price        = 40,
-            Iswinning    = true,
-            Repeatweeks  = 1,
-            Repeatactive = false,
-            Createdat    = now.AddDays(-3),
-            Deletedat    = null
-        };
-
-        var otherBoard = new Board
-        {
-            Id           = Guid.NewGuid().ToString(),
-            Playerid     = otherPlayer.Id,
-            Gameid       = newerGame.Id,
-            Numbers      = new[] { 7, 8, 9, 10, 11 }.ToList(),
-            Price        = 20,
-            Iswinning    = false,
-            Repeatweeks  = 1,
-            Repeatactive = false,
-            Createdat    = now,
-            Deletedat    = null
-        };
-
-        ctx.Boards.AddRange(olderBoard, newerBoard, otherBoard);
-        await ctx.SaveChangesAsync(ct);
+        await AddBoard(player, olderGame, new[] { 1, 2, 3, 4, 5 }, price: 20, repeatActive: false, repeatWeeks: 0);
+        await AddBoard(player, newerGame, new[] { 1, 2, 3, 4, 5, 6 }, price: 40, repeatActive: false, repeatWeeks: 0);
+        await AddBoard(other,  newerGame, new[] { 7, 8, 9, 10, 11 }, price: 20, repeatActive: false, repeatWeeks: 0);
 
         // Act
         var history = await gameService.GetPlayerHistory(player.Email);
 
-        // Assert: only boards for this player are included, ordered by game (newer -> older)
+        // Assert: only player's 2 items, newest game first
         Assert.Equal(2, history.Count);
         Assert.Equal(new[] { newerGame.Id, olderGame.Id }, history.Select(h => h.GameId).ToArray());
+        Assert.All(history, h => Assert.NotNull(h.Numbers));
 
-        // And weekly prices in history must reflect number of fields (5 -> 20, 6 -> 40)
-        var prices = history.Select(h => h.Price).ToArray();
-        Assert.Contains(20, prices);
-        Assert.Contains(40, prices);
+        // Prices reflect weekly prices (5->20, 6->40)
+        Assert.Contains(history, h => h.Price == 20);
+        Assert.Contains(history, h => h.Price == 40);
     }
 }

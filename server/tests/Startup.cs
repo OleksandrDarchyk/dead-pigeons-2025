@@ -1,8 +1,7 @@
-// tests/Startup.cs - FIXED VERSION
+// tests/Startup.cs
 using api;
 using dataccess;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Time.Testing;
@@ -12,31 +11,49 @@ namespace tests;
 
 public class Startup
 {
-    private static PostgreSqlContainer? _sharedContainer;
-    private static readonly object _lock = new();
-    private static bool _schemaInitialized = false; //  Track schema initialization
+    private static readonly object LockObj = new();
+    private static PostgreSqlContainer? _container;
+    private static bool _schemaInitialized;
+    private static bool _cleanupHooked;
 
-    private static PostgreSqlContainer GetSharedContainer()
+    private static PostgreSqlContainer GetOrStartContainer()
     {
-        lock (_lock)
+        lock (LockObj)
         {
-            if (_sharedContainer != null)
-                return _sharedContainer;
+            if (_container != null)
+                return _container;
 
-            _sharedContainer = new PostgreSqlBuilder()
+            _container = new PostgreSqlBuilder()
                 .WithImage("postgres:15-alpine")
                 .Build();
 
-            _sharedContainer.StartAsync().GetAwaiter().GetResult();
+            _container.StartAsync().GetAwaiter().GetResult();
 
-            return _sharedContainer;
+            if (!_cleanupHooked)
+            {
+                _cleanupHooked = true;
+                AppDomain.CurrentDomain.ProcessExit += (_, _) =>
+                {
+                    try
+                    {
+                        _container.StopAsync().GetAwaiter().GetResult();
+                        _container.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                    }
+                    catch
+                    {
+                        // ignore cleanup errors
+                    }
+                };
+            }
+
+            return _container;
         }
     }
-
 
     public void ConfigureServices(IServiceCollection services)
     {
         Environment.SetEnvironmentVariable("ASPNETCORE_ENVIRONMENT", "Test");
+
         Environment.SetEnvironmentVariable(
             "AppOptions__JwtSecret",
             "BP9bcgZwv3YOoOW5iJga1zlu48J37oB2GOcvfRMtcywKri2Z2SW65S8f+m/kHlb9jzMcC8dcX8R+8244wyIuww=="
@@ -47,16 +64,16 @@ public class Startup
         services.RemoveAll(typeof(MyDbContext));
         services.AddScoped<MyDbContext>(_ =>
         {
-            var container = GetSharedContainer();
-            var connectionString = container.GetConnectionString();
+            var container = GetOrStartContainer();
+            var cs = container.GetConnectionString();
 
             var options = new DbContextOptionsBuilder<MyDbContext>()
-                .UseNpgsql(connectionString)
-                .EnableSensitiveDataLogging()
+                .UseNpgsql(cs)
                 .Options;
 
             var ctx = new MyDbContext(options);
-            lock (_lock)
+
+            lock (LockObj)
             {
                 if (!_schemaInitialized)
                 {
@@ -64,7 +81,6 @@ public class Startup
                     _schemaInitialized = true;
                 }
             }
-         
 
             return ctx;
         });
@@ -72,52 +88,15 @@ public class Startup
         services.AddScoped<TestTransactionScope>();
 
         services.RemoveAll<TimeProvider>();
-        var fakeTime = new FakeTimeProvider();
-        fakeTime.SetUtcNow(DateTimeOffset.UtcNow);
-        services.AddSingleton<TimeProvider>(fakeTime);
-    }
-}
+        services.RemoveAll<FakeTimeProvider>();
 
-public class TestTransactionScope : IDisposable
-{
-    private readonly MyDbContext _context;
-    private IDbContextTransaction? _transaction;
-
-    public TestTransactionScope(MyDbContext context)
-    {
-        _context = context;
-    }
-
-    public async Task BeginTransactionAsync(CancellationToken ct = default)
-    {
-        //  Ensure no existing transaction
-        if (_transaction != null)
+        services.AddScoped<FakeTimeProvider>(_ =>
         {
-            await _transaction.RollbackAsync(ct);
-            await _transaction.DisposeAsync();
-        }
+            var fake = new FakeTimeProvider();
+            fake.SetUtcNow(DateTimeOffset.UtcNow); // <-- IMPORTANT
+            return fake;
+        });
 
-        _transaction = await _context.Database.BeginTransactionAsync(ct);
-    }
-
-    public void Dispose()
-    {
-        if (_transaction is null)
-            return;
-
-        try
-        {
-            //  Force rollback synchronously
-            _transaction.Rollback();
-        }
-        catch
-        {
-            // Ignore rollback errors (transaction may already be aborted)
-        }
-        finally
-        {
-            _transaction.Dispose();
-            _transaction = null;
-        }
+        services.AddScoped<TimeProvider>(sp => sp.GetRequiredService<FakeTimeProvider>());
     }
 }
