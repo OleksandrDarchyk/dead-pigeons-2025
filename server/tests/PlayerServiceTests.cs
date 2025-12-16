@@ -1,12 +1,11 @@
 // tests/PlayerServiceTests.cs
-
+using System.ComponentModel.DataAnnotations;
 using api.Models.Requests;
 using api.Services;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
 using ValidationException = Bogus.ValidationException;
-
 
 namespace tests;
 
@@ -57,14 +56,14 @@ public class PlayerServiceTests(
 
         return new Player
         {
-            Id          = Guid.NewGuid().ToString(),
-            Fullname    = fullName,
-            Email       = email,
-            Phone       = phone,
-            Isactive    = isActive,
+            Id = Guid.NewGuid().ToString(),
+            Fullname = fullName,
+            Email = email,
+            Phone = phone,
+            Isactive = isActive,
             Activatedat = isActive ? now : null,
-            Createdat   = now,
-            Deletedat   = isDeleted ? now : null
+            Createdat = now,
+            Deletedat = isDeleted ? now : null
         };
     }
 
@@ -83,8 +82,8 @@ public class PlayerServiceTests(
         var dto = new CreatePlayerRequestDto
         {
             FullName = "New Player",
-            Email    = email,
-            Phone    = "12345678"
+            Email = email,
+            Phone = "12345678"
         };
 
         // Act
@@ -124,12 +123,30 @@ public class PlayerServiceTests(
         var dto = new CreatePlayerRequestDto
         {
             FullName = "Another",
-            Email    = email,
-            Phone    = "22222222"
+            Email = email,
+            Phone = "22222222"
         };
 
         // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
+            async () => await playerService.CreatePlayer(dto));
+    }
+
+   
+
+    [Fact]
+    public async Task CreatePlayer_Throws_When_DtoInvalid()
+    {
+        // This test depends on DataAnnotations existing on CreatePlayerRequestDto.
+        // If your DTO has no validation attributes, this test should be removed or adjusted.
+        var dto = new CreatePlayerRequestDto
+        {
+            FullName = "A",
+            Email = "not-an-email",
+            Phone = "1"
+        };
+
+        await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(
             async () => await playerService.CreatePlayer(dto));
     }
 
@@ -143,10 +160,10 @@ public class PlayerServiceTests(
         var ct = TestContext.Current.CancellationToken;
 
         // Arrange: active + inactive + soft-deleted
-        var active1  = CreatePlayer("Alice",   "alice@test.local",   "11111111", isActive: true);
-        var active2  = CreatePlayer("Charlie", "charlie@test.local", "22222222", isActive: true);
-        var inactive = CreatePlayer("Bob",     "bob@test.local",     "33333333", isActive: false);
-        var deleted  = CreatePlayer("Deleted", "deleted@test.local", "44444444", isActive: true, isDeleted: true);
+        var active1 = CreatePlayer("Alice", "alice@test.local", "11111111", isActive: true);
+        var active2 = CreatePlayer("Charlie", "charlie@test.local", "22222222", isActive: true);
+        var inactive = CreatePlayer("Bob", "bob@test.local", "33333333", isActive: false);
+        var deleted = CreatePlayer("Deleted", "deleted@test.local", "44444444", isActive: true, isDeleted: true);
 
         ctx.Players.AddRange(active1, active2, inactive, deleted);
         await ctx.SaveChangesAsync(ct);
@@ -171,8 +188,8 @@ public class PlayerServiceTests(
         var ct = TestContext.Current.CancellationToken;
 
         // Arrange
-        var p1 = CreatePlayer("One",   "a@test.local", "11111111", isActive: true);
-        var p2 = CreatePlayer("Two",   "c@test.local", "22222222", isActive: true);
+        var p1 = CreatePlayer("One", "a@test.local", "11111111", isActive: true);
+        var p2 = CreatePlayer("Two", "c@test.local", "22222222", isActive: true);
         var p3 = CreatePlayer("Three", "b@test.local", "33333333", isActive: true);
 
         ctx.Players.AddRange(p1, p2, p3);
@@ -377,10 +394,10 @@ public class PlayerServiceTests(
 
         var dto = new UpdatePlayerRequestDto
         {
-            Id       = player.Id,
+            Id = player.Id,
             FullName = "New Name",
-            Email    = player.Email,    // unchanged
-            Phone    = "99999999"
+            Email = player.Email, // unchanged
+            Phone = "99999999"
         };
 
         // Act
@@ -398,18 +415,18 @@ public class PlayerServiceTests(
         var ct = TestContext.Current.CancellationToken;
 
         // Arrange
-        var player      = CreatePlayer("Target", "old@test.local",   "11111111", isActive: true);
-        var otherPlayer = CreatePlayer("Other",  "other@test.local", "22222222", isActive: true);
+        var player = CreatePlayer("Target", "old@test.local", "11111111", isActive: true);
+        var otherPlayer = CreatePlayer("Other", "other@test.local", "22222222", isActive: true);
 
         ctx.Players.AddRange(player, otherPlayer);
         await ctx.SaveChangesAsync(ct);
 
         var dto = new UpdatePlayerRequestDto
         {
-            Id       = player.Id,
+            Id = player.Id,
             FullName = "Target",
-            Email    = "newunique@test.local",
-            Phone    = "11111111"
+            Email = "newunique@test.local",
+            Phone = "11111111"
         };
 
         // Act
@@ -425,25 +442,25 @@ public class PlayerServiceTests(
         var ct = TestContext.Current.CancellationToken;
 
         // Arrange
-        var player      = CreatePlayer("Target", "target@test.local", "11111111", isActive: true);
-        var otherPlayer = CreatePlayer("Other",  "taken@test.local",  "22222222", isActive: true);
+        var player = CreatePlayer("Target", "target@test.local", "11111111", isActive: true);
+        var otherPlayer = CreatePlayer("Other", "taken@test.local", "22222222", isActive: true);
 
         ctx.Players.AddRange(player, otherPlayer);
         await ctx.SaveChangesAsync(ct);
 
         var dto = new UpdatePlayerRequestDto
         {
-            Id       = player.Id,
+            Id = player.Id,
             FullName = "Target",
-            Email    = "taken@test.local", // duplicate
-            Phone    = "11111111"
+            Email = "taken@test.local", // duplicate
+            Phone = "11111111"
         };
 
         // Act + Assert
         await Assert.ThrowsAsync<ValidationException>(
             async () => await playerService.UpdatePlayer(dto));
     }
-
+    
     [Fact]
     public async Task UpdatePlayer_Throws_When_PlayerNotFoundOrDeleted()
     {
@@ -462,23 +479,23 @@ public class PlayerServiceTests(
 
         var validDtoForDeleted = new UpdatePlayerRequestDto
         {
-            Id       = deleted.Id,
-            FullName = "Valid Name", // passes MinLength(3)
-            Email    = deleted.Email,
-            Phone    = deleted.Phone
+            Id = deleted.Id,
+            FullName = "Valid Name", // assumes MinLength(3)
+            Email = deleted.Email,
+            Phone = deleted.Phone
         };
 
-        // Act + Assert: deleted player -> domain ValidationException("Player not found.")
+        // Deleted player -> domain ValidationException("Player not found.")
         await Assert.ThrowsAsync<ValidationException>(
             async () => await playerService.UpdatePlayer(validDtoForDeleted));
 
-        // Also test completely unknown player id with a valid DTO
+        // Unknown id -> domain ValidationException("Player not found.")
         var validDtoForUnknown = new UpdatePlayerRequestDto
         {
-            Id       = Guid.NewGuid().ToString(),
+            Id = Guid.NewGuid().ToString(),
             FullName = "Another Valid Name",
-            Email    = "unknown-update@test.local",
-            Phone    = "22222222"
+            Email = "unknown-update@test.local",
+            Phone = "22222222"
         };
 
         await Assert.ThrowsAsync<ValidationException>(

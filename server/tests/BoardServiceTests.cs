@@ -1,6 +1,5 @@
-using System;
+// server/tests/BoardServiceTests.cs
 using System.Globalization;
-using System.Linq;
 using System.Security.Claims;
 using api.Models.Requests;
 using api.Services;
@@ -15,9 +14,12 @@ namespace tests;
 
 /// <summary>
 /// Service-level tests for BoardService.
-/// These tests ensure that board creation and querying follow all business rules,
-/// including balance calculation, validation, claim-based player resolution
-/// and the "Saturday 17:00" join cutoff rule.
+/// Covers:
+/// - create board validation + balance rules
+/// - active/inactive player + active/inactive game rules
+/// - claim-based "current user" resolution
+/// - Saturday 17:00 DK cutoff rule
+/// - read methods ordering + soft delete filtering
 /// </summary>
 public class BoardServiceTests(
     IBoardService boardService,
@@ -26,24 +28,29 @@ public class BoardServiceTests(
     TimeProvider timeProvider,
     ITestOutputHelper outputHelper) : IAsyncLifetime
 {
-    /// <summary>
-    /// Each test runs in its own database transaction which is rolled back afterwards.
-    /// </summary>
     public async ValueTask InitializeAsync()
     {
-        await transaction.BeginTransactionAsync();
+        var ct = TestContext.Current.CancellationToken;
+        await transaction.BeginTransactionAsync(ct);
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        // IMPORTANT: guarantee rollback per test
+        transaction.Dispose();
+        return ValueTask.CompletedTask;
+    }
 
-    /// <summary>
-    /// Helper to create a unique game (year/week randomized) to avoid unique index collisions.
-    /// </summary>
+    // ------------------------------------------------------------
+    // Helpers
+    // ------------------------------------------------------------
+
     private async Task<Game> CreateUniqueGame(bool isActive = true)
     {
         var ct  = TestContext.Current.CancellationToken;
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
+        // Push into far future to avoid collisions with seeded games.
         var year = now.Year + 20;
 
         var existingWeeks = await ctx.Games
@@ -70,11 +77,10 @@ public class BoardServiceTests(
         return game;
     }
 
-    /// <summary>
-    /// Helper to create a unique player.
-    /// Optionally seeds an approved transaction to give the player some balance.
-    /// </summary>
-    private async Task<Player> CreateUniquePlayer(string emailPrefix, int balance = 0, bool isActive = true)
+    private async Task<Player> CreateUniquePlayer(
+        string emailPrefix,
+        int balance = 0,
+        bool isActive = true)
     {
         var ct       = TestContext.Current.CancellationToken;
         var now      = timeProvider.GetUtcNow().UtcDateTime;
@@ -94,7 +100,6 @@ public class BoardServiceTests(
 
         ctx.Players.Add(player);
 
-        // Optional: seed an approved transaction to give the player starting balance
         if (balance > 0)
         {
             var tx = new Transaction
@@ -114,6 +119,10 @@ public class BoardServiceTests(
         await ctx.SaveChangesAsync(ct);
         return player;
     }
+
+    // ------------------------------------------------------------
+    // CreateBoard
+    // ------------------------------------------------------------
 
     [Fact]
     public async Task CreateBoard_Succeeds_When_PlayerHasEnoughBalance_AndValidNumbers()
@@ -146,11 +155,10 @@ public class BoardServiceTests(
             .Where(b => b.Playerid == player.Id && b.Deletedat == null)
             .SumAsync(b => (int?)b.Price, ct) ?? 0;
 
-        // Initial balance 100, board costs 20 -> 80 left
         Assert.Equal(80, approvedAmount - spentOnBoards);
 
         outputHelper.WriteLine(
-            $"[Board] Player {player.Id} ({player.Email}) bought board {board.Id} for game {game.Id}, price={board.Price}, balanceLeft={approvedAmount - spentOnBoards}"
+            $"[Board] Player {player.Id} bought board {board.Id}, price={board.Price}, balanceLeft={approvedAmount - spentOnBoards}"
         );
     }
 
@@ -174,17 +182,17 @@ public class BoardServiceTests(
     [Fact]
     public async Task CreateBoard_Throws_When_NumbersCountIsInvalid()
     {
-        // This is expected to be caught by DataAnnotations on the DTO
         var player = await CreateUniquePlayer("count-invalid", balance: 1000);
         var game   = await CreateUniqueGame(isActive: true);
 
         var dto = new CreateBoardRequestDto
         {
             GameId      = game.Id,
-            Numbers     = new[] { 1, 2, 3, 4 }, // only 4 numbers
+            Numbers     = new[] { 1, 2, 3, 4 }, // 4 numbers
             RepeatWeeks = 0
         };
 
+        // If DTO has MinLength/MaxLength -> DataAnnotations exception.
         await Assert.ThrowsAsync<DataAnnotationValidationException>(
             async () => await boardService.CreateBoard(player.Id, dto));
     }
@@ -198,7 +206,7 @@ public class BoardServiceTests(
         var dto = new CreateBoardRequestDto
         {
             GameId      = game.Id,
-            Numbers     = new[] { 1, 1, 2, 3, 4 }, // duplicated "1"
+            Numbers     = new[] { 1, 1, 2, 3, 4 },
             RepeatWeeks = 0
         };
 
@@ -215,7 +223,7 @@ public class BoardServiceTests(
         var dto = new CreateBoardRequestDto
         {
             GameId      = game.Id,
-            Numbers     = new[] { 1, 2, 3, 4, 17 }, // 17 is out of [1;16]
+            Numbers     = new[] { 1, 2, 3, 4, 17 },
             RepeatWeeks = 0
         };
 
@@ -288,6 +296,10 @@ public class BoardServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             async () => await boardService.CreateBoard(player.Id, dto));
     }
+
+    // ------------------------------------------------------------
+    // GetBoardsForGame / GetBoardsForPlayer
+    // ------------------------------------------------------------
 
     [Fact]
     public async Task GetBoardsForGame_Returns_OnlyNonDeletedBoards_ForGivenGame_OrderedByCreatedAt()
@@ -448,6 +460,10 @@ public class BoardServiceTests(
         Assert.Equal(new[] { newerBoard.Id, olderBoard.Id }, result.Select(b => b.Id).ToArray());
     }
 
+    // ------------------------------------------------------------
+    // Current user (claims)
+    // ------------------------------------------------------------
+
     [Fact]
     public async Task CreateBoardForCurrentUser_ResolvesPlayerFromEmailClaim_AndCreatesBoard()
     {
@@ -480,7 +496,7 @@ public class BoardServiceTests(
 
         var dto = new CreateBoardRequestDto
         {
-            GameId      = "dummy",
+            GameId      = Guid.NewGuid().ToString(),
             Numbers     = new[] { 1, 2, 3, 4, 5 },
             RepeatWeeks = 0
         };
@@ -542,28 +558,17 @@ public class BoardServiceTests(
         Assert.Equal(player.Id, result[0].Playerid);
     }
 
-    // ==========================================
-    // Saturday 17:00 Danish local time cutoff
-    // ==========================================
+    // ------------------------------------------------------------
+    // Saturday 17:00 DK cutoff
+    // ------------------------------------------------------------
 
     private static TimeZoneInfo GetDanishTimeZoneForTests()
     {
-        try
-        {
-            // Linux / macOS
-            return TimeZoneInfo.FindSystemTimeZoneById("Europe/Copenhagen");
-        }
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Europe/Copenhagen"); }
         catch (TimeZoneNotFoundException)
         {
-            try
-            {
-                // Windows fallback
-                return TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time");
-            }
-            catch (TimeZoneNotFoundException)
-            {
-                return TimeZoneInfo.Local;
-            }
+            try { return TimeZoneInfo.FindSystemTimeZoneById("Romance Standard Time"); }
+            catch { return TimeZoneInfo.Local; }
         }
         catch (InvalidTimeZoneException)
         {
@@ -578,7 +583,7 @@ public class BoardServiceTests(
         var saturdayLocal = ISOWeek
             .ToDateTime(game.Year, game.Weeknumber, DayOfWeek.Saturday)
             .AddHours(16)
-            .AddMinutes(59); // 16:59 Danish local time
+            .AddMinutes(59);
 
         return TimeZoneInfo.ConvertTimeToUtc(saturdayLocal, dkZone);
     }
@@ -589,7 +594,7 @@ public class BoardServiceTests(
 
         var saturdayLocal = ISOWeek
             .ToDateTime(game.Year, game.Weeknumber, DayOfWeek.Saturday)
-            .AddHours(17); // 17:00 Danish local time
+            .AddHours(17);
 
         return TimeZoneInfo.ConvertTimeToUtc(saturdayLocal, dkZone);
     }
@@ -600,7 +605,7 @@ public class BoardServiceTests(
 
         var saturdayLocal = ISOWeek
             .ToDateTime(game.Year, game.Weeknumber, DayOfWeek.Saturday)
-            .AddHours(18); // 18:00 Danish local time
+            .AddHours(18);
 
         return TimeZoneInfo.ConvertTimeToUtc(saturdayLocal, dkZone);
     }
@@ -613,8 +618,7 @@ public class BoardServiceTests(
         var player = await CreateUniquePlayer("cutoff-before", balance: 100);
         var game   = await CreateUniqueGame(isActive: true);
 
-        var beforeCutoffUtc = GetDanishSaturdayBeforeCutoffUtc(game);
-        fakeTime.SetUtcNow(beforeCutoffUtc);
+        fakeTime.SetUtcNow(GetDanishSaturdayBeforeCutoffUtc(game));
 
         var dto = new CreateBoardRequestDto
         {
@@ -627,10 +631,6 @@ public class BoardServiceTests(
 
         Assert.Equal(game.Id, board.Gameid);
         Assert.Equal(player.Id, board.Playerid);
-
-        outputHelper.WriteLine(
-            $"[Cutoff-Before] Game week={game.Weeknumber}/{game.Year}, nowUTC={fakeTime.GetUtcNow()}"
-        );
     }
 
     [Fact]
@@ -641,8 +641,7 @@ public class BoardServiceTests(
         var player = await CreateUniquePlayer("cutoff-exact", balance: 100);
         var game   = await CreateUniqueGame(isActive: true);
 
-        var cutoffUtc = GetDanishSaturdayCutoffUtc(game);
-        fakeTime.SetUtcNow(cutoffUtc);
+        fakeTime.SetUtcNow(GetDanishSaturdayCutoffUtc(game));
 
         var dto = new CreateBoardRequestDto
         {
@@ -653,10 +652,6 @@ public class BoardServiceTests(
 
         await Assert.ThrowsAsync<ValidationException>(
             async () => await boardService.CreateBoard(player.Id, dto));
-
-        outputHelper.WriteLine(
-            $"[Cutoff-Exact] Game week={game.Weeknumber}/{game.Year}, nowUTC={fakeTime.GetUtcNow()}, blocked at 17:00 Danish time as expected"
-        );
     }
 
     [Fact]
@@ -667,8 +662,7 @@ public class BoardServiceTests(
         var player = await CreateUniquePlayer("cutoff-after", balance: 100);
         var game   = await CreateUniqueGame(isActive: true);
 
-        var afterCutoffUtc = GetDanishSaturdayAfterCutoffUtc(game);
-        fakeTime.SetUtcNow(afterCutoffUtc);
+        fakeTime.SetUtcNow(GetDanishSaturdayAfterCutoffUtc(game));
 
         var dto = new CreateBoardRequestDto
         {
@@ -679,9 +673,5 @@ public class BoardServiceTests(
 
         await Assert.ThrowsAsync<ValidationException>(
             async () => await boardService.CreateBoard(player.Id, dto));
-
-        outputHelper.WriteLine(
-            $"[Cutoff-After] Game week={game.Weeknumber}/{game.Year}, nowUTC={fakeTime.GetUtcNow()}, blocked after 17:00 Danish time as expected"
-        );
     }
 }

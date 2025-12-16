@@ -40,7 +40,6 @@ public class SetupTests(
     {
         var ct = TestContext.Current.CancellationToken;
 
-        // Seeder does not accept CancellationToken – just call it
         await seeder.Seed();
 
         var usersCount = await ctx.Users.CountAsync(ct);

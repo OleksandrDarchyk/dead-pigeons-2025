@@ -4,8 +4,8 @@ using api.Services;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Time.Testing;
 using ValidationException = Bogus.ValidationException;
-
 
 namespace tests;
 
@@ -17,24 +17,45 @@ public class AuthServiceTests(
     IAuthService authService,
     MyDbContext ctx,
     TestTransactionScope transaction,
+    TimeProvider timeProvider,
     ITestOutputHelper output) : IAsyncLifetime
 {
     /// <summary>
     /// Each test runs in its own transaction which gets rolled back afterwards.
+    /// Also resets FakeTimeProvider because other test classes may change it.
     /// </summary>
     public async ValueTask InitializeAsync()
     {
-        await transaction.BeginTransactionAsync();
+        var ct = TestContext.Current.CancellationToken;
+        await transaction.BeginTransactionAsync(ct);
+
+        // IMPORTANT:
+        // Other tests (e.g. BoardService cutoff tests) may SetUtcNow(...) to a future date.
+        // That can break JWT validation ("token not yet valid").
+        if (timeProvider is FakeTimeProvider fake)
+        {
+            fake.SetUtcNow(DateTime.UtcNow);
+        }
     }
 
-    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+    public ValueTask DisposeAsync()
+    {
+        // optional extra safety: reset time again
+        if (timeProvider is FakeTimeProvider fake)
+        {
+            fake.SetUtcNow(DateTime.UtcNow);
+        }
+
+        return ValueTask.CompletedTask;
+    }
 
     /// <summary>
     /// Helper for creating a Player entity with a given email and active/inactive status.
     /// </summary>
-    private static Player CreatePlayer(string email, bool isActive = true)
+    private Player CreatePlayer(string email, bool isActive = true)
     {
-        var now = DateTime.UtcNow;
+        var now = timeProvider.GetUtcNow().UtcDateTime;
+
         return new Player
         {
             Id = Guid.NewGuid().ToString(),
@@ -95,7 +116,6 @@ public class AuthServiceTests(
             ConfirmPassword = "StrongPassword123!"
         };
 
-        // No player with this email -> registration must fail
         await Assert.ThrowsAsync<ValidationException>(
             async () => await authService.Register(dto));
     }
@@ -128,14 +148,12 @@ public class AuthServiceTests(
         var ct = TestContext.Current.CancellationToken;
         var email = $"{Guid.NewGuid()}@test.local";
 
-        // Player email is stored in lower-case
         var player = CreatePlayer(email.ToLower(), isActive: true);
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
         var dto = new RegisterRequestDto
         {
-            // User types the same email but upper-case
             Email = email.ToUpper(),
             Password = "StrongPassword123!",
             ConfirmPassword = "StrongPassword123!"
@@ -153,7 +171,6 @@ public class AuthServiceTests(
         var email = $"{Guid.NewGuid()}@test.local";
         const string password = "StrongPassword123!";
 
-        // Existing active player
         var player = CreatePlayer(email, isActive: true);
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
@@ -165,10 +182,8 @@ public class AuthServiceTests(
             ConfirmPassword = password
         };
 
-        // First registration succeeds
         await authService.Register(dto);
 
-        // Second registration with same email must fail
         await Assert.ThrowsAsync<ValidationException>(
             async () => await authService.Register(dto));
     }
@@ -180,12 +195,10 @@ public class AuthServiceTests(
         var email = $"{Guid.NewGuid()}@test.local";
         const string password = "ValidPassword123!";
 
-        // Player exists and is active
         var player = CreatePlayer(email, isActive: true);
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
-        // Register user first
         await authService.Register(new RegisterRequestDto
         {
             Email = email,
@@ -215,7 +228,6 @@ public class AuthServiceTests(
             Password = "SomePassword123!"
         };
 
-        // No user with this email -> login must fail
         await Assert.ThrowsAsync<ValidationException>(
             async () => await authService.Login(dto));
     }
@@ -231,7 +243,6 @@ public class AuthServiceTests(
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
-        // Register with correct password
         await authService.Register(new RegisterRequestDto
         {
             Email = email,
@@ -260,7 +271,6 @@ public class AuthServiceTests(
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
-        // Register using lower-case email
         await authService.Register(new RegisterRequestDto
         {
             Email = email.ToLower(),
@@ -268,7 +278,6 @@ public class AuthServiceTests(
             ConfirmPassword = password
         });
 
-        // Login using upper-case version of the same email
         var loginDto = new LoginRequestDto
         {
             Email = email.ToUpper(),
@@ -291,7 +300,6 @@ public class AuthServiceTests(
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
-        // Register user to get a valid token
         var response = await authService.Register(new RegisterRequestDto
         {
             Email = email,
@@ -309,7 +317,6 @@ public class AuthServiceTests(
     [Fact]
     public async Task VerifyAndDecodeToken_Throws_For_InvalidToken()
     {
-        // Service wraps SecurityTokenException into Bogus.ValidationException
         await Assert.ThrowsAsync<ValidationException>(
             async () => await authService.VerifyAndDecodeToken("totally-invalid-token"));
     }
