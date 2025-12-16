@@ -14,13 +14,10 @@ public class Startup
 {
     private static PostgreSqlContainer? _sharedContainer;
     private static readonly object _lock = new();
-    private static bool _schemaInitialized = false; // ✅ Track schema initialization
+    private static bool _schemaInitialized = false; //  Track schema initialization
 
     private static PostgreSqlContainer GetSharedContainer()
     {
-        if (_sharedContainer != null)
-            return _sharedContainer;
-
         lock (_lock)
         {
             if (_sharedContainer != null)
@@ -35,6 +32,7 @@ public class Startup
             return _sharedContainer;
         }
     }
+
 
     public void ConfigureServices(IServiceCollection services)
     {
@@ -58,18 +56,15 @@ public class Startup
                 .Options;
 
             var ctx = new MyDbContext(options);
-            if (!_schemaInitialized)
+            lock (_lock)
             {
-                lock (_lock)
+                if (!_schemaInitialized)
                 {
-                    if (!_schemaInitialized)
-                    {
-                        ctx.Database.EnsureCreated();
-
-                        _schemaInitialized = true;
-                    }
+                    ctx.Database.EnsureCreated();
+                    _schemaInitialized = true;
                 }
             }
+         
 
             return ctx;
         });
@@ -95,7 +90,7 @@ public class TestTransactionScope : IDisposable
 
     public async Task BeginTransactionAsync(CancellationToken ct = default)
     {
-        // ✅ Ensure no existing transaction
+        //  Ensure no existing transaction
         if (_transaction != null)
         {
             await _transaction.RollbackAsync(ct);
@@ -112,7 +107,7 @@ public class TestTransactionScope : IDisposable
 
         try
         {
-            // ✅ Force rollback synchronously
+            //  Force rollback synchronously
             _transaction.Rollback();
         }
         catch

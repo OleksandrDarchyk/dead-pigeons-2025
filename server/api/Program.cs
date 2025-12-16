@@ -207,12 +207,9 @@ public class Program
         // Dev-only: generate TypeScript client and seed the database
         if (app.Environment.IsDevelopment())
         {
-            Console.WriteLine("PROD: seeding games started");
-
             app.GenerateApiClientsFromOpenApi("/../../client/src/core/api/generated/generated-client.ts")
                 .GetAwaiter()
                 .GetResult();
-            Console.WriteLine("PROD: seeding games finished");
 
             // Use Dev seeder here so we do NOT wipe the database on each run.
             using var scope = app.Services.CreateScope();
