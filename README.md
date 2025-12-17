@@ -94,7 +94,7 @@ and boards, and a player dashboard to deposit money, buy boards, and track histo
 > Tip: To stop the database containers: `docker compose down`
 
 
-### 1) Clone repository
+###  Clone repository
 ```bash
 git clone https://github.com/OleksandrDarchyk/dead-pigeons-2025.git
-cd dead-pigeons-2025
+
