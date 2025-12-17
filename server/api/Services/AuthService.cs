@@ -7,7 +7,6 @@ using dataccess.Entities;
 using Api.Security;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using ValidationException = Bogus.ValidationException;
 

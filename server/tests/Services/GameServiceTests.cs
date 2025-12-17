@@ -4,10 +4,9 @@ using api.Services;
 using dataccess;
 using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Time.Testing;
 using ValidationException = Bogus.ValidationException;
 
-namespace tests;
+namespace tests.Services;
 
 /// <summary>
 /// Service-level tests for GameService.
@@ -125,28 +124,27 @@ public class GameServiceTests(
         return p;
     }
 
-    private async Task<Transaction> AddApprovedTransaction(Player player, int amount)
+    private async Task AddApprovedTransaction(Player player, int amount)
     {
         var ct  = TestContext.Current.CancellationToken;
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
         var tx = new Transaction
         {
-            Id              = Guid.NewGuid().ToString(),
-            Playerid        = player.Id,
-            Amount          = amount,
-            Status          = "Approved",
+            Id = Guid.NewGuid().ToString(),
+            Playerid = player.Id,
+            Amount = amount,
+            Status = "Approved",
             Mobilepaynumber = $"TX-{now.Ticks}-{Random.Shared.Next(1000,9999)}",
-            Createdat       = now,
-            Approvedat      = now,
-            Rejectionreason = null,
-            Deletedat       = null
+            Createdat = now,
+            Approvedat = now,
+            Deletedat = null
         };
 
         ctx.Transactions.Add(tx);
         await ctx.SaveChangesAsync(ct);
-        return tx;
     }
+
 
     private async Task<Board> AddBoard(
         Player player,
@@ -185,22 +183,19 @@ public class GameServiceTests(
     [Fact]
     public async Task GetActiveGame_Returns_ActiveGame()
     {
-        var ct  = TestContext.Current.CancellationToken;
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Arrange: create one active + one inactive
         var year = now.Year + 40;
         var active = await CreateGame(year, 1, isActive: true);
         await CreateGame(year, 2, isActive: false);
 
-        // Act
         var result = await gameService.GetActiveGame();
 
-        // Assert
         Assert.Equal(active.Id, result.Id);
         Assert.True(result.Isactive);
         Assert.Null(result.Deletedat);
     }
+
 
     [Fact]
     public async Task GetActiveGame_Throws_When_NoActiveGameExists()
@@ -351,7 +346,7 @@ public class GameServiceTests(
     [Fact]
     public async Task SetWinningNumbers_Throws_When_NotThreeDistinctNumbers()
     {
-        var (current, next) = await CreateCurrentAndNextGame();
+        var (current, _) = await CreateCurrentAndNextGame(); // "_" = "ігноруємо значення"
 
         var dto = new SetWinningNumbersRequestDto
         {
@@ -360,13 +355,14 @@ public class GameServiceTests(
         };
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await gameService.SetWinningNumbers(dto));
+            () => gameService.SetWinningNumbers(dto));
     }
+
 
     [Fact]
     public async Task SetWinningNumbers_Throws_When_NumberOutOfRange()
     {
-        var (current, next) = await CreateCurrentAndNextGame();
+        var (current, _) = await CreateCurrentAndNextGame();
 
         var dto = new SetWinningNumbersRequestDto
         {
@@ -375,8 +371,9 @@ public class GameServiceTests(
         };
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await gameService.SetWinningNumbers(dto));
+            () => gameService.SetWinningNumbers(dto));
     }
+
 
     [Fact]
     public async Task SetWinningNumbers_Throws_When_GameNotFound()
@@ -394,7 +391,7 @@ public class GameServiceTests(
     [Fact]
     public async Task SetWinningNumbers_Throws_When_GameAlreadyFinished()
     {
-        var (current, next) = await CreateCurrentAndNextGame();
+        var (current, _) = await CreateCurrentAndNextGame();
 
         current.Isactive = false;
         await ctx.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -406,14 +403,15 @@ public class GameServiceTests(
         };
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await gameService.SetWinningNumbers(dto));
+            () => gameService.SetWinningNumbers(dto));
     }
+
 
     [Fact]
     public async Task SetWinningNumbers_Throws_When_WinningNumbersAlreadySet()
     {
         var ct = TestContext.Current.CancellationToken;
-        var (current, next) = await CreateCurrentAndNextGame();
+        var (current, _) = await CreateCurrentAndNextGame();
 
         current.Winningnumbers = new List<int> { 1, 2, 3 };
         await ctx.SaveChangesAsync(ct);
@@ -425,8 +423,9 @@ public class GameServiceTests(
         };
 
         await Assert.ThrowsAsync<ValidationException>(
-            async () => await gameService.SetWinningNumbers(dto));
+            () => gameService.SetWinningNumbers(dto));
     }
+
 
     // ------------------------------------------------------------
     // GetPlayerHistory

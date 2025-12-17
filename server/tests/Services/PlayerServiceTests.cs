@@ -1,5 +1,4 @@
 // tests/PlayerServiceTests.cs
-using System.ComponentModel.DataAnnotations;
 using api.Models.Requests;
 using api.Services;
 using dataccess;
@@ -7,7 +6,7 @@ using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
 using ValidationException = Bogus.ValidationException;
 
-namespace tests;
+namespace tests.Services;
 
 /// <summary>
 /// Service-level tests for <see cref="PlayerService"/>.
