@@ -90,23 +90,17 @@ public class Program
         services.AddCors();
 
         // Application services
-        // Application services
         services.AddScoped<IAuthService, AuthService>();
-
-        // ISeeder here is mainly for tests (they inject ISeeder).
-        // In Development we will explicitly use DevSeeder in Program.ConfigureApp.
-        services.AddScoped<ISeeder, TestSeeder>();
-
-        services.AddScoped<DevSeeder>(); // Dev seeder for local runs
         
+        services.AddScoped<ISeeder, TestSeeder>();
+        services.AddScoped<DevSeeder>(); 
         services.AddScoped<GameSeeder>();
-
-
+        
         services.AddScoped<IPlayerService, PlayerService>();
         services.AddScoped<IGameService, GameService>();
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<ITransactionService, TransactionService>();
-
+       
         // Admin bootstrapper (one-time Admin creation in Production)
         services.AddScoped<AdminBootstrapper>();
 

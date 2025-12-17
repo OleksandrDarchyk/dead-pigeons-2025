@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Time.Testing;
 using ValidationException = Bogus.ValidationException;
 
-namespace tests;
+namespace tests.Services;
 
 /// <summary>
 /// Service-level tests for AuthService (login, register, token verification).

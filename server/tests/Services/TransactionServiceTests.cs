@@ -8,7 +8,7 @@ using dataccess.Entities;
 using Microsoft.EntityFrameworkCore;
 using ValidationException = System.ComponentModel.DataAnnotations.ValidationException;
 
-namespace tests;
+namespace tests.Services;
 
 /// <summary>
 /// Service-level tests for <see cref="TransactionService"/>:

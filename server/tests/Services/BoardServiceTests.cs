@@ -10,7 +10,7 @@ using Microsoft.Extensions.Time.Testing;
 using ValidationException = Bogus.ValidationException;
 using DataAnnotationValidationException = System.ComponentModel.DataAnnotations.ValidationException;
 
-namespace tests;
+namespace tests.Services;
 
 /// <summary>
 /// Service-level tests for BoardService.
