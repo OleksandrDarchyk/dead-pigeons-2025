@@ -1,0 +1,34 @@
+
+# Git / IDE
+
+.git/
+.vscode/
+.idea/
+.DS_Store
+
+
+# Secrets / local env
+
+.env
+.env.*
+!.env.example
+
+# Don't bake config files into the image
+appsettings.*.json
+
+
+# .NET build output
+
+**/bin/
+**/obj/
+**/TestResults/
+**/*.trx
+**/*.pdb
+**/*.log
+**/*.user
+**/*.suo
+
+# Client artifacts (if any are inside server context)
+
+**/node_modules/
+**/dist/
