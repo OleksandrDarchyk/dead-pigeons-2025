@@ -1,3 +1,4 @@
+// client/src/hooks/usePlayerHistory.ts
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
@@ -7,7 +8,9 @@ import { ApiException } from "@core/api/generated/generated-client";
 
 
 export type GameHistoryItem = {
+    // One game (one week / round)
     game: GameResponseDto;
+    // All history entries (boards) that the current player has in this game
     boards: PlayerGameHistoryItemDto[];
 };
 
@@ -29,9 +32,13 @@ export function usePlayerHistory(enabled: boolean = true) {
                 setIsLoading(true);
                 setIsNotPlayer(false);
 
+                // Load flat history from backend:
+                // each item is (one game + one board of the current player)
                 const history: PlayerGameHistoryItemDto[] =
                     await gamesApi.getMyGameHistory();
 
+                // Group by GameId so that the UI can show:
+                // "one game + all my boards in that game"
                 const groupedByGame = new Map<string, GameHistoryItem>();
 
                 for (const entry of history ?? []) {
@@ -41,8 +48,9 @@ export function usePlayerHistory(enabled: boolean = true) {
                     let existing = groupedByGame.get(gameId);
 
                     if (!existing) {
+                        // Build a lightweight GameResponseDto from the history item
                         const game: GameResponseDto = {
-                            id: entry.gameId,
+                            id: entry.gameId, // non-null assertion removed (not needed for the type)
                             weekNumber: entry.weekNumber ?? 0,
                             year: entry.year ?? 0,
                             winningNumbers:
@@ -78,6 +86,7 @@ export function usePlayerHistory(enabled: boolean = true) {
                 console.error(err);
 
                 if (err instanceof ApiException) {
+                    // Try to read ProblemDetails from the response body
                     let problemTitle: string | undefined;
 
                     try {
@@ -90,9 +99,11 @@ export function usePlayerHistory(enabled: boolean = true) {
                                 parsed?.title ?? parsed?.detail;
                         }
                     } catch {
+                        console.error(
+                            "Failed to parse ProblemDetails JSON",
+                        );                    }
 
-                    }
-
+                    // Domain case: user is logged in, but there is no Player for this email
                     if (
                         problemTitle &&
                         problemTitle.includes(
@@ -102,10 +113,12 @@ export function usePlayerHistory(enabled: boolean = true) {
                         setItems([]);
                         setIsNotPlayer(true);
                         setIsLoading(false);
+                        // No error toast here – this is a normal domain situation
                         return;
                     }
                 }
 
+                // Any other error is treated as a real failure
                 setIsNotPlayer(false);
                 setItems([]);
                 toast.error("Failed to load game history");
@@ -114,12 +127,13 @@ export function usePlayerHistory(enabled: boolean = true) {
             }
         };
 
+        // Explicitly ignore the Promise returned by load in effect
         void load();
     }, [enabled]);
 
     return {
         items,
         isLoading,
-        isNotPlayer,
+        isNotPlayer, // UI can show a friendly message if true
     };
 }
