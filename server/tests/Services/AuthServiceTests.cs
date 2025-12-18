@@ -22,7 +22,6 @@ public class AuthServiceTests(
         var ct = TestContext.Current.CancellationToken;
         await transaction.BeginTransactionAsync(ct);
 
-        // Reset fake time (JWT validation can fail if another test moved time forward).
         if (timeProvider is FakeTimeProvider fake)
         {
             fake.SetUtcNow(DateTime.UtcNow);
