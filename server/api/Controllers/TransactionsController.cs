@@ -1,4 +1,3 @@
-// api/Controllers/TransactionsController.cs
 
 using api.Models.Responses;
 using api.Models.Transactions;
@@ -12,10 +11,9 @@ namespace api.Controllers;
 
 [ApiController]
 [Route("[controller]")]
-[Authorize] // all actions require authenticated user unless overridden
+[Authorize] 
 public class TransactionsController(ITransactionService transactionService) : ControllerBase
 {
-    // Maps EF entity -> response DTO for API
     private static TransactionResponseDto MapToDto(Transaction t) => new()
     {
         Id              = t.Id,
@@ -28,7 +26,6 @@ public class TransactionsController(ITransactionService transactionService) : Co
         RejectionReason = t.Rejectionreason
     };
 
-    // Player: create a transaction for their own account (player id comes from JWT)
     [HttpPost(nameof(CreateTransaction))]
     public async Task<TransactionResponseDto> CreateTransaction(
         [FromBody] CreateTransactionForCurrentUserRequestDto dto)
@@ -37,7 +34,6 @@ public class TransactionsController(ITransactionService transactionService) : Co
         return MapToDto(transaction);
     }
 
-    // Admin: create a transaction for a specific player
     [HttpPost(nameof(CreateTransactionForPlayer))]
     [Authorize(Roles = Roles.Admin)]
     public async Task<TransactionResponseDto> CreateTransactionForPlayer(
@@ -47,7 +43,6 @@ public class TransactionsController(ITransactionService transactionService) : Co
         return MapToDto(transaction);
     }
 
-    // Admin: approve a pending transaction
     [HttpPost(nameof(ApproveTransaction))]
     [Authorize(Roles = Roles.Admin)]
     public async Task<TransactionResponseDto> ApproveTransaction([FromQuery] string transactionId)
@@ -56,7 +51,6 @@ public class TransactionsController(ITransactionService transactionService) : Co
         return MapToDto(transaction);
     }
 
-    // Admin: reject a pending transaction
     [HttpPost(nameof(RejectTransaction))]
     [Authorize(Roles = Roles.Admin)]
     public async Task<TransactionResponseDto> RejectTransaction([FromQuery] string transactionId)
@@ -65,7 +59,6 @@ public class TransactionsController(ITransactionService transactionService) : Co
         return MapToDto(transaction);
     }
 
-    // Player: get their own transactions
     [HttpGet(nameof(GetMyTransactions))]
     public async Task<List<TransactionResponseDto>> GetMyTransactions()
     {
@@ -75,7 +68,6 @@ public class TransactionsController(ITransactionService transactionService) : Co
             .ToList();
     }
 
-    // Admin: get all pending transactions
     [HttpGet(nameof(GetPendingTransactions))]
     [Authorize(Roles = Roles.Admin)]
     public async Task<List<TransactionResponseDto>> GetPendingTransactions()
@@ -86,14 +78,12 @@ public class TransactionsController(ITransactionService transactionService) : Co
             .ToList();
     }
 
-    // Player: get their own balance
     [HttpGet(nameof(GetMyBalance))]
     public async Task<PlayerBalanceResponseDto> GetMyBalance()
     {
         return await transactionService.GetBalanceForCurrentUser(User);
     }
 
-    // Admin: get balance for a specific player
     [HttpGet(nameof(GetPlayerBalance))]
     [Authorize(Roles = Roles.Admin)]
     public async Task<PlayerBalanceResponseDto> GetPlayerBalance([FromQuery] string playerId)
@@ -101,17 +91,14 @@ public class TransactionsController(ITransactionService transactionService) : Co
         return await transactionService.GetPlayerBalance(playerId);
     }
 
-    // Admin: get transaction history for one player (optionally filtered by status)
     [HttpGet(nameof(GetTransactionsHistory))]
     [Authorize(Roles = Roles.Admin)]
     public async Task<List<TransactionResponseDto>> GetTransactionsHistory(
         [FromQuery] string playerId,
         [FromQuery] string? status)
     {
-        // 1) Load all transactions for this player from the service
         var transactions = await transactionService.GetTransactionsForPlayer(playerId);
 
-        // 2) If status is provided, filter by it (case-insensitive)
         if (!string.IsNullOrWhiteSpace(status))
         {
             var normalized = status.Trim().ToLowerInvariant();
@@ -121,8 +108,6 @@ public class TransactionsController(ITransactionService transactionService) : Co
                             t.Status.ToLowerInvariant() == normalized)
                 .ToList();
         }
-
-        // 3) Map entities to DTOs for the API response
         return transactions
             .Select(MapToDto)
             .ToList();

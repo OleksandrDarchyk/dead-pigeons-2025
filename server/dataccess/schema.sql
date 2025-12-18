@@ -70,14 +70,11 @@ create table deadpigeons.board
 (
     id           text primary key not null,
 
-    -- IMPORTANT: on delete RESTRICT, because we use soft delete
-    -- and do not want history to be removed by cascade delete
     playerId     text             references deadpigeons.player(id) on delete restrict,
     gameId       text             references deadpigeons.game(id)   on delete restrict,
 
     numbers      int[]            not null,
 
-    -- IMPORTANT:
     -- price is always the price for ONE game (one week),
     -- not the total prepaid amount for multiple weeks.
     price        int              not null,
@@ -106,7 +103,6 @@ create table deadpigeons.transactions
 (
     id              text primary key not null,
 
-    -- Correct approach: on delete RESTRICT
     playerId        text not null references deadpigeons.player(id) on delete restrict,
 
     mobilePayNumber text not null,
@@ -127,9 +123,7 @@ create table deadpigeons.transactions
 create unique index idx_transactions_mp
     on deadpigeons.transactions (mobilePayNumber);
 
--- ==========================
--- BALANCES
--- ==========================
+
 
 -- Balance is calculated in the backend as:
 --   sum(approved transactions.amount) - sum(boards.price) per player.

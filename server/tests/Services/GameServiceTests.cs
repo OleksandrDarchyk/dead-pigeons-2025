@@ -1,4 +1,3 @@
-// server/tests/GameServiceTests.cs
 using api.Models.Requests;
 using api.Services;
 using dataccess;
@@ -8,14 +7,7 @@ using ValidationException = Bogus.ValidationException;
 
 namespace tests.Services;
 
-/// <summary>
-/// Service-level tests for GameService.
-/// Covers:
-/// - GetActiveGame
-/// - GetGamesHistory ordering + soft delete
-/// - SetWinningNumbers: closes current game, marks winners, activates next game, repeats boards
-/// - GetPlayerHistory mapping + ordering + error cases
-/// </summary>
+
 public class GameServiceTests(
     IGameService gameService,
     MyDbContext ctx,
@@ -31,14 +23,11 @@ public class GameServiceTests(
 
     public ValueTask DisposeAsync()
     {
-        transaction.Dispose(); // guarantee rollback
+        transaction.Dispose(); 
         return ValueTask.CompletedTask;
     }
 
-    // ------------------------------------------------------------
     // Helpers
-    // ------------------------------------------------------------
-
     private async Task<Game> CreateGame(int year, int week, bool isActive)
     {
         var ct  = TestContext.Current.CancellationToken;
@@ -176,10 +165,7 @@ public class GameServiceTests(
         return b;
     }
 
-    // ------------------------------------------------------------
     // GetActiveGame
-    // ------------------------------------------------------------
-
     [Fact]
     public async Task GetActiveGame_Returns_ActiveGame()
     {
@@ -212,10 +198,7 @@ public class GameServiceTests(
             async () => await gameService.GetActiveGame());
     }
 
-    // ------------------------------------------------------------
     // GetGamesHistory
-    // ------------------------------------------------------------
-
     [Fact]
     public async Task GetGamesHistory_Returns_NonDeletedGames_NewestFirst()
     {
@@ -252,10 +235,7 @@ public class GameServiceTests(
         Assert.Contains(history, g => g.Id == g1.Id);
         Assert.DoesNotContain(history, g => g.Id == g2.Id);
     }
-
-    // ------------------------------------------------------------
-    // SetWinningNumbers
-    // ------------------------------------------------------------
+    
 
     [Fact]
     public async Task SetWinningNumbers_ClosesGame_ActivatesNext_MarksWinners_CreatesRepeatBoard_AndReturnsSummary()
@@ -267,11 +247,8 @@ public class GameServiceTests(
 
         var player = await CreatePlayer($"player-{Guid.NewGuid()}@test.local", isActive: true);
 
-        // Give balance so repeating can be created in next game
         await AddApprovedTransaction(player, amount: 100);
-
-        // Board that will WIN and repeats:
-        // Winning numbers will be {1,2,3}, board has {1,2,3,4,5} -> win
+        
         var winningBoard = await AddBoard(
             player, current,
             numbers: new[] { 1, 2, 3, 4, 5 },
@@ -279,7 +256,6 @@ public class GameServiceTests(
             repeatActive: true,
             repeatWeeks: 3);
 
-        // Board that will LOSE and does not repeat
         await AddBoard(
             player, current,
             numbers: new[] { 6, 7, 8, 9, 10 },
@@ -291,12 +267,11 @@ public class GameServiceTests(
         var dto = new SetWinningNumbersRequestDto
         {
             GameId = current.Id,
-            WinningNumbers = new[] { 3, 1, 2 } // shuffled on purpose
+            WinningNumbers = new[] { 3, 1, 2 } 
         };
 
         var summary = await gameService.SetWinningNumbers(dto);
 
-        // Reload
         var currentDb = await ctx.Games
             .Include(g => g.Boards)
             .SingleAsync(g => g.Id == current.Id, ct);
@@ -346,7 +321,7 @@ public class GameServiceTests(
     [Fact]
     public async Task SetWinningNumbers_Throws_When_NotThreeDistinctNumbers()
     {
-        var (current, _) = await CreateCurrentAndNextGame(); // "_" = "ігноруємо значення"
+        var (current, _) = await CreateCurrentAndNextGame();
 
         var dto = new SetWinningNumbersRequestDto
         {
@@ -425,12 +400,7 @@ public class GameServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             () => gameService.SetWinningNumbers(dto));
     }
-
-
-    // ------------------------------------------------------------
-    // GetPlayerHistory
-    // ------------------------------------------------------------
-
+    
     [Fact]
     public async Task GetPlayerHistory_Throws_When_EmailMissing()
     {

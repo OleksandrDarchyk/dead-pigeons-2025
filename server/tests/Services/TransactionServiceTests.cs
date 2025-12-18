@@ -1,4 +1,3 @@
-// server/tests/TransactionServiceTests.cs
 using System.Security.Claims;
 using api.Models.Responses;
 using api.Models.Transactions;
@@ -10,14 +9,6 @@ using ValidationException = System.ComponentModel.DataAnnotations.ValidationExce
 
 namespace tests.Services;
 
-/// <summary>
-/// Service-level tests for <see cref="TransactionService"/>:
-/// - create transactions (admin + current user)
-/// - approve / reject
-/// - pending + history queries
-/// - balance calculation
-/// Uses TestTransactionScope so each test runs in isolation (rollback after each test).
-/// </summary>
 public class TransactionServiceTests(
     ITransactionService transactionService,
     MyDbContext ctx,
@@ -25,10 +16,7 @@ public class TransactionServiceTests(
     TimeProvider timeProvider,
     ITestOutputHelper outputHelper) : IAsyncLifetime
 {
-    // ---------------------------------------------------------------------
-    // xUnit v3 lifecycle
-    // ---------------------------------------------------------------------
-
+    
     public async ValueTask InitializeAsync()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -37,14 +25,10 @@ public class TransactionServiceTests(
 
     public ValueTask DisposeAsync()
     {
-        // Ensure rollback even if DI disposal order changes.
         transactionScope.Dispose();
         return ValueTask.CompletedTask;
     }
-
-    // ---------------------------------------------------------------------
-    // Helpers
-    // ---------------------------------------------------------------------
+    
 
     private async Task<Player> CreateUniquePlayer(string emailPrefix)
     {
@@ -74,7 +58,6 @@ public class TransactionServiceTests(
         var ct = TestContext.Current.CancellationToken;
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Use far-future year to avoid collisions with any seeded/realistic data.
         var week = (Math.Abs(Guid.NewGuid().GetHashCode()) % 52) + 1;
 
         var game = new Game
@@ -103,10 +86,7 @@ public class TransactionServiceTests(
 
         return new ClaimsPrincipal(identity);
     }
-
-    // ============================================================
-    // CreateTransaction (admin)
-    // ============================================================
+    
 
     [Fact]
     public async Task CreateTransaction_Succeeds_ForExistingPlayer_AndUniqueMobilePayNumber()
@@ -192,11 +172,7 @@ public class TransactionServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             async () => await transactionService.CreateTransaction(dto));
     }
-
-    // ============================================================
-    // CreateTransactionForCurrentUser
-    // ============================================================
-
+    
     [Fact]
     public async Task CreateTransactionForCurrentUser_Succeeds_When_EmailClaimAndPlayerExist()
     {
@@ -247,11 +223,7 @@ public class TransactionServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             async () => await transactionService.CreateTransactionForCurrentUser(user, dto));
     }
-
-    // ============================================================
-    // ApproveTransaction
-    // ============================================================
-
+    
     [Fact]
     public async Task ApproveTransaction_SetsStatusApproved_AndApprovedAt_ForPendingTransaction()
     {
@@ -327,11 +299,7 @@ public class TransactionServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             async () => await transactionService.ApproveTransaction(tx.Id));
     }
-
-    // ============================================================
-    // RejectTransaction
-    // ============================================================
-
+    
     [Fact]
     public async Task RejectTransaction_SetsStatusRejected_ForPendingTransaction()
     {
@@ -406,11 +374,7 @@ public class TransactionServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             async () => await transactionService.RejectTransaction(tx.Id));
     }
-
-    // ============================================================
-    // GetTransactionsForPlayer
-    // ============================================================
-
+    
     [Fact]
     public async Task GetTransactionsForPlayer_Returns_OnlyNonDeleted_ForPlayer_OrderedNewestFirst()
     {
@@ -490,11 +454,7 @@ public class TransactionServiceTests(
         Assert.NotNull(result);
         Assert.Empty(result);
     }
-
-    // ============================================================
-    // GetPendingTransactions
-    // ============================================================
-
+    
     [Fact]
     public async Task GetPendingTransactions_Returns_PendingOnly_OrderedByCreatedAt_AndIncludesPlayer()
     {
@@ -553,7 +513,6 @@ public class TransactionServiceTests(
 
         var result = await transactionService.GetPendingTransactions();
 
-        // Should be exactly our 2 pending non-deleted, ordered oldest -> newest
         Assert.Equal(2, result.Count);
         Assert.Equal(new[] { pendingOld.Id, pendingNew.Id }, result.Select(t => t.Id).ToArray());
         Assert.All(result, t =>
@@ -572,11 +531,7 @@ public class TransactionServiceTests(
         Assert.NotNull(result);
         Assert.Empty(result);
     }
-
-    // ============================================================
-    // GetTransactionsHistory
-    // ============================================================
-
+    
     [Fact]
     public async Task GetTransactionsHistory_Filters_ByPlayer_AndExcludesPendingByDefault()
     {
@@ -691,11 +646,7 @@ public class TransactionServiceTests(
         Assert.NotNull(history);
         Assert.Empty(history);
     }
-
-    // ============================================================
-    // GetPlayerBalance / Current user methods
-    // ============================================================
-
+    
     [Fact]
     public async Task GetPlayerBalance_Computes_ApprovedMinusBoardsPrice()
     {

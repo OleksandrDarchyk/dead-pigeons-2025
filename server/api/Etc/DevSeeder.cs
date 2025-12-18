@@ -1,4 +1,3 @@
-// api/Etc/DevSeeder.cs
 using dataccess;
 using dataccess.Entities;
 using Microsoft.AspNetCore.Identity;
@@ -6,12 +5,8 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Etc;
 
-/// <summary>
 /// Seeder used in Development environment.
-/// - Does NOT clear the database.
-/// - Seeds core demo data only once when the DB is empty (based on Users).
-/// - Ensures games exist (Tip 1) via GameSeeder in an idempotent way.
-/// </summary>
+/// - Seeds  data only once when the DB is empty 
 public class DevSeeder(
     MyDbContext ctx,
     TimeProvider timeProvider,

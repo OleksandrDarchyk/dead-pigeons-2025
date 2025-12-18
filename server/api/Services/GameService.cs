@@ -17,14 +17,12 @@ public class GameService(
 {
     public async Task<Game> GetActiveGame()
     {
-        // Find the current active game (ignore soft-deleted)
         var game = await ctx.Games
             .Where(g => g.Deletedat == null && g.Isactive)
             .OrderBy(g => g.Year)
             .ThenBy(g => g.Weeknumber)
             .FirstOrDefaultAsync();
 
-        // If this happens, seeding or data is broken
         if (game == null)
         {
             throw new ValidationException("No active game found.");
@@ -35,7 +33,6 @@ public class GameService(
 
     public async Task<List<Game>> GetGamesHistory()
     {
-        // All non-deleted games, newest first
         return await ctx.Games
             .Where(g => g.Deletedat == null)
             .OrderByDescending(g => g.Year)
@@ -154,37 +151,17 @@ public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersReque
     }
 }
 
-
-
-
-    /// <summary>
-    /// For all boards in the current game that are marked as repeating,
-    /// try to create a new board in the next game and charge the weekly price again.
-    ///
-    /// Important:
-    /// - RepeatWeeks means "how many FUTURE games this board should still participate in".
-    ///   Example: RepeatWeeks = 3 => this board should auto-repeat for the next 3 games.
-    /// - We only repeat boards where Repeatactive = true and Repeatweeks > 0.
-    /// - For each repeat we:
-    ///     * check the player's current balance (including extra charges planned in this loop),
-    ///     * if enough balance -> create a new board with Price = weekly price,
-    ///     * decrease remaining future weeks on the new board,
-    ///     * if not enough balance -> stop repeating for this board (Repeatactive = false, Repeatweeks = 0).
-    /// </summary>
     private async Task CreateRepeatingBoardsForNextGame(Game currentGame, Game nextGame)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Only non-deleted boards that are still set to repeat in future games
         var repeatingBoards = currentGame.Boards
             .Where(b =>
                 b.Deletedat == null &&
                 b.Repeatactive &&
                 b.Repeatweeks > 0)
             .ToList();
-
-        // Track additional "planned" charges per player so we do not overspend
-        // when a player has multiple repeating boards in the same game.
+        
         var extraChargesPerPlayer = new Dictionary<string, int>();
 
         foreach (var board in repeatingBoards)
@@ -198,28 +175,21 @@ public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersReque
             var weeklyPrice = CalculateWeeklyPrice(board);
             if (weeklyPrice <= 0)
             {
-                // Invalid board configuration, skip silently.
                 continue;
             }
 
-            // Current balance from DB
             var currentBalance = await GetCurrentBalance(playerId);
 
-            // Subtract charges we already decided to apply during this loop
             extraChargesPerPlayer.TryGetValue(playerId, out var alreadyPlanned);
             var availableBalance = currentBalance - alreadyPlanned;
 
             if (availableBalance < weeklyPrice)
             {
-                // Not enough money to repeat this board.
-                // We also disable repeating so we do not try again next time.
                 board.Repeatactive = false;
                 board.Repeatweeks = 0;
                 continue;
             }
-
-            // There is enough balance to repeat this board for the next game.
-            // We create a new board in the next game and charge one weekly price.
+            
             var remainingFutureWeeks = board.Repeatweeks - 1;
 
             var newBoard = new Board
@@ -229,12 +199,10 @@ public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersReque
                 Gameid       = nextGame.Id,
                 Numbers      = board.Numbers.ToList(),
 
-                // We always charge the weekly price per game.
                 Price        = weeklyPrice,
 
                 Iswinning    = false,
 
-                // Remaining future weeks for auto-repeat after this newly created game
                 Repeatweeks  = remainingFutureWeeks,
                 Repeatactive = remainingFutureWeeks > 0,
 
@@ -243,32 +211,26 @@ public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersReque
             };
 
             ctx.Boards.Add(newBoard);
-
-            // Remember that we have "spent" this weekly price from the player's balance
             extraChargesPerPlayer[playerId] = alreadyPlanned + weeklyPrice;
         }
     }
 
     public async Task<List<PlayerGameHistoryItemDto>> GetPlayerHistory(string playerEmail)
     {
-        // Email must be present in the token
         if (string.IsNullOrWhiteSpace(playerEmail))
         {
             throw new ValidationException("Email claim is missing for the current user.");
         }
 
-        // Find the player by email (ignore soft-deleted)
         var player = await ctx.Players
             .Where(p => p.Deletedat == null && p.Email == playerEmail)
             .FirstOrDefaultAsync();
 
         if (player == null)
         {
-            // Domain-level error: logged in user is not registered as a player
             throw new ValidationException("Player not found for the current user.");
         }
 
-        // Load all boards for this player, including related games
         var boards = await ctx.Boards
             .Include(b => b.Game)
             .Where(b =>
@@ -280,7 +242,6 @@ public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersReque
             .ThenByDescending(b => b.Game!.Weeknumber)
             .ToListAsync();
 
-        // Map boards + games to a flat list of DTOs for the UI
         var history = boards
             .Select(b => new PlayerGameHistoryItemDto
             {
@@ -292,7 +253,6 @@ public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersReque
                 BoardId        = b.Id,
                 Numbers        = b.Numbers.ToArray(),
 
-                // We show per-game price, and now Board.Price already stores weekly price.
                 Price          = b.Price,
                 BoardCreatedAt = b.Createdat,
 
@@ -303,12 +263,7 @@ public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersReque
 
         return history;
     }
-
-    /// <summary>
-    /// Helper for weekly board price based on count of numbers:
-    /// 5 -> 20, 6 -> 40, 7 -> 80, 8 -> 160, otherwise 0.
-    /// Must be consistent with BoardService.
-    /// </summary>
+    
     private static int CalculateWeeklyPrice(Board board)
     {
         var count = board.Numbers?.Count ?? 0;
@@ -322,13 +277,7 @@ public async Task<GameResultSummaryDto> SetWinningNumbers(SetWinningNumbersReque
             _ => 0
         };
     }
-
-    /// <summary>
-    /// Calculates current balance for a player as:
-    ///   sum(Approved transactions.amount) - sum(boards.Price).
-    ///
-    /// This is the same rule as in BoardService.
-    /// </summary>
+    
     private async Task<int> GetCurrentBalance(string playerId)
     {
         var approvedAmount = await ctx.Transactions

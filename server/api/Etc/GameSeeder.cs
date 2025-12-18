@@ -1,4 +1,3 @@
-// api/Etc/GameSeeder.cs
 using System.Data;
 using dataccess;
 using dataccess.Entities;
@@ -6,15 +5,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace api.Etc;
 
-/// <summary>
-/// Tip 1 (State-less API) seeder:
-/// - No scheduler/cron: games are pre-seeded for ~20 years.
-/// - Idempotent: safe to run on every startup.
-/// - Guarantees exactly one active game and enough future inactive games.
-/// </summary>
 public class GameSeeder(MyDbContext ctx, TimeProvider timeProvider)
 {
-    private const int WeeksToCreate = 20 * 52; // ~20 years forward using a 1..52 week model
+    private const int WeeksToCreate = 20 * 52; 
 
     public async Task SeedGamesIfMissingAsync(CancellationToken ct = default)
     {

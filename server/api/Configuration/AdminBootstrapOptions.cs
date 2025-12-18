@@ -1,19 +1,12 @@
 namespace api.Configuration;
 
-/// <summary>
-/// Configuration options for one-time admin bootstrap in Production.
-/// Values should come from environment variables / secrets, not from committed appsettings.json.
-/// </summary>
+// Settings used to create the very first admin account in Production.
+
 public class AdminBootstrapOptions
 {
-    /// <summary>
-    /// Email for the initial admin user (for example: admin@deadpigeons.dk).
-    /// </summary>
+    /// Admin email address.
     public string? Email { get; set; }
-
-    /// <summary>
-    /// Plain-text password for the initial admin user.
-    /// This should only be provided via secrets in Production and removed after the admin is created.
-    /// </summary>
+    
+    /// Admin password in plain text. Use only for the initial bootstrap, then remove/rotate.
     public string? Password { get; set; }
 }

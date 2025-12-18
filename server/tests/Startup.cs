@@ -1,4 +1,3 @@
-// tests/Startup.cs
 using api;
 using dataccess;
 using Microsoft.EntityFrameworkCore;
