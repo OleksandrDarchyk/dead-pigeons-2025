@@ -67,8 +67,7 @@ public class BoardController(IBoardService boardService) : ControllerBase
         RepeatWeeks  = b.Repeatweeks,
         RepeatActive = b.Repeatactive,
         CreatedAt    = b.Createdat,
-
-        // Extra convenience for UI – game info comes from navigation property
+        
         GameWeek     = b.Game?.Weeknumber ?? 0,
         GameYear     = b.Game?.Year       ?? 0,
         GameIsActive = b.Game?.Isactive   ?? false,
