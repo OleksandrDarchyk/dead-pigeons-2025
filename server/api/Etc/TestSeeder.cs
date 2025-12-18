@@ -4,10 +4,6 @@ using Microsoft.AspNetCore.Identity;
 
 namespace api.Etc;
 
-/// <summary>
-/// Seeder used ONLY for tests.
-/// It always starts from a clean database and then calls the shared SeedData.
-/// </summary>
 public class TestSeeder(
     MyDbContext ctx,
     TimeProvider timeProvider,
@@ -15,11 +11,8 @@ public class TestSeeder(
 {
     public async Task Seed()
     {
-        // Dev/Test only: ensure database exists
         await ctx.Database.EnsureCreatedAsync();
-
-        // WARNING: Tests only!
-        // This wipes all data so we always start from a known clean state.
+        
         ctx.Boards.RemoveRange(ctx.Boards);
         ctx.Transactions.RemoveRange(ctx.Transactions);
         ctx.Players.RemoveRange(ctx.Players);
@@ -28,7 +21,6 @@ public class TestSeeder(
 
         await ctx.SaveChangesAsync();
 
-        // Re-use shared seed logic so Dev and Tests have the same basic data.
         await SeedData.SeedCoreAsync(ctx, timeProvider, passwordHasher);
     }
 }

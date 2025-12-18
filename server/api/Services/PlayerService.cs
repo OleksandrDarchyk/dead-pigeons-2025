@@ -7,17 +7,14 @@ using ValidationException = Bogus.ValidationException;
 
 namespace api.Services;
 
-// Handles CRUD and status changes for players
 public class PlayerService(
     MyDbContext ctx,
     TimeProvider timeProvider) : IPlayerService
 {
     public async Task<Player> CreatePlayer(CreatePlayerRequestDto dto)
     {
-        // Basic attribute validation (required, length, etc.)
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
-        // Email must be unique among non-deleted players
         var emailTaken = await ctx.Players.AnyAsync(p =>
             p.Email == dto.Email && p.Deletedat == null);
 
@@ -28,7 +25,6 @@ public class PlayerService(
 
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // New players start as inactive by business rule
         var player = new Player
         {
             Id = Guid.NewGuid().ToString(),
@@ -96,7 +92,6 @@ public class PlayerService(
 
     public async Task<Player> ActivatePlayer(string playerId)
     {
-        // Only non-deleted players can be activated
         var player = await ctx.Players
             .FirstOrDefaultAsync(p => p.Id == playerId && p.Deletedat == null);
 
@@ -136,7 +131,6 @@ public class PlayerService(
 
     public async Task<Player> SoftDeletePlayer(string playerId)
     {
-        // Soft delete: mark as deleted instead of removing the row
         var player = await ctx.Players
             .FirstOrDefaultAsync(p => p.Id == playerId && p.Deletedat == null);
 
@@ -153,7 +147,6 @@ public class PlayerService(
 
     public async Task<Player> GetPlayerById(string playerId)
     {
-        // Only return non-deleted players
         var player = await ctx.Players
             .Where(p => p.Deletedat == null)
             .FirstOrDefaultAsync(p => p.Id == playerId);
@@ -168,7 +161,6 @@ public class PlayerService(
 
     public async Task<Player> UpdatePlayer(UpdatePlayerRequestDto dto)
     {
-        // Attribute-level validation on the DTO
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
         var player = await ctx.Players
@@ -179,7 +171,6 @@ public class PlayerService(
             throw new ValidationException("Player not found.");
         }
 
-        // If email is changed, check that it is still unique
         if (!string.IsNullOrWhiteSpace(dto.Email) && dto.Email != player.Email)
         {
             var emailTaken = await ctx.Players
@@ -196,7 +187,6 @@ public class PlayerService(
             player.Email = dto.Email;
         }
 
-        // Update basic properties
         player.Fullname = dto.FullName;
         player.Phone = dto.Phone;
 

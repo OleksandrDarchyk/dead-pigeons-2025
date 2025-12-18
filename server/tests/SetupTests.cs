@@ -1,4 +1,3 @@
-// tests/SetupTests.cs
 using api.Etc;
 using api.Models.Requests;
 using api.Services;
@@ -15,7 +14,6 @@ public class SetupTests(
     ITestOutputHelper output,
     IAuthService authService) : IAsyncLifetime
 {
-    // xUnit v3 lifecycle: use TestContext.Current.CancellationToken
     public async ValueTask InitializeAsync()
     {
         var ct = TestContext.Current.CancellationToken;
@@ -115,7 +113,6 @@ public class SetupTests(
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
 
-        // FindAsync overload with CancellationToken
         var found = await ctx.Players.FindAsync(
             new object[] { testId },
             ct
@@ -124,6 +121,5 @@ public class SetupTests(
         Assert.NotNull(found);
 
         output.WriteLine($"✓ Transaction isolation confirmed for player {testId}");
-        // After test: TestTransactionScope rolls back the transaction
     }
 }

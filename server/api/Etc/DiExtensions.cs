@@ -62,10 +62,8 @@ public static class DiExtensions
         logger.LogInformation("OpenAPI JSON with documentation saved at: " + openApiPath);
         logger.LogInformation("TypeScript client generated at: " + outputPath);
     }
-
-    /// <summary>
-    ///     Adds const objects with actual values for schemas marked with constant values
-    /// </summary>
+    
+    
     private static string AddConstantObjects(string code, OpenApiDocument document)
     {
         var constantExports = new List<string>();

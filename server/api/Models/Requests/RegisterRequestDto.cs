@@ -10,12 +10,10 @@ public class RegisterRequestDto
     [EmailAddress]
     public string Email { get; set; } = null!;
 
-    // Raw password, server will hash it
     [Required]
     [MinLength(8)]
     public string Password { get; set; } = null!;
 
-    // Simple confirm password check on the server
     [Required]
     [Compare(nameof(Password), ErrorMessage = "Passwords do not match")]
     public string ConfirmPassword { get; set; } = null!;

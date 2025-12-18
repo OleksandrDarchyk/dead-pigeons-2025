@@ -1,4 +1,3 @@
-// tests/PlayerServiceTests.cs
 using api.Models.Requests;
 using api.Services;
 using dataccess;
@@ -8,11 +7,6 @@ using ValidationException = Bogus.ValidationException;
 
 namespace tests.Services;
 
-/// <summary>
-/// Service-level tests for <see cref="PlayerService"/>.
-/// Verifies create, read, update, soft delete, filtering and sorting logic.
-/// Each test runs in its own transaction for full isolation.
-/// </summary>
 public class PlayerServiceTests(
     IPlayerService playerService,
     MyDbContext ctx,
@@ -20,30 +14,16 @@ public class PlayerServiceTests(
     ITestOutputHelper outputHelper,
     TestTransactionScope transaction) : IAsyncLifetime
 {
-    /// <summary>
-    /// Start a new database transaction before each test.
-    /// All changes will be rolled back by <see cref="TestTransactionScope"/>.
-    /// </summary>
+    // Start a new database transaction before each test.
+    // All changes will be rolled back by <see cref="TestTransactionScope"/>.
     public async ValueTask InitializeAsync()
     {
         var ct = TestContext.Current.CancellationToken;
         await transaction.BeginTransactionAsync(ct);
     }
-
-    /// <summary>
-    /// No extra async cleanup needed here.
-    /// Transaction rollback happens inside <see cref="TestTransactionScope.Dispose"/>.
-    /// </summary>
+    
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
-
-    // ---------------------------------------------------------------------
-    // Helper methods
-    // ---------------------------------------------------------------------
-
-    /// <summary>
-    /// Helper to create a Player entity with reasonable defaults.
-    /// Uses TimeProvider so tests remain deterministic and do not depend on DateTime.UtcNow.
-    /// </summary>
+    
     private Player CreatePlayer(
         string fullName,
         string email,
@@ -65,11 +45,7 @@ public class PlayerServiceTests(
             Deletedat = isDeleted ? now : null
         };
     }
-
-    // ============================================================
-    // CreatePlayer
-    // ============================================================
-
+    
     [Fact]
     public async Task CreatePlayer_Creates_InactivePlayer_WithUniqueEmail()
     {
@@ -136,8 +112,6 @@ public class PlayerServiceTests(
     [Fact]
     public async Task CreatePlayer_Throws_When_DtoInvalid()
     {
-        // This test depends on DataAnnotations existing on CreatePlayerRequestDto.
-        // If your DTO has no validation attributes, this test should be removed or adjusted.
         var dto = new CreatePlayerRequestDto
         {
             FullName = "A",
@@ -148,11 +122,7 @@ public class PlayerServiceTests(
         await Assert.ThrowsAsync<System.ComponentModel.DataAnnotations.ValidationException>(
             async () => await playerService.CreatePlayer(dto));
     }
-
-    // ============================================================
-    // GetPlayers (filtering + ordering)
-    // ============================================================
-
+    
     [Fact]
     public async Task GetPlayers_Filters_By_IsActive_And_DefaultSortsByFullNameAsc()
     {
@@ -205,11 +175,7 @@ public class PlayerServiceTests(
             new[] { "c@test.local", "b@test.local", "a@test.local" },
             result.Select(p => p.Email).ToArray());
     }
-
-    // ============================================================
-    // ActivatePlayer
-    // ============================================================
-
+    
     [Fact]
     public async Task ActivatePlayer_Sets_IsActive_And_ActivatedAt_When_Inactive()
     {
@@ -245,11 +211,7 @@ public class PlayerServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             async () => await playerService.ActivatePlayer(unknownId));
     }
-
-    // ============================================================
-    // DeactivatePlayer
-    // ============================================================
-
+    
     [Fact]
     public async Task DeactivatePlayer_Sets_IsActiveFalse_ForActivePlayer()
     {
@@ -278,11 +240,7 @@ public class PlayerServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             async () => await playerService.DeactivatePlayer(unknownId));
     }
-
-    // ============================================================
-    // SoftDeletePlayer
-    // ============================================================
-
+    
     [Fact]
     public async Task SoftDeletePlayer_Sets_DeletedAt_And_PlayerIsExcludedFromQueries()
     {
@@ -328,11 +286,7 @@ public class PlayerServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             async () => await playerService.SoftDeletePlayer(player.Id));
     }
-
-    // ============================================================
-    // GetPlayerById
-    // ============================================================
-
+    
     [Fact]
     public async Task GetPlayerById_Returns_Player_When_Exists_And_NotDeleted()
     {
@@ -376,11 +330,7 @@ public class PlayerServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             async () => await playerService.GetPlayerById(unknownId));
     }
-
-    // ============================================================
-    // UpdatePlayer
-    // ============================================================
-
+    
     [Fact]
     public async Task UpdatePlayer_Updates_FullName_And_Phone_When_EmailUnchanged()
     {

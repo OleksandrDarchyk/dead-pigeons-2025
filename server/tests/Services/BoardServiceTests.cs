@@ -1,4 +1,3 @@
-// server/tests/BoardServiceTests.cs
 using System.Globalization;
 using System.Security.Claims;
 using api.Models.Requests;
@@ -12,15 +11,6 @@ using DataAnnotationValidationException = System.ComponentModel.DataAnnotations.
 
 namespace tests.Services;
 
-/// <summary>
-/// Service-level tests for BoardService.
-/// Covers:
-/// - create board validation + balance rules
-/// - active/inactive player + active/inactive game rules
-/// - claim-based "current user" resolution
-/// - Saturday 17:00 DK cutoff rule
-/// - read methods ordering + soft delete filtering
-/// </summary>
 public class BoardServiceTests(
     IBoardService boardService,
     MyDbContext ctx,
@@ -36,21 +26,16 @@ public class BoardServiceTests(
 
     public ValueTask DisposeAsync()
     {
-        // IMPORTANT: guarantee rollback per test
         transaction.Dispose();
         return ValueTask.CompletedTask;
     }
-
-    // ------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------
+    
 
     private async Task<Game> CreateUniqueGame(bool isActive = true)
     {
         var ct  = TestContext.Current.CancellationToken;
         var now = timeProvider.GetUtcNow().UtcDateTime;
 
-        // Push into far future to avoid collisions with seeded games.
         var year = now.Year + 20;
 
         var existingWeeks = await ctx.Games
@@ -119,10 +104,7 @@ public class BoardServiceTests(
         await ctx.SaveChangesAsync(ct);
         return player;
     }
-
-    // ------------------------------------------------------------
-    // CreateBoard
-    // ------------------------------------------------------------
+    
 
     [Fact]
     public async Task CreateBoard_Succeeds_When_PlayerHasEnoughBalance_AndValidNumbers()
@@ -192,7 +174,6 @@ public class BoardServiceTests(
             RepeatWeeks = 0
         };
 
-        // If DTO has MinLength/MaxLength -> DataAnnotations exception.
         await Assert.ThrowsAsync<DataAnnotationValidationException>(
             async () => await boardService.CreateBoard(player.Id, dto));
     }
@@ -296,10 +277,7 @@ public class BoardServiceTests(
         await Assert.ThrowsAsync<ValidationException>(
             async () => await boardService.CreateBoard(player.Id, dto));
     }
-
-    // ------------------------------------------------------------
-    // GetBoardsForGame / GetBoardsForPlayer
-    // ------------------------------------------------------------
+    
 
     [Fact]
     public async Task GetBoardsForGame_Returns_OnlyNonDeletedBoards_ForGivenGame_OrderedByCreatedAt()
@@ -459,10 +437,7 @@ public class BoardServiceTests(
         Assert.All(result, b => Assert.Equal(player.Id, b.Playerid));
         Assert.Equal(new[] { newerBoard.Id, olderBoard.Id }, result.Select(b => b.Id).ToArray());
     }
-
-    // ------------------------------------------------------------
-    // Current user (claims)
-    // ------------------------------------------------------------
+    
 
     [Fact]
     public async Task CreateBoardForCurrentUser_ResolvesPlayerFromEmailClaim_AndCreatesBoard()
@@ -557,10 +532,7 @@ public class BoardServiceTests(
         Assert.Single(result);
         Assert.Equal(player.Id, result[0].Playerid);
     }
-
-    // ------------------------------------------------------------
-    // Saturday 17:00 DK cutoff
-    // ------------------------------------------------------------
+    
 
     private static TimeZoneInfo GetDanishTimeZoneForTests()
     {

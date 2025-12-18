@@ -9,8 +9,6 @@ public class TransactionResponseDto
     public string MobilePayNumber { get; set; } = null!;
 
     public int Amount { get; set; }
-
-    // "Pending", "Approved", "Rejected"
     public string Status { get; set; } = null!;
 
     public DateTime CreatedAt { get; set; }

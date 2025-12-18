@@ -17,7 +17,6 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // Normal path when the real app is starting
         ConfigureServices(builder.Services, builder.Configuration);
 
         var app = builder.Build();
@@ -26,13 +25,9 @@ public class Program
 
         app.Run();
     }
-
-    /// <summary>
-    /// Used by tests (Startup in the tests project)
-    /// </summary>
+    
     public static void ConfigureServices(IServiceCollection services)
     {
-        // Build configuration manually when tests call this overload
         var configuration = new ConfigurationBuilder()
             .SetBasePath(AppContext.BaseDirectory)
             .AddJsonFile("appsettings.json", optional: true)
@@ -44,23 +39,17 @@ public class Program
 
         ConfigureServices(services, configuration);
     }
-
-    /// <summary>
-    /// Shared registration, used by both the real app and the tests
-    /// </summary>
+    
     public static void ConfigureServices(IServiceCollection services, IConfiguration configuration)
     {
-        // TimeProvider + AppOptions + DbContext
         services.AddSingleton(TimeProvider.System);
-        services.InjectAppOptions();          // uses AppOptions from configuration (Db, JwtSecret)
+        services.InjectAppOptions();        
         services.AddMyDbContext();
 
-        // Admin bootstrap options (used in Production for initial Admin user)
         services
             .AddOptions<AdminBootstrapOptions>()
             .Bind(configuration.GetSection("AdminBootstrap"));
 
-        // Controllers + JSON configuration
         services.AddControllers().AddJsonOptions(opts =>
         {
             opts.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
@@ -68,8 +57,6 @@ public class Program
             opts.JsonSerializerOptions.MaxDepth = 32;
         });
 
-
-        // OpenAPI / Swagger + Sieve string constants
         services.AddOpenApiDocument(options =>
         {
             options.Title = "Dead Pigeons API";
@@ -89,7 +76,6 @@ public class Program
 
         services.AddCors();
 
-        // Application services
         services.AddScoped<IAuthService, AuthService>();
         
         services.AddScoped<ISeeder, TestSeeder>();
@@ -100,17 +86,11 @@ public class Program
         services.AddScoped<IGameService, GameService>();
         services.AddScoped<IBoardService, BoardService>();
         services.AddScoped<ITransactionService, TransactionService>();
-       
-        // Admin bootstrapper (one-time Admin creation in Production)
         services.AddScoped<AdminBootstrapper>();
 
-        // Password hasher (Argon2id)
         services.AddScoped<IPasswordHasher<User>, NSecArgon2idPasswordHasher>();
-
-        // JWT token service (used by JwtBearer validation)
         services.AddScoped<ITokenService, JwtService>();
         
-        // Authentication setup
         services
             .AddAuthentication(options =>
             {
@@ -123,7 +103,6 @@ public class Program
             {
                 options.TokenValidationParameters = JwtService.ValidationParameters(configuration);
 
-                // Simple debug logging
                 options.Events = new JwtBearerEvents
                 {
                     OnAuthenticationFailed = context =>
@@ -139,33 +118,25 @@ public class Program
                 };
             });
 
-        // Global "whitelist" style authorization:
-        // everything requires an authenticated user unless [AllowAnonymous] is used
+    
         services.AddAuthorization(options =>
         {
             options.FallbackPolicy = new AuthorizationPolicyBuilder()
                 .RequireAuthenticatedUser()
                 .Build();
         });
-
-        // Global exception handling (maps ValidationException etc. to ProblemDetails)
         services.AddExceptionHandler<GlobalExceptionHandler>();
         services.AddProblemDetails();
     }
 
     public static void ConfigureApp(WebApplication app)
     {
-        // Centralized exception handler should be early in the pipeline
         app.UseExceptionHandler();
-
-        // OpenAPI / Swagger / Scalar
         app.UseOpenApi();
         app.UseSwaggerUi();
         app.MapScalarApiReference(options =>
             options.OpenApiRoutePattern = "/swagger/v1/swagger.json"
         );
-
-        // CORS configuration
         app.UseCors(config =>
             config
                 .AllowAnyHeader()
@@ -173,14 +144,10 @@ public class Program
                 .AllowAnyOrigin()
                 .SetIsOriginAllowed(_ => true));
 
-        // Authentication + Authorization
         app.UseAuthentication();
         app.UseAuthorization();
-
-        // Map controllers
         app.MapControllers();
-
-        // Production: ensure games exist (Tip 1) + ensure there is at least one Admin user
+        
         if (app.Environment.IsProduction())
         {
             using var scope = app.Services.CreateScope();
@@ -198,14 +165,11 @@ public class Program
     
         Console.WriteLine($"ENV = {app.Environment.EnvironmentName}");
 
-        // Dev-only: generate TypeScript client and seed the database
         if (app.Environment.IsDevelopment())
         {
             app.GenerateApiClientsFromOpenApi("/../../client/src/core/api/generated/generated-client.ts")
                 .GetAwaiter()
                 .GetResult();
-
-            // Use Dev seeder here so we do NOT wipe the database on each run.
             using var scope = app.Services.CreateScope();
             var devSeeder = scope.ServiceProvider.GetRequiredService<DevSeeder>();
             devSeeder.Seed().GetAwaiter().GetResult();

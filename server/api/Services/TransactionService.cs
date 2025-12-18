@@ -13,8 +13,7 @@ public class TransactionService : ITransactionService
 {
     private readonly MyDbContext _ctx;
     private readonly TimeProvider _timeProvider;
-
-    // Local status constants to avoid magic strings
+    
     private const string StatusPending  = "Pending";
     private const string StatusApproved = "Approved";
     private const string StatusRejected = "Rejected";
@@ -24,14 +23,10 @@ public class TransactionService : ITransactionService
         _ctx = ctx;
         _timeProvider = timeProvider;
     }
-
-    // Admin: create transaction for a specific player
     public async Task<Transaction> CreateTransaction(AdminCreateTransactionRequestDto dto)
     {
-        // Validate DTO attributes (Required, MinLength, Range)
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
-        // Player must exist and not be soft-deleted
         var player = await _ctx.Players
             .FirstOrDefaultAsync(p => p.Id == dto.PlayerId && p.Deletedat == null);
 
@@ -40,7 +35,6 @@ public class TransactionService : ITransactionService
             throw new ValidationException("Player not found.");
         }
 
-        // Prevent duplicate MobilePay numbers (among non-deleted transactions)
         var exists = await _ctx.Transactions
             .AnyAsync(t => t.Mobilepaynumber == dto.MobilePayNumber && t.Deletedat == null);
 
@@ -69,23 +63,18 @@ public class TransactionService : ITransactionService
 
         return transaction;
     }
-
-    // Player: create transaction for the currently logged-in user
     public async Task<Transaction> CreateTransactionForCurrentUser(
         ClaimsPrincipal claims,
         CreateTransactionForCurrentUserRequestDto dto)
     {
-        // Validate basic DTO attributes
         Validator.ValidateObject(dto, new ValidationContext(dto), validateAllProperties: true);
 
-        // Email must be present in token
         var email = claims.FindFirst(ClaimTypes.Email)?.Value;
         if (string.IsNullOrWhiteSpace(email))
         {
             throw new ValidationException("Email not found in token.");
         }
 
-        // Look up player by email
         var player = await _ctx.Players
             .FirstOrDefaultAsync(p => p.Email == email && p.Deletedat == null);
 
@@ -94,7 +83,6 @@ public class TransactionService : ITransactionService
             throw new ValidationException("Player not found for this user.");
         }
 
-        // Reuse admin creation logic with correct PlayerId
         var adminDto = new AdminCreateTransactionRequestDto
         {
             PlayerId        = player.Id,
@@ -105,7 +93,6 @@ public class TransactionService : ITransactionService
         return await CreateTransaction(adminDto);
     }
 
-    // Admin: approve transaction
     public async Task<Transaction> ApproveTransaction(string transactionId)
     {
         if (string.IsNullOrWhiteSpace(transactionId))
@@ -130,7 +117,6 @@ public class TransactionService : ITransactionService
         return transaction;
     }
 
-    // Admin: reject transaction
     public async Task<Transaction> RejectTransaction(string transactionId)
     {
         if (string.IsNullOrWhiteSpace(transactionId))
@@ -149,16 +135,13 @@ public class TransactionService : ITransactionService
 
         transaction.Status = StatusRejected;
         transaction.Approvedat = null;
-        // Optionally later you can add a Reject(reason) overload and set Rejectionreason
 
         await _ctx.SaveChangesAsync();
         return transaction;
     }
 
-    // Admin: all transactions for a specific player
     public async Task<List<Transaction>> GetTransactionsForPlayer(string playerId)
     {
-        // For read-only list AsNoTracking is fine
         return await _ctx.Transactions
             .Where(t => t.Playerid == playerId && t.Deletedat == null)
             .Include(t => t.Player)
@@ -166,8 +149,6 @@ public class TransactionService : ITransactionService
             .AsNoTracking()
             .ToListAsync();
     }
-
-    // Admin: all pending transactions
     public async Task<List<Transaction>> GetPendingTransactions()
     {
         return await _ctx.Transactions
@@ -177,9 +158,7 @@ public class TransactionService : ITransactionService
             .AsNoTracking()
             .ToListAsync();
     }
-
-    //  history (Approved/Rejected, optionally filtered)
-    // ✅ History (Approved/Rejected, optionally filtered)
+    
     public async Task<List<Transaction>> GetTransactionsHistory(
         string? playerId = null,
         string? status = null)
@@ -215,8 +194,6 @@ public class TransactionService : ITransactionService
             .ToListAsync();
     }
 
-
-    // Current user: balance based on own boards and approved payments
     public async Task<PlayerBalanceResponseDto> GetBalanceForCurrentUser(ClaimsPrincipal claims)
     {
         var email = claims.FindFirst(ClaimTypes.Email)?.Value;
@@ -235,8 +212,6 @@ public class TransactionService : ITransactionService
 
         return await GetPlayerBalance(player.Id);
     }
-
-    // Current user: own transactions
     public async Task<List<Transaction>> GetTransactionsForCurrentUser(ClaimsPrincipal claims)
     {
         var email = claims.FindFirst(ClaimTypes.Email)?.Value;
@@ -255,8 +230,6 @@ public class TransactionService : ITransactionService
 
         return await GetTransactionsForPlayer(player.Id);
     }
-
-    // Shared balance calculation logic
     public async Task<PlayerBalanceResponseDto> GetPlayerBalance(string playerId)
     {
         var playerExists = await _ctx.Players
@@ -266,8 +239,7 @@ public class TransactionService : ITransactionService
         {
             throw new ValidationException("Player not found.");
         }
-
-        // Sum of approved transactions
+        
         var approvedAmount = await _ctx.Transactions
             .Where(t =>
                 t.Playerid == playerId &&
@@ -275,7 +247,6 @@ public class TransactionService : ITransactionService
                 t.Status == StatusApproved)
             .SumAsync(t => (int?)t.Amount) ?? 0;
 
-        // Sum of all board prices for this player
         var spentOnBoards = await _ctx.Boards
             .Where(b =>
                 b.Playerid == playerId &&

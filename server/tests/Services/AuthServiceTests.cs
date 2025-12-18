@@ -9,10 +9,7 @@ using ValidationException = Bogus.ValidationException;
 
 namespace tests.Services;
 
-/// <summary>
-/// Service-level tests for AuthService (login, register, token verification).
-/// These tests work directly against the real database in a transaction.
-/// </summary>
+// AuthService tests (register, login, token).
 public class AuthServiceTests(
     IAuthService authService,
     MyDbContext ctx,
@@ -20,18 +17,12 @@ public class AuthServiceTests(
     TimeProvider timeProvider,
     ITestOutputHelper output) : IAsyncLifetime
 {
-    /// <summary>
-    /// Each test runs in its own transaction which gets rolled back afterwards.
-    /// Also resets FakeTimeProvider because other test classes may change it.
-    /// </summary>
     public async ValueTask InitializeAsync()
     {
         var ct = TestContext.Current.CancellationToken;
         await transaction.BeginTransactionAsync(ct);
 
-        // IMPORTANT:
-        // Other tests (e.g. BoardService cutoff tests) may SetUtcNow(...) to a future date.
-        // That can break JWT validation ("token not yet valid").
+        // Reset fake time (JWT validation can fail if another test moved time forward).
         if (timeProvider is FakeTimeProvider fake)
         {
             fake.SetUtcNow(DateTime.UtcNow);
@@ -49,9 +40,7 @@ public class AuthServiceTests(
         return ValueTask.CompletedTask;
     }
 
-    /// <summary>
-    /// Helper for creating a Player entity with a given email and active/inactive status.
-    /// </summary>
+    // Creates a test player row.
     private Player CreatePlayer(string email, bool isActive = true)
     {
         var now = timeProvider.GetUtcNow().UtcDateTime;
@@ -76,7 +65,6 @@ public class AuthServiceTests(
         var email = $"{Guid.NewGuid()}@test.local";
         const string password = "StrongPassword123!";
 
-        // Arrange: create active player with this email
         var player = CreatePlayer(email, isActive: true);
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);
@@ -126,7 +114,6 @@ public class AuthServiceTests(
         var ct = TestContext.Current.CancellationToken;
         var email = $"{Guid.NewGuid()}@test.local";
 
-        // Player exists but is inactive
         var player = CreatePlayer(email, isActive: false);
         ctx.Players.Add(player);
         await ctx.SaveChangesAsync(ct);

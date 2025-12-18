@@ -6,8 +6,8 @@ namespace Api.Security;
 public static class ClaimExtensions
 {
     public static string GetUserId(this ClaimsPrincipal claims) =>
-        claims.FindFirst(ClaimTypes.NameIdentifier)?.Value   // default mapped claim
-        ?? claims.FindFirst("sub")?.Value                    // fallback to raw "sub"
+        claims.FindFirst(ClaimTypes.NameIdentifier)?.Value   
+        ?? claims.FindFirst("sub")?.Value                   
         ?? throw new InvalidOperationException("No user id claim found in token.");
 
     public static string? GetUserRole(this ClaimsPrincipal claims) =>
