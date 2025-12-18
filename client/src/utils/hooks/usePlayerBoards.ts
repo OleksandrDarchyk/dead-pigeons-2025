@@ -60,7 +60,7 @@ export function usePlayerBoards(enabled: boolean = true) {
             setIsLoading(false);
         }
     };
-
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (!enabled) {
             setIsLoading(false);
@@ -72,7 +72,6 @@ export function usePlayerBoards(enabled: boolean = true) {
         void loadBoards();
     }, [enabled]);
 
-    // Toggle a number in the board form
     const toggleNumber = (num: number) => {
         setForm((prev) => {
             const alreadySelected = prev.selectedNumbers.includes(num);
