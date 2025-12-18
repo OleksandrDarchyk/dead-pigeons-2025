@@ -130,8 +130,7 @@ create unique index idx_transactions_mp
 -- ==========================
 -- BALANCES
 -- ==========================
--- IMPORTANT:
--- We DO NOT store balance in a table.
+
 -- Balance is calculated in the backend as:
 --   sum(approved transactions.amount) - sum(boards.price) per player.
--- That is why we intentionally do NOT create a deadpigeons.balance table here.
+-- That is why  intentionally do NOT create a deadpigeons.balance table here.
