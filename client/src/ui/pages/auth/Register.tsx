@@ -1,4 +1,3 @@
-// src/pages/auth/Register.tsx
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "@core/state/auth";
@@ -43,14 +42,12 @@ export default function Register() {
         try {
             setIsLoading(true);
 
-            // Only email + passwords are sent to the API
             await register({
                 email: form.email.trim(),
                 password: form.password,
                 confirmPassword: form.confirmPassword,
             });
 
-            // On success, the auth hook will log the user in and redirect
         } catch (err) {
             console.error("Registration failed", err);
 
@@ -115,7 +112,6 @@ export default function Register() {
                 </p>
 
                 <form
-                    // Wrapper keeps React handler type as () => void, and we explicitly ignore the Promise from async handler
                     onSubmit={(e: FormEvent<HTMLFormElement>) => {
                         void handleSubmit(e);
                     }}

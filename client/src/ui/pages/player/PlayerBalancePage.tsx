@@ -1,4 +1,3 @@
-// client/src/pages/player/PlayerBalancePage.tsx
 import { useAuth } from "@core/state/auth";
 import { usePlayerBalance } from "@hooks/usePlayerBalance";
 import PlayerPaymentsSection from "./PlayerPaymentsSection";

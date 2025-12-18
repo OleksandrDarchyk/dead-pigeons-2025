@@ -1,4 +1,3 @@
-// client/src/pages/player/PlayerGuard.tsx
 import type { ReactNode } from "react";
 import { useAuth } from "@core/state/auth";
 
@@ -25,7 +24,6 @@ export default function PlayerGuard({ children }: PlayerGuardProps) {
         );
     }
 
-    // 2) токен є, але whoAmI ще не повернув юзера
     if (token && !user) {
         return (
             <div className="min-h-[calc(100vh-4rem)] bg-slate-50">

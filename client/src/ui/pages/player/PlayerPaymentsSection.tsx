@@ -1,10 +1,8 @@
-// client/src/pages/player/PlayerPaymentsSection.tsx
 import { usePlayerPayments } from "@hooks/usePlayerPayments";
 import type { FormEvent } from "react";
 
 export default function PlayerPaymentsSection() {
-    // Custom hook for player payments:
-    // keeps the list, the form state and the submit logic in one place
+
     const {
         payments,
         isLoading,
@@ -14,11 +12,6 @@ export default function PlayerPaymentsSection() {
         submitPayment,
     } = usePlayerPayments();
 
-    // Form submit handler:
-    // - prevent default browser navigation
-    // - call async submitPayment() from the hook
-    // We keep this function NON-async and use `void` so ESLint
-    // does not complain about a Promise-returning handler.
     const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         void submitPayment();
@@ -43,7 +36,6 @@ export default function PlayerPaymentsSection() {
                 className="mb-6 grid gap-3 md:grid-cols-[1fr,1fr,auto]"
             >
                 <input
-                    // Amount is kept as string in form state and validated in the hook
                     type="text"
                     className="input input-bordered w-full text-sm bg-slate-50"
                     placeholder="Amount (DKK)"
@@ -57,7 +49,6 @@ export default function PlayerPaymentsSection() {
                 />
 
                 <input
-                    // MobilePay number as free text (validated on the server side)
                     type="text"
                     className="input input-bordered w-full text-sm bg-slate-50"
                     placeholder="MobilePay number"
@@ -103,7 +94,6 @@ export default function PlayerPaymentsSection() {
                         </thead>
                         <tbody>
                         {payments.map((tx) => {
-                            // createdAt comes from the API; format as local date
                             const date =
                                 tx.createdAt &&
                                 new Date(

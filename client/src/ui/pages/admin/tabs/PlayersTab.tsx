@@ -1,4 +1,3 @@
-// src/pages/admin/tabs/PlayersTab.tsx
 
 import {
     useEffect,
@@ -21,19 +20,15 @@ type SortBy = "fullName" | "createdAt";
 type SortDirection = "asc" | "desc";
 
 export default function PlayersTab() {
-    // List of players from the API
     const [players, setPlayers] = useState<PlayerDto[]>([]);
-    // Map: playerId -> balance
     const [balances, setBalances] = useState<BalanceMap>({});
     const [isLoading, setIsLoading] = useState(true);
 
-    // Filters and sorting
     const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
     const [sortBy, setSortBy] = useState<SortBy>("fullName");
     const [sortDirection, setSortDirection] =
         useState<SortDirection>("asc");
 
-    // Form state (used for both create and edit)
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [fullName, setFullName] = useState("");
     const [phone, setPhone] = useState("");
@@ -41,11 +36,9 @@ export default function PlayersTab() {
     const [active, setActive] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    // If not null, form is in "edit" mode for this player id
     const [editingPlayerId, setEditingPlayerId] =
         useState<string | null>(null);
 
-    // Reset form to default "create new player" state
     const resetForm = () => {
         setFullName("");
         setPhone("");
@@ -194,45 +187,36 @@ export default function PlayersTab() {
         }
     };
 
-    // Open/close the form; when closing, leave edit mode
     const handleOpenForm = () => {
         if (!isFormOpen) {
-            // Opening: always start with fresh "create" form
             resetForm();
         } else {
-            // Closing: make sure we are not in edit mode anymore
             setEditingPlayerId(null);
         }
         setIsFormOpen((prev) => !prev);
     };
 
-    // Change filter: all / active / inactive
     const handleStatusFilterChange = (value: StatusFilter) => {
         setStatusFilter(value);
     };
 
-    // Change sorting: click on column header
     const handleSort = (column: SortBy) => {
         if (sortBy === column) {
-            // If we click same column → toggle direction
             setSortDirection(
                 sortDirection === "asc" ? "desc" : "asc"
             );
         } else {
-            // If we click new column → sort by it, ascending
             setSortBy(column);
             setSortDirection("asc");
         }
     };
 
-    // Helper to style filter buttons
     const filterButtonClass = (value: StatusFilter) =>
         "rounded-full px-3 py-1 text-xs font-semibold border " +
         (statusFilter === value
             ? "bg-slate-900 text-white border-slate-900"
             : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100");
 
-    // Helper to show arrow on current sort column
     const renderSortArrow = (column: SortBy) => {
         if (sortBy !== column) return null;
         return (

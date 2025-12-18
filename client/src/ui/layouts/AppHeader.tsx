@@ -1,4 +1,3 @@
-// src/components/layout/AppHeader.tsx
 import { Link } from "react-router-dom";
 import { useAuth } from "@core/state/auth";
 

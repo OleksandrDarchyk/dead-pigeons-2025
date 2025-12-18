@@ -1,4 +1,3 @@
-// src/pages/auth/Login.tsx
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { useAuth, type LoginCredentials } from "@core/state/auth";
@@ -7,7 +6,6 @@ import toast from "react-hot-toast";
 export default function Login() {
     const { login } = useAuth();
 
-    // Local state for the form
     const [form, setForm] = useState<LoginCredentials>({
         email: "",
         password: "",
@@ -15,7 +13,6 @@ export default function Login() {
 
     const [isLoading, setIsLoading] = useState(false);
 
-    // Async submit handler: validates form, calls global login hook and shows errors
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
@@ -27,16 +24,13 @@ export default function Login() {
         try {
             setIsLoading(true);
 
-            // Use global auth hook
             await login(form);
-            // On success, the hook will navigate to /admin or /player
         } catch (err) {
             console.error("Login failed", err);
 
             let message = "Login failed";
 
             try {
-                // NSwag ApiException usually має поле `response` з JSON-строкою
                 const apiErr = err as { response?: string };
 
                 if (apiErr.response) {
@@ -64,14 +58,12 @@ export default function Login() {
                     }
                 }
             } catch (parseError) {
-                // Якщо не вийшло прочитати JSON – залишаємо дефолтне повідомлення
                 console.error(
                     "Failed to parse login error response",
                     parseError,
                 );
             }
 
-            // Показуємо помилку як native bubble біля email
             const emailInput = document.querySelector<HTMLInputElement>(
                 'input[type="email"]',
             );
@@ -80,7 +72,6 @@ export default function Login() {
                 emailInput.reportValidity();
             }
 
-            // І плюс toast (як раніше)
             toast.error(message);
         } finally {
             setIsLoading(false);
@@ -115,7 +106,6 @@ export default function Login() {
                             placeholder="you@example.com"
                             value={form.email}
                             onChange={(e) => {
-                                // При зміні email забираємо старе повідомлення помилки
                                 e.target.setCustomValidity("");
                                 setForm({
                                     ...form,

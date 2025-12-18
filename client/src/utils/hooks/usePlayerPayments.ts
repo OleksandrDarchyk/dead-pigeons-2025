@@ -18,12 +18,10 @@ export function usePlayerPayments() {
         mobilePayNumber: "",
     });
 
-    // Load payments when the player page is opened
     const loadPayments = async () => {
         try {
             setIsLoading(true);
 
-            // getMyTransactions() вже типізований як TransactionResponseDto[]
             const list = await transactionsApi.getMyTransactions();
 
             setPayments(Array.isArray(list) ? list : []);
@@ -40,7 +38,6 @@ export function usePlayerPayments() {
     }, []);
 
     const submitPayment = async () => {
-        // Normalize amount: replace comma with dot and trim spaces
         const normalizedAmount = form.amount.replace(",", ".").trim();
         const amountNumber = Number(normalizedAmount);
 
@@ -65,7 +62,6 @@ export function usePlayerPayments() {
 
             toast.success("Payment submitted for approval");
 
-            // Reset form and reload list
             setForm({
                 amount: "",
                 mobilePayNumber: "",

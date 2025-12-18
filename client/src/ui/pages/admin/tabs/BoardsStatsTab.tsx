@@ -1,4 +1,3 @@
-// client/src/components/admin/BoardsStatsTab.tsx
 import { useEffect, useMemo, useState } from "react";
 import type {
     BoardResponseDto,
@@ -10,50 +9,38 @@ import { boardsApi } from "@core/api/boardsApi";
 import { playersApi } from "@core/api/playersApi";
 import toast from "react-hot-toast";
 
-
-
-// Boards are safe DTOs coming from the API
 type BoardWithPlayer = BoardResponseDto;
 
 export default function BoardsStatsTab() {
-    // All games history (active + finished + scheduled)
+
     const [games, setGames] = useState<GameResponseDto[]>([]);
 
-    // Selected game id for the dropdown (empty string means "nothing selected yet")
     const [selectedGameId, setSelectedGameId] = useState<string>("");
 
-    // Currently selected game (derived from games + selectedGameId)
     const selectedGame: GameResponseDto | null =
         games.find((g) => g.id === selectedGameId) ?? null;
 
-    // Boards for the selected game
     const [boards, setBoards] = useState<BoardWithPlayer[]>([]);
 
-    // Active players as DTOs (for resolving names)
     const [players, setPlayers] = useState<PlayerResponseDto[]>([]);
 
     const [isLoadingGames, setIsLoadingGames] = useState(true);
     const [isLoadingBoards, setIsLoadingBoards] = useState(false);
 
-    // Load games history and active players once
     useEffect(() => {
         const loadGamesAndPlayers = async () => {
             try {
                 setIsLoadingGames(true);
 
-                // Load all games (history)
                 const allGames = await gamesApi.getGamesHistory();
                 setGames(Array.isArray(allGames) ? allGames : []);
 
-                // Pick initial game:
-                // Prefer the active game, otherwise the first in the list
                 if (allGames.length > 0) {
                     const active = allGames.find((g) => g.isActive);
                     const initial = active ?? allGames[0];
                     setSelectedGameId(initial.id);
                 }
 
-                // Load active players for name resolution
                 const allPlayers = await playersApi.getPlayers(true);
                 setPlayers(Array.isArray(allPlayers) ? allPlayers : []);
             } catch (err) {
@@ -64,11 +51,9 @@ export default function BoardsStatsTab() {
             }
         };
 
-        // Explicitly ignore the Promise in effect
         void loadGamesAndPlayers();
     }, []);
 
-    // Load boards when selected game changes
     useEffect(() => {
         if (!selectedGameId) {
             setBoards([]);
@@ -93,11 +78,9 @@ export default function BoardsStatsTab() {
             }
         };
 
-        // Explicitly ignore the Promise in effect
         void loadBoardsForGame();
     }, [selectedGameId]);
 
-    // High-level statistics for the selected game
     const stats = useMemo(() => {
         if (!selectedGame) {
             return {
@@ -109,7 +92,6 @@ export default function BoardsStatsTab() {
             };
         }
 
-        // Unique players who actually bought at least one board in this game
         const playersInGame = new Set(boards.map((b) => b.playerId));
         const totalPlayersInGame = playersInGame.size;
 
@@ -118,7 +100,6 @@ export default function BoardsStatsTab() {
             .length;
         const winningBoards = boards.filter((b) => b.isWinning).length;
 
-        // Sum of board prices for this game
         const digitalRevenue = boards.reduce(
             (sum, b) => sum + (b.price ?? 0),
             0,
@@ -133,7 +114,6 @@ export default function BoardsStatsTab() {
         };
     }, [boards, selectedGame]);
 
-    // Resolve player name for a board using playerId from DTO and PlayerResponseDto list
     const getPlayerName = (board: BoardWithPlayer): string => {
         const player = players.find((p) => p.id === board.playerId);
         return player?.fullName ?? "Unknown player";

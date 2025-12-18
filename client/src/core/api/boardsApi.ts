@@ -1,4 +1,3 @@
-// src/utilities/boardsApi.ts
 import {
     BoardClient,
     type BoardResponseDto,
@@ -7,14 +6,6 @@ import {
 import { baseUrl } from "@core/config/baseUrl.ts";
 import { customFetch } from "@core/api/customFetch.ts";
 
-/**
- * NSwag BoardClient instance using customFetch.
- * Methods:
- * - createBoard
- * - getBoardsForGame
- * - getBoardsForPlayer
- * - getMyBoards
- */
 export const boardsApi = new BoardClient(baseUrl, { fetch: customFetch });
 
 // Optional DTO aliases

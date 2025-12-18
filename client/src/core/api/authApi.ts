@@ -1,4 +1,3 @@
-// src/utilities/authApi.ts
 import {
     AuthClient,
     type JwtResponse,
@@ -8,7 +7,6 @@ import {
 import { baseUrl } from "@core/config/baseUrl.ts";
 import { customFetch } from "@core/api/customFetch.ts";
 
-// Shared AuthClient instance using our customFetch (JWT + ProblemDetails)
 const client = new AuthClient(baseUrl, { fetch: customFetch });
 
 export const authApi = {
@@ -24,6 +22,4 @@ export const authApi = {
         return client.whoAmI();
     },
 };
-
-// Optional convenient type re-exports
 export type { LoginRequestDto, RegisterRequestDto, JwtResponse };

@@ -1,4 +1,3 @@
-// client/src/pages/player/PlayerTabs.tsx
 import { NavLink } from "react-router-dom";
 
 export default function PlayerTabs() {

@@ -1,7 +1,5 @@
-// src/pages/home/HomePage.tsx
 import HeroSection from "./components/HeroSection.tsx";
 
-// всередині src/pages/home/HomePage.tsx
 
 function HowItWorksSection() {
     return (

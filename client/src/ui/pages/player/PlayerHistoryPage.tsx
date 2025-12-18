@@ -1,16 +1,12 @@
-// client/src/pages/player/PlayerHistoryPage.tsx
 import { useAuth } from "@core/state/auth";
 import { usePlayerHistory } from "@hooks/usePlayerHistory";
 import PlayerGuard from "./PlayerGuard";
 import PlayerTabs from "./PlayerTabs";
 import type { GameResponseDto } from "@core/api/generated/generated-client";
 
-// Helper: read winning numbers from GameResponseDto and sort them
 function getWinningNumbers(game: GameResponseDto): number[] {
-    // If there are no winning numbers yet, return an empty array
     const numbers = game.winningNumbers ?? [];
 
-    // Return a sorted copy (smallest → biggest)
     return [...numbers].sort((a, b) => a - b);
 }
 
@@ -18,10 +14,8 @@ export default function PlayerHistoryPage() {
     const { user, token } = useAuth();
     const role = user?.role;
 
-    // Only real players (role "User") should see this page
     const isPlayer = Boolean(token && user && role === "User");
 
-    // Custom hook returns grouped history (GameResponseDto + PlayerGameHistoryItemDto[])
     const { items, isLoading } = usePlayerHistory(isPlayer);
 
     return (
@@ -135,16 +129,13 @@ export default function PlayerHistoryPage() {
                                             ) : (
                                                 <div className="space-y-3">
                                                     {boards.map((b, index) => {
-                                                        // Board numbers from the history DTO (fallback to empty array)
                                                         const boardNumbers =
                                                             b.numbers ?? [];
 
-                                                        // Stable key for React: prefer BoardId, fallback to index
                                                         const boardKey =
                                                             b.boardId ??
                                                             `${game.id}-board-${index}`;
 
-                                                        // How many numbers from this board match the winning ones
                                                         const matchedCount =
                                                             hasWinningNumbers
                                                                 ? boardNumbers.filter(
@@ -155,19 +146,14 @@ export default function PlayerHistoryPage() {
                                                                 ).length
                                                                 : 0;
 
-                                                        // What backend says about this board
                                                         const isWinnerFromServer =
                                                             b.isWinning ?? false;
 
-                                                        // Simple backup rule: board is winning
-                                                        // if it contains all winning numbers
                                                         const isWinnerByNumbers =
                                                             hasWinningNumbers &&
                                                             matchedCount ===
                                                             winningNumbers.length;
 
-                                                        // Final winner flag: trust the server first,
-                                                        // but keep our own calculation as a backup
                                                         const isWinner =
                                                             isWinnerFromServer ||
                                                             isWinnerByNumbers;

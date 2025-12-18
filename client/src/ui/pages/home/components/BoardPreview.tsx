@@ -1,4 +1,3 @@
-// src/pages/home/components/BoardPreview.tsx
 
 export default function BoardPreview() {
     return (

@@ -1,4 +1,3 @@
-// src/pages/home/components/HeroSection.tsx
 import { Link } from "react-router-dom";
 import BoardPreview from "./BoardPreview.tsx";
 

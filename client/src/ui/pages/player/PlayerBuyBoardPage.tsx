@@ -1,4 +1,3 @@
-// client/src/pages/player/PlayerBuyBoardPage.tsx
 import { useAuth } from "@core/state/auth";
 import PlayerGuard from "./PlayerGuard";
 import { usePlayerBoards } from "../../../utils/hooks/usePlayerBoards";
@@ -28,24 +27,20 @@ export default function PlayerBuyBoardPage() {
     const {
         balance,
         isLoading: isBalanceLoading,
-        reloadBalance, // used to refresh balance after buying a board
+        reloadBalance,
     } = usePlayerBalance(isPlayer);
 
     const numbersCount = form.selectedNumbers.length;
 
-    // Repeat is invalid when the user enters something outside 1–52
     const isRepeatInvalid =
         form.repeatEnabled && (form.repeatWeeks < 1 || form.repeatWeeks > 52);
 
-    // Do not allow buying a board if the total price (with repeat)
-    // is higher than the current balance.
     const notEnoughBalance =
         totalPrice !== null &&
         !isBalanceLoading &&
         balance !== null &&
         totalPrice > balance;
 
-    // Preview: list of weeks where this repeating board will be active
     const repeatSchedule =
         activeGame &&
         form.repeatEnabled &&
@@ -56,7 +51,7 @@ export default function PlayerBuyBoardPage() {
 
                 let week = activeGame.weekNumber;
                 let year = activeGame.year;
-                const totalWeeks = form.repeatWeeks; // includes current week
+                const totalWeeks = form.repeatWeeks;
 
                 for (let i = 0; i < totalWeeks; i++) {
                     list.push({ week, year });
@@ -72,7 +67,6 @@ export default function PlayerBuyBoardPage() {
             })()
             : [];
 
-    // Boards only for the current active game (nice, clean view for the player)
     const boardsForActiveGame =
         activeGame && boards.length > 0
             ? boards.filter((b) => b.gameId === activeGame.id)

@@ -1,4 +1,3 @@
-// client/src/pages/player/PlayerDashboardPage.tsx
 import { Link } from "react-router-dom";
 import { useAuth } from "@core/state/auth";
 import PlayerPaymentsSection from "./PlayerPaymentsSection";
@@ -29,18 +28,14 @@ export default function PlayerDashboardPage() {
         isLoading: isBoardsLoading,
     } = usePlayerBoards(isPlayer);
 
-    // Filter: show only boards for the current active game, or all history
     const [filterMode, setFilterMode] =
         useState<BoardFilterMode>("current");
 
-    // Choose which boards to show based on filterMode and activeGame
     const visibleBoards = useMemo(() => {
         if (filterMode === "all") {
             return boards;
         }
 
-        // "Current round" filter:
-        // keep only boards that belong to the currently active game
         if (!activeGame) {
             return [];
         }
@@ -61,8 +56,6 @@ export default function PlayerDashboardPage() {
         });
     }, [boards, activeGame, filterMode]);
 
-    // Placeholder handler for stopping repeating boards:
-    // when backend endpoint is ready, this will be replaced with a real API call.
     const handleStopRepeating = (board: BoardResponseDto) => {
         console.log("Stop repeating board", board.id);
         toast(

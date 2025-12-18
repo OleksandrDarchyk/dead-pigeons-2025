@@ -1,4 +1,3 @@
-// client/src/hooks/usePlayerBoards.ts
 import { useEffect, useState } from "react";
 import { boardsApi } from "@core/api/boardsApi";
 import { gamesApi } from "@core/api/gamesApi";
@@ -12,7 +11,6 @@ type BoardFormState = {
     repeatWeeks: number;
 };
 
-// Simple price table based on how many numbers are picked
 function getPriceForCount(count: number): number | null {
     switch (count) {
         case 5:
@@ -28,15 +26,9 @@ function getPriceForCount(count: number): number | null {
     }
 }
 
-/**
- * enabled = false → the hook is prepared but does not fire requests yet
- * (for example, until we know the user is logged in as a player).
- */
 export function usePlayerBoards(enabled: boolean = true) {
-    // Boards for the current logged-in player (DTOs, not raw EF entities)
     const [boards, setBoards] = useState<BoardResponseDto[]>([]);
 
-    // Active game (DTO)
     const [activeGame, setActiveGame] = useState<GameResponseDto | null>(null);
 
     const [isLoading, setIsLoading] = useState<boolean>(enabled);
@@ -48,9 +40,7 @@ export function usePlayerBoards(enabled: boolean = true) {
         repeatWeeks: 1,
     });
 
-    // Load active game and current player's boards
     const loadBoards = async () => {
-        // Якщо хук вимкнений – взагалі не робимо запитів
         if (!enabled) return;
 
         try {
@@ -118,11 +108,9 @@ export function usePlayerBoards(enabled: boolean = true) {
         }));
     };
 
-    // Create a new board for the active game
     const submitBoard = async () => {
         const count = form.selectedNumbers.length;
 
-        // Basic client-side validation for UX
         if (count < 5 || count > 8) {
             toast.error("You must pick between 5 and 8 numbers");
             return;
@@ -149,7 +137,6 @@ export function usePlayerBoards(enabled: boolean = true) {
         try {
             setIsSaving(true);
 
-            // Server will validate gameId, numbers, repeatWeeks and balance
             await boardsApi.createBoard({
                 gameId: activeGame.id,
                 numbers: form.selectedNumbers,
@@ -158,14 +145,12 @@ export function usePlayerBoards(enabled: boolean = true) {
 
             toast.success("Board created");
 
-            // Reset form after successful creation
             setForm({
                 selectedNumbers: [],
                 repeatEnabled: false,
                 repeatWeeks: 1,
             });
 
-            // Reload boards to reflect the new purchase
             await loadBoards();
         } catch (err) {
             console.error(err);
@@ -175,21 +160,12 @@ export function usePlayerBoards(enabled: boolean = true) {
         }
     };
 
-    /**
-     * Stop repeating a specific board for the current user.
-     * Backend:
-     *  - знайде борду по id + поточному гравцю
-     *  - поставить RepeatActive = false, RepeatWeeks = 0
-     *  - поверне оновлений BoardResponseDto
-     */
     const stopRepeating = async (boardId: string) => {
         try {
             setIsSaving(true);
 
             const updated = await boardsApi.stopRepeatingMyBoard({ boardId });
 
-            // Акуратно оновлюємо локальний список:
-            // замінюємо тільки цю одну борду, всі інші лишаються як були.
             setBoards((prev) =>
                 prev.map((b) => (b.id === updated.id ? updated : b)),
             );
@@ -203,7 +179,6 @@ export function usePlayerBoards(enabled: boolean = true) {
         }
     };
 
-    // Price preview
     const currentPrice = getPriceForCount(form.selectedNumbers.length);
     const totalPrice =
         currentPrice !== null
@@ -213,9 +188,7 @@ export function usePlayerBoards(enabled: boolean = true) {
     return {
         boards,
         activeGame,
-        // старе імʼя прапорця — нічого не ламаємо
         isLoading,
-        // нове імʼя, яке використовує сторінка PlayerBuyBoardPage
         isLoadingBoards: isLoading,
         isSaving,
         form,
@@ -227,7 +200,6 @@ export function usePlayerBoards(enabled: boolean = true) {
         setRepeatEnabled,
         setRepeatWeeks,
         stopRepeating,
-        // якщо десь ще захочеш вручну перезавантажувати
         reloadBoards: loadBoards,
     };
 }

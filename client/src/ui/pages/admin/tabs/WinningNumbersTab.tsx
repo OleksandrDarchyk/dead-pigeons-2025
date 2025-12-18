@@ -1,4 +1,3 @@
-// src/components/admin/WinningNumbersTab.tsx
 import { useEffect, useState, type FormEvent } from "react";
 import { gamesApi } from "@core/api/gamesApi";
 import type {
@@ -10,17 +9,14 @@ import toast from "react-hot-toast";
 
 
 export default function WinningNumbersTab() {
-    // Active game loaded from API
     const [activeGame, setActiveGame] = useState<GameResponseDto | null>(
         null,
     );
 
-    // Last closed game summary (after successful submit)
     const [summary, setSummary] = useState<GameResultSummaryDto | null>(
         null,
     );
 
-    // Local state for 3 winning numbers (number or empty string)
     const [n1, setN1] = useState<number | "">("");
     const [n2, setN2] = useState<number | "">("");
     const [n3, setN3] = useState<number | "">("");
@@ -40,18 +36,14 @@ export default function WinningNumbersTab() {
 
     // Load game on first render
     useEffect(() => {
-        // Explicitly ignore the Promise returned by the async loader
         void loadActiveGame();
     }, []);
 
-    // Available numbers 1–16
     const numbers = Array.from({ length: 16 }, (_, i) => i + 1);
 
-    // Async submit handler: validates and sends winning numbers to the API
     const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        // Basic client-side validation: all 3 numbers must be selected
         if (n1 === "" || n2 === "" || n3 === "") {
             toast.error("Please select all 3 winning numbers");
             return;
@@ -60,7 +52,6 @@ export default function WinningNumbersTab() {
         const chosen = [n1, n2, n3];
         const uniqueCount = new Set(chosen).size;
 
-        // All three must be distinct
         if (uniqueCount !== 3) {
             toast.error("Winning numbers must be different");
             return;
@@ -74,8 +65,6 @@ export default function WinningNumbersTab() {
         try {
             setIsSaving(true);
 
-            // Call API to set winning numbers for the active game.
-            // Backend returns a GameResultSummaryDto.
             const result = await gamesApi.setWinningNumbers({
                 gameId: activeGame.id,
                 winningNumbers: chosen,
@@ -98,8 +87,7 @@ export default function WinningNumbersTab() {
             await loadActiveGame();
         } catch (err) {
             console.error(err);
-            // Global customFetch already shows the server error message,
-            // this is just a fallback toast in case something else goes wrong
+
             toast.error("Failed to save winning numbers");
         } finally {
             setIsSaving(false);
@@ -121,7 +109,6 @@ export default function WinningNumbersTab() {
             </p>
 
             <form
-                // Wrap async handler so onSubmit receives a void-returning function
                 onSubmit={(e) => {
                     void handleSubmit(e);
                 }}

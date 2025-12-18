@@ -1,4 +1,3 @@
-// client/src/pages/admin/AdminDashboardPage.tsx
 import { useState } from "react";
 import { useAuth } from "@core/state/auth";
 
@@ -38,7 +37,6 @@ export default function AdminDashboardPage() {
 
     const role = user?.role;
 
-    // User is not logged in at all (no token)
     if (!token) {
         return (
             <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
@@ -54,7 +52,6 @@ export default function AdminDashboardPage() {
         );
     }
 
-    // Token exists, but user info is still loading (WhoAmI call)
     if (token && !user) {
         return (
             <div className="min-h-[calc(100vh-4rem)] bg-slate-50">
@@ -67,7 +64,6 @@ export default function AdminDashboardPage() {
         );
     }
 
-    // Logged in but not an admin
     if (role !== "Admin") {
         return (
             <div className="min-h-[calc(100vh-4rem)] bg-slate-50">

@@ -1,4 +1,3 @@
-// client/src/pages/admin/tabs/PaymentsTab.tsx
 
 import { useState } from "react";
 import { useAdminPayments } from "@hooks/useAdminPayments";
@@ -9,15 +8,7 @@ import {transactionsApi} from "@core/api/transactionsApi.ts";
 
 type HistoryStatusFilter = "All" | "Pending" | "Approved" | "Rejected";
 
-/**
- * Admin Payments tab:
- * - shows all pending MobilePay transactions
- * - lets admin approve / reject them
- * - lets admin create a new payment for a selected player
- * - shows transaction history for a chosen player
- */
 export default function PaymentsTab() {
-    // Pending payments + add-payment form state come from the hook
     const {
         pending,
         players,
@@ -32,20 +23,17 @@ export default function PaymentsTab() {
         saveNewPayment,
     } = useAdminPayments();
 
-    // History filter and data (admin side)
     const [historyPlayerId, setHistoryPlayerId] = useState<string>("");
     const [historyStatus, setHistoryStatus] =
         useState<HistoryStatusFilter>("All");
     const [history, setHistory] = useState<TransactionResponseDto[]>([]);
     const [isHistoryLoading, setIsHistoryLoading] = useState(false);
 
-    // Helper: show a readable player name from playerId
     const getPlayerName = (playerId: string): string => {
         const player = players.find((p) => p.id === playerId);
         return player?.fullName ?? "Unknown player";
     };
 
-    // Helper: update a single field in the "new payment" form
     const handleChange = (
         field: "playerId" | "amount" | "mobilePayNumber",
         value: string,
@@ -56,7 +44,6 @@ export default function PaymentsTab() {
         }));
     };
 
-    // Helper: reset form to default empty values
     const resetForm = () => {
         setForm({
             playerId: "",
@@ -65,7 +52,6 @@ export default function PaymentsTab() {
         });
     };
 
-    // Load transaction history for selected player + status
     const loadHistory = async () => {
         if (!historyPlayerId) {
             toast.error("Please select a player for history");
@@ -75,7 +61,6 @@ export default function PaymentsTab() {
         try {
             setIsHistoryLoading(true);
 
-            // "All" means no status filter on the API call
             const statusParam =
                 historyStatus === "All" ? undefined : historyStatus;
 
@@ -110,12 +95,10 @@ export default function PaymentsTab() {
                 <button
                     type="button"
                     onClick={() => {
-                        // When opening the form → start with a clean state
                         if (!isAdding) {
                             resetForm();
                             setIsAdding(true);
                         } else {
-                            // When closing → just hide the form
                             setIsAdding(false);
                         }
                     }}

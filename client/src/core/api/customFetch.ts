@@ -1,15 +1,6 @@
-// src/utilities/customFetch.ts
 import type { ProblemDetails } from "@core/api/generated/problemdetails.ts";
 import toast from "react-hot-toast";
 
-/**
- * HTTP client that:
- * - reads JWT from sessionStorage ("jwt")
- * - trims and removes quotes around token if they exist
- * - adds Authorization: Bearer <token>
- * - sets Accept: application/json if not provided
- * - shows toast if response is not ok and has ProblemDetails
- */
 export async function customFetch(
     url: RequestInfo,
     init?: RequestInit,
@@ -60,7 +51,6 @@ export async function customFetch(
             let message = "Unexpected error";
 
             if (problem) {
-                // Try to read first validation error from "errors"
                 const firstErrorFromErrors =
                     problem.errors &&
                     Object.values(problem.errors)
@@ -71,7 +61,6 @@ export async function customFetch(
                                 e.trim().length > 0,
                         );
 
-                // Fallback chain: errors -> detail -> title -> default
                 message =
                     firstErrorFromErrors ||
                     (problem.detail && problem.detail.trim()) ||
